@@ -1,9 +1,19 @@
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/db";
 import Link from "next/link";
 import { requirePanelAccess } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
 import { PanelNav } from "./PanelNav";
 import { GoWebLogo } from "@/components/brand/GoWebLogo";
 import { toggleOpen, logout } from "./actions";
+import { AutoPrinter } from "@/components/ThermalPrint";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { name: true, country: true } });
+  const pt = t?.country === "BR";
+  return { title: `${t?.name ?? "GoWeb"} — ${pt ? "Painel" : "Panel"} GoWeb`, robots: { index: false } };
+}
 
 export default async function PanelLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -48,7 +58,15 @@ export default async function PanelLayout({ children, params }: { children: Reac
           <Link href={`/painel/${slug}/plano`} className="underline">{T("Ver facturas y pagar", "Ver faturas e pagar")}</Link>
         </div>
       )}
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        {/* impressão automática em qualquer tela do painel, assim que o pedido chega */}
+        {access.areas.has("orders") && tenant.autoPrint && (
+          <div className="no-print mb-4">
+            <AutoPrinter slug={slug} enabled label={T("Reimprimir", "Reimprimir")} />
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

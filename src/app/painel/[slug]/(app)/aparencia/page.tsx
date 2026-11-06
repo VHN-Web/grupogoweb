@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
 import { THEMES, THEME_IDS } from "@/core/themes";
-import { ILLUSTRATIONS, ILLUSTRATION_KEYS } from "@/core/illustrations";
+import { ILLUSTRATION_KEYS, illustrationLabel } from "@/core/illustrations";
 import { Illustration } from "@/components/Illustration";
 import { saveAppearance } from "../actions";
 
@@ -12,7 +12,7 @@ export default async function AppearancePage({ params, searchParams }: { params:
   const { slug } = await params;
   const sp = await searchParams;
   const t = await requireTenantAdmin(slug, "appearance");
-  const { T } = panelI18n(t);
+  const { T, region } = panelI18n(t);
 
   return (
     <form action={saveAppearance.bind(null, slug)} className="mx-auto max-w-4xl space-y-6">
@@ -116,7 +116,7 @@ export default async function AppearancePage({ params, searchParams }: { params:
               <span className="grid aspect-square place-items-center rounded-xl border-2 border-line bg-paper text-[11px] text-muted peer-checked:border-ink">{T("Ninguna", "Nenhuma")}</span>
             </label>
             {ILLUSTRATION_KEYS.map((k) => (
-              <label key={k} className="cursor-pointer" title={ILLUSTRATIONS[k].label}>
+              <label key={k} className="cursor-pointer" title={illustrationLabel(k, region.locale)}>
                 <input type="radio" name="bannerIllustration" value={k} defaultChecked={t.bannerIllustration === k} className="peer sr-only" />
                 <span className="grid aspect-square place-items-center rounded-xl border-2 border-line bg-paper peer-checked:border-ink">
                   <Illustration name={k} size={44} />

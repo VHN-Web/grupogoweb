@@ -32,6 +32,7 @@ import { planName } from "@/core/plans";
 
 const Tc = (c: { country?: string | null }) => tr(getRegion(c.country).locale);
 import { hashPassword } from "@/lib/password";
+import { onInvoicePaidDocuments } from "./documents";
 import { appUrl, tenantPublicUrl } from "@/lib/urls";
 import type { Customer, Plan } from "@/db/schema";
 
@@ -192,16 +193,21 @@ export type CheckoutOutcome =
 
 export async function startCheckout(invoiceId: string, currency: Currency): Promise<CheckoutOutcome> {
   const inv = await db.query.invoices.findFirst({ where: eq(schema.invoices.id, invoiceId), with: { customer: true } });
-  if (!inv) throw new BillingError("Factura no encontrada");
-  if (inv.status !== "OPEN") throw new BillingError("Esta factura ya no está pendiente");
+  if (!inv) throw new BillingError("Fatura não encontrada");
+  const T = Tc(inv.customer);
+  if (inv.status !== "OPEN") throw new BillingError(T("Esta factura ya no está pendiente", "Esta fatura não está mais pendente"));
+  // Antes de pagar a implantação o cliente precisa ver o resumo e aceitar o contrato
+  if (inv.kind === "SETUP" && !inv.acceptedAt) {
+    throw new BillingError(T("Antes de pagar, leé el resumen y confirmá que estás de acuerdo.", "Antes de pagar, leia o resumo e confirme que está ciente e de acordo."));
+  }
   const amount = amountIn(inv, currency);
-  if (amount <= 0) throw new BillingError("Moneda no disponible para esta factura");
+  if (amount <= 0) throw new BillingError(T("Moneda no disponible para esta factura", "Moeda indisponível para esta fatura"));
 
   const settings = await getSettings();
   const providerId = gatewayMap(settings.gatewayByCurrency)[currency];
   const provider = getBillingProvider(providerId);
   if (!provider || !provider.isConfigured() || !provider.currencies.includes(currency)) {
-    throw new BillingError("Medio de pago no disponible para esta moneda. Elegí otra moneda.");
+    throw new BillingError(T("Medio de pago no disponible para esta moneda. Elegí otra moneda.", "Forma de pagamento indisponível no momento. Fale com o suporte."));
   }
 
   await db.update(schema.customers).set({ preferredCurrency: currency }).where(eq(schema.customers.id, inv.customerId));
@@ -220,7 +226,7 @@ export async function startCheckout(invoiceId: string, currency: Currency): Prom
     await db.update(schema.invoices).set({ provider: provider.id }).where(eq(schema.invoices.id, inv.id));
     return {
       kind: "instructions",
-      text: result.instructions || settings.manualInstructions || "Contactanos para coordinar el pago.",
+      text: result.instructions || settings.manualInstructions || T("Contactanos para coordinar el pago.", "Fale conosco para combinar o pagamento."),
       amount: formatMinor(amount, currency),
     };
   }
@@ -253,6 +259,31 @@ export async function markInvoicePaid(
 
   if (inv.kind === "SETUP") await onSetupPaid(inv.customerId);
   else await onSubscriptionPaid(inv.customerId);
+
+  // Contrato (implantação) + recibo/NFS-e, enviados por e-mail ao cliente contratante
+  const docs = await onInvoicePaidDocuments(inv);
+  const c = await db.query.customers.findFirst({ where: eq(schema.customers.id, inv.customerId) });
+  if (c && (docs.contractUrl || docs.receiptUrl)) {
+    const T = Tc(c);
+    const settings = await getSettings();
+    await notifyCustomer(
+      c,
+      `${settings.companyName}: ${docs.contractUrl ? T("tu contrato y recibo", "seu contrato e recibo") : T("tu recibo", "seu recibo")}`,
+      [
+        T(`Hola ${c.contactName}! Confirmamos tu pago (${inv.description}).`, `Olá ${c.contactName}! Confirmamos o seu pagamento (${inv.description}).`),
+        docs.contractUrl ? `${T("Contrato (guardá una copia)", "Contrato (guarde uma cópia)")}: ${docs.contractUrl}` : "",
+        docs.receiptUrl ? `${T("Recibo", "Recibo")}: ${docs.receiptUrl}` : "",
+        docs.contractUrl
+          ? T(
+              "Recordá: podés arrepentirte en hasta 7 días y no se cobra ninguna mensualidad; el valor de la implementación no es reembolsable (cláusula 4).",
+              "Lembrete: você pode se arrepender em até 7 dias e nenhuma mensalidade será cobrada; o valor da implantação não é reembolsável (cláusula 5).",
+            )
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    ).catch(() => null);
+  }
   return inv;
 }
 

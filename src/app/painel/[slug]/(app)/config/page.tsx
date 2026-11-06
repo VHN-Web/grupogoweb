@@ -1,4 +1,5 @@
 import { requireTenantAdmin } from "@/lib/auth";
+import { MoneyInput } from "@/components/forms/MoneyInput";
 import { openCredentials } from "@/lib/security";
 import { PAYMENT_METHODS, type Currency } from "@/core/types";
 import { panelI18n } from "@/lib/panel-i18n";
@@ -187,9 +188,9 @@ export default async function ConfigPage({ params, searchParams }: { params: Pro
           <Field label={T("Latitud del local", "Latitude do local")}><input name="lat" className="input" defaultValue={t.lat ?? ""} placeholder="-25.5097" /></Field>
           <Field label={T("Longitud del local", "Longitude do local")}><input name="lng" className="input" defaultValue={t.lng ?? ""} placeholder="-54.6111" /></Field>
           <Field label={T("Radio máximo (km)", "Raio máximo (km)")}><input name="deliveryMaxKm" className="input" defaultValue={t.deliveryMaxKm} /></Field>
-          <Field label={`${T("Tarifa base", "Taxa base")} (${sym})`}><input name="deliveryBaseFeePyg" className="input" inputMode="decimal" defaultValue={mi(t.deliveryBaseFeePyg)} /></Field>
-          <Field label={`${T("Por km", "Por km")} (${sym})`}><input name="deliveryPerKmPyg" className="input" inputMode="decimal" defaultValue={mi(t.deliveryPerKmPyg)} /></Field>
-          <Field label={`${T("Gratis desde", "Grátis a partir de")} (${sym})`}><input name="deliveryFreeOverPyg" className="input" inputMode="decimal" defaultValue={mi(t.deliveryFreeOverPyg)} placeholder={T("vacío = nunca", "vazio = nunca")} /></Field>
+          <Field label={`${T("Tarifa base", "Taxa base")} (${sym})`}><MoneyInput name="deliveryBaseFeePyg" currency={t.currency as Currency} defaultMinor={t.deliveryBaseFeePyg} /></Field>
+          <Field label={`${T("Por km", "Por km")} (${sym})`}><MoneyInput name="deliveryPerKmPyg" currency={t.currency as Currency} defaultMinor={t.deliveryPerKmPyg} /></Field>
+          <Field label={`${T("Gratis desde", "Grátis a partir de")} (${sym})`}><MoneyInput name="deliveryFreeOverPyg" currency={t.currency as Currency} defaultMinor={t.deliveryFreeOverPyg} placeholder={T("vacío = nunca", "vazio = nunca")} /></Field>
           <p className="text-xs text-muted sm:col-span-3">{T("Tip: en Google Maps, tocá tu local y copiá las coordenadas.", "Dica: no Google Maps, toque no seu local e copie as coordenadas.")}</p>
           <Save label={T("Guardar", "Salvar")} />
         </form>

@@ -8,8 +8,7 @@ export function Illustration({ name, size, className }: { name: string | null | 
       width={size}
       height={size}
       viewBox="0 0 100 100"
-      role="img"
-      aria-label={it.label}
+      aria-hidden="true"
       className={className}
       dangerouslySetInnerHTML={{ __html: it.svg }}
     />

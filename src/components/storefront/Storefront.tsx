@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, parseMajorToMinor, fromBase, toBase, type Rates } from "@/core/money";
-import { isValidName, tr, type Locale } from "@/core/region";
+import { formatCpf, isValidCpf, isValidName, tr, type Locale } from "@/core/region";
 import { getLabels, type Currency, type OrderType, type PaymentMethod } from "@/core/types";
 import type { PublicPaymentConfig } from "@/core/tenant-config";
 import { getTheme, type Theme, type ThemeId } from "@/core/themes";
@@ -838,6 +838,7 @@ function Checkout({
   const typeOptions = (["PICKUP", "DELIVERY"] as const).filter((t) => data.accepts[t]);
   const [type, setType] = useState<OrderType>(data.table ? "DINE_IN" : typeOptions[0] ?? "PICKUP");
   const [name, setName] = useState("");
+  const [cpf, setCpf] = useState("");
   const [phone, setPhone] = useState<string | null>(null); // E.164 válido ou null
   const [address, setAddress] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -945,9 +946,11 @@ function Checkout({
   const change = tenderedBase != null ? tenderedBase - total : null;
   const nameOk = isValidName(name);
   const phoneRequired = type === "DELIVERY";
+  const cpfOk = !cpf || isValidCpf(cpf);
 
   const canSubmit =
     nameOk &&
+    cpfOk &&
     !!method &&
     !submitting &&
     (!phoneRequired || !!phone) &&
@@ -965,6 +968,7 @@ function Checkout({
           slug: data.slug,
           customerName: name.trim(),
           customerPhone: phone,
+          customerDoc: cpf.replace(/\D/g, "") || null,
           type,
           tableCode: data.table?.code ?? null,
           address: type === "DELIVERY" ? address : null,
@@ -1009,6 +1013,26 @@ function Checkout({
           <NameInput id="name" value={name} onChange={setName} placeholder={T("Ej: Ana", "Ex: Ana")} />
           {name && !nameOk && <p className="mt-1 text-[12px] text-red-500">{T("Escribí al menos 2 letras", "Digite pelo menos 2 letras")}</p>}
         </div>
+        {data.country === "BR" && (
+          <div>
+            <label className="label" htmlFor="cpf">CPF na nota (opcional)</label>
+            <input
+              id="cpf"
+              className="input"
+              inputMode="numeric"
+              autoComplete="off"
+              value={cpf}
+              maxLength={14}
+              placeholder="000.000.000-00"
+              onChange={(e) => setCpf(formatCpf(e.target.value))}
+            />
+            {cpf && !cpfOk && (
+              <p className="mt-1 text-[12px] text-red-500">
+                {cpf.replace(/\D/g, "").length < 11 ? "Digite os 11 números do CPF ou deixe em branco" : "CPF inválido — confira os números"}
+              </p>
+            )}
+          </div>
+        )}
         {(type === "DELIVERY" || type === "PICKUP") && (
           <div>
             <label className="label" htmlFor="phone">

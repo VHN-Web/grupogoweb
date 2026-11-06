@@ -21,8 +21,12 @@ const Body = z.object({
 export async function POST(req: Request) {
   const limited = await tooMany(req, "agenda", 8, 600);
   if (limited) return limited;
-  const p = Body.safeParse(await req.json().catch(() => null));
-  if (!p.success) return NextResponse.json({ error: "Dados inválidos · Datos inválidos" }, { status: 400 });
+  const raw = await req.json().catch(() => null);
+  const p = Body.safeParse(raw);
+  if (!p.success) {
+    const tt = typeof raw?.slug === "string" ? await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, raw.slug), columns: { country: true } }) : null;
+    return NextResponse.json({ error: tr(getRegion(tt?.country).locale)("Revisá tu nombre y WhatsApp", "Confira seu nome e WhatsApp") }, { status: 400 });
+  }
   const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, p.data.slug) });
   if (!t || !isPro(t)) return NextResponse.json({ error: "—" }, { status: 404 });
   const T = tr(getRegion(t.country).locale);

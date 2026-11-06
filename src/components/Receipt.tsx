@@ -1,6 +1,6 @@
 import { formatMoney, MINOR_UNITS } from "@/core/money";
 import { getLabels, type Currency } from "@/core/types";
-import { formatPhone, getRegion, tr } from "@/core/region";
+import { formatCpf, formatPhone, getRegion, tr } from "@/core/region";
 import type { Order, OrderItem, Tenant } from "@/db/schema";
 
 /** Comprovante (no fiscal) gerado automaticamente para cada pedido. Formato ticket 80mm. */
@@ -23,6 +23,7 @@ export function Receipt({ tenant, order }: { tenant: Pick<Tenant, "name" | "ruc"
       <div className="mt-2 space-y-0.5">
         <p>{T("Fecha", "Data")}: {date}</p>
         <p>Cliente: {order.customerName}</p>
+        {order.customerDoc && <p>CPF: {formatCpf(order.customerDoc)}</p>}
         <p>
           Tipo: {L.orderType[order.type]}
           {order.tableLabel ? ` · ${order.tableLabel}` : ""}

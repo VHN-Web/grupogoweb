@@ -1,4 +1,5 @@
 import { desc, eq } from "drizzle-orm";
+import { customerCurrency, customerDocuments } from "@/services/documents";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
@@ -27,7 +28,8 @@ export default async function MyPlan({ params }: { params: Promise<{ slug: strin
   const c = await db.query.customers.findFirst({ where: eq(schema.customers.tenantId, t.id), with: { plan: true } });
   if (!c) return <p className="text-sm text-muted">{T("Este local no tiene un plan asociado.", "Este estabelecimento não tem plano associado.")}</p>;
   const invoices = await db.query.invoices.findMany({ where: eq(schema.invoices.customerId, c.id), orderBy: desc(schema.invoices.createdAt) });
-  const cur = c.preferredCurrency;
+  const cur = customerCurrency(c); // Brasil sempre em R$
+  const docs = await customerDocuments(c.id);
   const price = cur === "PYG" ? c.plan.pricePyg : cur === "USD" ? c.plan.priceUsdMinor : c.plan.priceBrlMinor;
 
   return (
@@ -57,6 +59,25 @@ export default async function MyPlan({ params }: { params: Promise<{ slug: strin
             <span className="min-w-40 flex-1">{i.description}<br /><span className="text-xs text-muted">{T("vence", "vence")} {fmtDate(i.dueAt)}</span></span>
             <b className={i.status === "PAID" ? "text-emerald-700" : ""}>{T(STATUS[i.status][0], STATUS[i.status][1])}</b>
             {i.status === "OPEN" && <a href={invoiceUrl(i.id)} className="btn-brand px-3 py-1.5 text-xs">{T("Pagar", "Pagar")}</a>}
+          </div>
+        ))}
+      </div>
+      <div className="card divide-y divide-line">
+        <h2 className="px-4 py-3 font-semibold">{T("Contrato y recibos", "Contrato e recibos")}</h2>
+        {docs.contracts.length === 0 && docs.receipts.length === 0 && (
+          <p className="px-4 py-3 text-sm text-muted">{T("Aparecen aquí después de cada pago.", "Aparecem aqui depois de cada pagamento.")}</p>
+        )}
+        {docs.contracts.map((d) => (
+          <div key={d.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+            <span className="min-w-40 flex-1">📄 {T("Contrato", "Contrato")} {d.number}<br /><span className="text-xs text-muted">{T("aceptado el", "aceito em")} {fmtDate(d.acceptedAt)}</span></span>
+            <a href={`/contrato/${d.id}`} target="_blank" className="btn-ghost px-3 py-1.5 text-xs">{T("Ver / imprimir", "Ver / imprimir")}</a>
+          </div>
+        ))}
+        {docs.receipts.map((r) => (
+          <div key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+            <span className="min-w-40 flex-1">🧾 {r.kind === "NFSE" ? T("Factura", "Nota fiscal") : T("Recibo", "Recibo")} {r.number}<br /><span className="text-xs text-muted">{r.description}</span></span>
+            <b>{formatMinor(r.amountMinor, r.currency)}</b>
+            <a href={`/recibo/${r.id}`} target="_blank" className="btn-ghost px-3 py-1.5 text-xs">{T("Ver", "Ver")}</a>
           </div>
         ))}
       </div>

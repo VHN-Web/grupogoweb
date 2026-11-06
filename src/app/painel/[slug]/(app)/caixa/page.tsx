@@ -6,6 +6,8 @@ import { panelI18n } from "@/lib/panel-i18n";
 import { formatMinor } from "@/core/money";
 import { PAYMENT_METHODS, CURRENCIES } from "@/core/types";
 import { CURRENCY_SYMBOL } from "@/core/money";
+import { MoneyInput } from "@/components/forms/MoneyInput";
+import type { Currency } from "@/core/types";
 import { getOpenSession, listSessions, summarizeSession } from "@/services/cash";
 import { PayBadge } from "@/components/PayBadge";
 import { addCashMovement, closeCash, markOrderPaid, openCash } from "../actions";
@@ -17,6 +19,7 @@ export default async function CashPage({ params }: { params: Promise<{ slug: str
   const t = await requireTenantAdmin(slug, "cash");
   const { T, L, fm, fmtDate, region } = panelI18n(t);
   const sym = CURRENCY_SYMBOL[t.currency as keyof typeof CURRENCY_SYMBOL];
+  const cur = t.currency as Currency;
   const session = await getOpenSession(t.id);
   const history = await listSessions(t.id, 10);
 
@@ -28,7 +31,7 @@ export default async function CashPage({ params }: { params: Promise<{ slug: str
           <p className="mt-1 text-sm text-muted">{T("Los pedidos se asocian a la caja abierta para el cierre del día.", "Os pedidos ficam ligados ao caixa aberto para o fechamento do dia.")}</p>
           <form action={openCash.bind(null, slug)} className="mt-4 space-y-3">
             <label className="label">{T("Fondo inicial en efectivo", "Fundo de troco inicial")} ({sym})</label>
-            <input name="openingAmountPyg" className="input" inputMode="decimal" defaultValue="0" />
+            <MoneyInput name="openingAmountPyg" currency={cur} defaultMinor={0} />
             <button className="btn-brand w-full">{T("Abrir caja", "Abrir caixa")}</button>
           </form>
         </div>
@@ -84,7 +87,7 @@ export default async function CashPage({ params }: { params: Promise<{ slug: str
               <option value="OUT">{T("Retiro / gasto", "Sangria / despesa")}</option>
               <option value="IN">{T("Ingreso", "Suprimento")}</option>
             </select>
-            <input name="amountPyg" className="input" inputMode="decimal" placeholder={`${T("Monto", "Valor")} ${sym}`} />
+            <MoneyInput name="amountPyg" currency={cur} placeholder={`${T("Monto", "Valor")} ${sym}`} required />
             <input name="description" className="input col-span-2" placeholder={T("Descripción (ej: hielo, cambio)", "Descrição (ex: gelo, troco)")} />
             <button className="btn-primary col-span-2">{T("Registrar", "Registrar")}</button>
           </form>
@@ -102,7 +105,7 @@ export default async function CashPage({ params }: { params: Promise<{ slug: str
           <h2 className="font-semibold">{T("Cerrar caja", "Fechar caixa")}</h2>
           <p className="mt-1 text-sm text-muted">{T("Contá el efectivo en", "Conte o dinheiro em")} {sym}. {T("Esperado", "Esperado")}: <b className="text-ink">{fm(s.expectedPygInDrawer)}</b></p>
           <form action={closeCash.bind(null, slug, session.id)} className="mt-3 space-y-2">
-            <input name="countedAmountPyg" className="input" inputMode="decimal" placeholder={`${T("Monto contado", "Valor contado")} (${sym})`} required />
+            <MoneyInput name="countedAmountPyg" currency={cur} placeholder={`${T("Monto contado", "Valor contado")} (${sym})`} required />
             <textarea name="notes" className="input" placeholder={T("Observaciones (otras monedas contadas, diferencias…)", "Observações (outras moedas, diferenças…)")} />
             <button className="btn-brand w-full">{T("Cerrar caja", "Fechar caixa")}</button>
           </form>

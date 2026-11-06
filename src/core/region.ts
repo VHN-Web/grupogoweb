@@ -185,3 +185,26 @@ export function formatPhone(e164: string | null | undefined): string {
   if (rule.country === "PY") return `+595 ${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}`;
   return `+${rule.dial} ${n.slice(0, 2)} ${n.slice(2, 6)} ${n.slice(6)}`;
 }
+
+// ---------------------------------------------------------------- CPF (Brasil)
+/** Valida CPF pelos dígitos verificadores. Aceita com ou sem pontuação. */
+export function isValidCpf(v: string): boolean {
+  const d = v.replace(/\D/g, "");
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const calc = (n: number) => {
+    let s = 0;
+    for (let i = 0; i < n; i++) s += Number(d[i]) * (n + 1 - i);
+    const r = (s * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return calc(9) === Number(d[9]) && calc(10) === Number(d[10]);
+}
+
+/** 12345678909 -> 123.456.789-09 (formata parcialmente enquanto digita). */
+export function formatCpf(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
+}

@@ -37,3 +37,15 @@ export const ILLUSTRATION_KEYS = Object.keys(ILLUSTRATIONS) as IllustrationKey[]
 export function isIllustration(k: string | null | undefined): k is IllustrationKey {
   return !!k && k in ILLUSTRATIONS;
 }
+
+const LABEL_PT: Record<string, string> = {
+  Hamburguesa: "Hambúrguer", "Papas fritas": "Batata frita", Gaseosa: "Refrigerante", Vino: "Vinho", Café: "Café",
+  Medialuna: "Croissant", Torta: "Bolo", Jugo: "Suco", Cerveza: "Cerveja", Trago: "Drinque", Remera: "Camiseta",
+  Calzado: "Calçado", Bolso: "Bolsa", Tijera: "Tesoura", Navaja: "Navalha", Peine: "Pente", Auriculares: "Fone de ouvido",
+  Labial: "Batom", Crema: "Creme",
+};
+/** Nome da ilustração no idioma da loja. */
+export function illustrationLabel(key: string, locale: "es" | "pt"): string {
+  const l = ILLUSTRATIONS[key as IllustrationKey]?.label ?? key;
+  return locale === "pt" ? (LABEL_PT[l] ?? l) : l;
+}

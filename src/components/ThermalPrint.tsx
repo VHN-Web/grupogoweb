@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 
 /** Dispara a impressão quando a página do comprovante termina de carregar. */
 export function PrintOnLoad() {
@@ -28,28 +28,57 @@ export function ThermalPrintButton({ url, label, className }: { url: string; lab
 }
 
 /**
- * Impressão automática: cada pedido novo que aparecer no quadro é impresso uma única vez
- * (controle no navegador, para não repetir ao recarregar).
+ * Impressão automática: assim que um pedido novo chega, ele é impresso (uma única vez —
+ * o servidor marca o pedido como impresso). Funciona com o painel de pedidos aberto.
+ * Para imprimir sem a janela de confirmação, abra o Chrome com --kiosk-printing.
  */
-export function AutoPrinter({ slug, orderIds, enabled }: { slug: string; orderIds: string[]; enabled: boolean }) {
-  const first = useRef(true);
+export function AutoPrinter({ slug, enabled, label = "Imprimir" }: { slug: string; enabled: boolean; label?: string }) {
+  const [pending, setPending] = useState<string[]>([]);
   useEffect(() => {
     if (!enabled) return;
-    const key = `gw_printed_${slug}`;
-    let printed: string[] = [];
-    try {
-      printed = JSON.parse(localStorage.getItem(key) ?? "[]");
-    } catch {}
-    // na primeira carga só marca os existentes, para não imprimir o histórico
-    if (first.current && printed.length === 0) {
-      first.current = false;
-      localStorage.setItem(key, JSON.stringify(orderIds));
-      return;
-    }
-    first.current = false;
-    const fresh = orderIds.filter((id) => !printed.includes(id));
-    fresh.forEach((id, i) => setTimeout(() => printUrl(`/painel/${slug}/imprimir/${id}`), i * 2500));
-    if (fresh.length) localStorage.setItem(key, JSON.stringify([...printed, ...fresh].slice(-300)));
-  }, [slug, orderIds, enabled]);
-  return null;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await fetch("/api/print-claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug }) });
+        const { ids } = (await r.json()) as { ids: string[] };
+        if (!alive || !ids?.length) return;
+        beep();
+        ids.forEach((id, i) => setTimeout(() => printUrl(`/painel/${slug}/imprimir/${id}`), i * 2500));
+        setPending((p) => [...p, ...ids].slice(-5));
+      } catch {}
+    };
+    tick();
+    const h = setInterval(tick, 4000);
+    return () => {
+      alive = false;
+      clearInterval(h);
+    };
+  }, [slug, enabled]);
+  if (!enabled || pending.length === 0) return null;
+  // se o navegador bloquear a impressão sem clique, o lojista reimprime aqui
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
+      <span>🖨️ Pedido novo enviado para a impressora.</span>
+      {pending.map((id) => (
+        <button key={id} type="button" className="underline" onClick={() => printUrl(`/painel/${slug}/imprimir/${id}`)}>
+          {label}
+        </button>
+      ))}
+      <button type="button" className="ml-auto text-xs opacity-70" onClick={() => setPending([])}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function beep() {
+  try {
+    const C = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new C();
+    const o = ctx.createOscillator();
+    o.frequency.value = 880;
+    o.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.25);
+  } catch {}
 }

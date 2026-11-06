@@ -31,7 +31,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             <F label="Nome do estabelecimento"><input name="businessName" className="input" required /></F>
             <F label="Endereço do cardápio (slug)"><input name="slug" className="input" placeholder="gerado do nome se vazio" /></F>
             <F label="País do estabelecimento">
-              <select name="country" className="input" defaultValue="PY">
+              <select name="country" className="input" defaultValue="BR">
                 {COUNTRIES.map((c) => (
                   <option key={c} value={c}>{REGIONS[c].name.pt} — moeda {REGIONS[c].currency}, idioma {REGIONS[c].locale === "pt" ? "português" : "espanhol"}</option>
                 ))}
@@ -44,8 +44,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             <F label="RUC / CNPJ / CPF (opcional)"><input name="ruc" className="input" /></F>
             <F label="Moeda preferida para pagar">
               <select name="currency" className="input" defaultValue="PYG">
-                <option value="PYG">Guaraníes (Gs.)</option>
-                <option value="USD">Dólares (US$)</option>
+                <option value="PYG">Guarani (Gs.)</option>
+                <option value="USD">Dólar (US$)</option>
                 <option value="BRL">Reais (R$)</option>
               </select>
             </F>

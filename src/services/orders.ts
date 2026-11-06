@@ -7,7 +7,7 @@ import { quoteDelivery } from "@/core/delivery";
 import { changeDue, formatMoney, fromBase, type Rates } from "@/core/money";
 import { checkCoupon, effectivePrice } from "@/core/intelligence";
 import { couponError, findCoupon, markCartRecovered } from "./intelligence";
-import { getRegion, isValidE164, isValidName, tr } from "@/core/region";
+import { getRegion, isValidCpf, isValidE164, isValidName, tr } from "@/core/region";
 import { parsePaymentConfig } from "@/core/tenant-config";
 import { CURRENCIES, ORDER_TYPES, PAYMENT_METHODS, type Currency, type OrderStatus, type PaymentStatus } from "@/core/types";
 import { getPaymentProvider } from "@/adapters/payments/registry";
@@ -49,6 +49,7 @@ export const createOrderSchema = z.object({
   cashTenderedMinor: z.number().int().min(0).optional().nullable(),
   couponCode: z.string().trim().max(30).optional().nullable(),
   cartId: z.string().max(60).optional().nullable(),
+  customerDoc: z.string().max(20).optional().nullable(), // CPF opcional (Brasil)
 });
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 
@@ -165,6 +166,14 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   }
   const totalPyg = subtotalPyg - discountPyg + deliveryFeePyg;
 
+  // ---- CPF na nota (opcional, só Brasil)
+  const docDigits = (input.customerDoc ?? "").replace(/\D/g, "");
+  let customerDoc: string | null = null;
+  if (docDigits && tenant.country === "BR") {
+    if (!isValidCpf(docDigits)) throw new OrderError("DOC", T("CPF inválido", "CPF inválido — confira os números ou deixe em branco"));
+    customerDoc = docDigits;
+  }
+
   // ---- Pagamento
   const payCfg = parsePaymentConfig(tenant.paymentConfig);
   const option = payCfg.options.find((o) => o.enabled && o.method === input.paymentMethod);
@@ -215,6 +224,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
         number,
         customerName: input.customerName,
         customerPhone: input.customerPhone ?? null,
+        customerDoc,
         type: input.type,
         tableId: table?.id ?? null,
         tableLabel: table?.label ?? null,

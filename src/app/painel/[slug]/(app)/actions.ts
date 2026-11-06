@@ -113,7 +113,17 @@ export async function saveProduct(slug: string, f: FormData) {
     durationMin: t.tier === "pro" && int(f, "durationMin") > 0 ? Math.min(480, int(f, "durationMin")) : null,
   };
   if (!values.name || values.pricePyg < 0) throw new Error("Dados inválidos");
-  if (values.categoryId) {
+  // categoria nova digitada no próprio formulário do produto
+  const newCat = str(f, "newCategory").slice(0, 40);
+  if (newCat) {
+    const same = await db.query.categories.findFirst({ where: and(eq(schema.categories.tenantId, t.id), eq(schema.categories.name, newCat)) });
+    if (same) values.categoryId = same.id;
+    else {
+      const n = await db.$count(schema.categories, eq(schema.categories.tenantId, t.id));
+      const [c] = await db.insert(schema.categories).values({ tenantId: t.id, name: newCat, sortOrder: n + 1 }).returning();
+      values.categoryId = c.id;
+    }
+  } else if (values.categoryId) {
     const c = await db.query.categories.findFirst({
       where: and(eq(schema.categories.id, values.categoryId), eq(schema.categories.tenantId, t.id)),
     });

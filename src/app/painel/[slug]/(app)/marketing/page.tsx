@@ -1,4 +1,5 @@
 import { and, asc, desc, eq } from "drizzle-orm";
+import { MoneyInput } from "@/components/forms/MoneyInput";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
@@ -99,7 +100,7 @@ export default async function MarketingPage({ params, searchParams }: { params: 
             <option value="FIXED">{sym}</option>
           </select>
           <input name="value" className="input" inputMode="decimal" placeholder={T("Valor", "Valor")} required />
-          <input name="minSubtotal" className="input" inputMode="decimal" placeholder={`${T("Mínimo", "Mínimo")} ${sym}`} />
+          <MoneyInput name="minSubtotal" currency={t.currency as Currency} placeholder={`${T("Mínimo", "Mínimo")} ${sym}`} />
           <input name="maxUses" className="input" inputMode="numeric" placeholder={T("Usos máx.", "Usos máx.")} />
           <input name="days" className="input" inputMode="numeric" placeholder={T("Válido (días)", "Válido (dias)")} />
           <button className="btn-primary sm:col-span-5">{T("Crear cupón", "Criar cupom")}</button>
@@ -145,7 +146,7 @@ export default async function MarketingPage({ params, searchParams }: { params: 
               </option>
             ))}
           </select>
-          <input name="promoPrice" className="input" inputMode="decimal" placeholder={`${T("Precio oferta", "Preço da oferta")} ${sym}`} required />
+          <MoneyInput name="promoPrice" currency={t.currency as Currency} placeholder={`${T("Precio oferta", "Preço da oferta")} ${sym}`} required />
           <select name="hours" className="input" defaultValue="2">
             <option value="1">1 h</option>
             <option value="2">2 h</option>

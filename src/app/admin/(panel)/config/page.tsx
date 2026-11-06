@@ -4,7 +4,7 @@ import { gatewayMap, getSettings } from "@/services/billing";
 import { Flash } from "@/components/Flash";
 import { saveSettings } from "../actions";
 
-const CUR = { PYG: "Guaraníes (Gs.)", USD: "Dólares (US$)", BRL: "Reais (R$)" } as const;
+const CUR = { PYG: "Guarani (Gs.)", USD: "Dólar (US$)", BRL: "Real (R$)" } as const;
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const sp = await searchParams;
@@ -43,7 +43,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             ))}
           </div>
           <F label="Instruções para pagamento manual (transferência / depósito)" className="mt-3">
-            <textarea name="manualInstructions" className="input min-h-24" defaultValue={s.manualInstructions ?? ""} placeholder={"Banco Itaú PY · Cuenta 000000 · Titular ...\nPix: chave@empresa.com\nEnviá el comprobante por WhatsApp."} />
+            <textarea name="manualInstructions" className="input min-h-24" defaultValue={s.manualInstructions ?? ""} placeholder={"Pix: sua-chave@email.com (Titular: Seu Nome)\nEnvie o comprovante pelo WhatsApp do suporte."} />
           </F>
           <p className="mt-2 text-xs text-muted">Credenciais ficam no servidor (variáveis de ambiente): MERCADOPAGO_ACCESS_TOKEN, MERCADOPAGO_WEBHOOK_SECRET. Webhook do Mercado Pago: <code>/api/billing/webhook/mercadopago</code>.</p>
         </Section>
@@ -54,6 +54,40 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <input name="domainUsd" className="input" defaultValue={s.domainPriceUsdMinor / 100} aria-label="US$" placeholder="US$" />
             <input name="domainBrl" className="input" defaultValue={s.domainPriceBrlMinor / 100} aria-label="R$" placeholder="R$" />
           </div>
+        </Section>
+
+        <Section title="Dados legais (aparecem no contrato e no recibo)" desc="Enquanto não houver CNPJ, use seu nome completo e CPF.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <F label="Razão social ou nome completo"><input name="legalName" className="input" defaultValue={s.legalName ?? ""} placeholder="Ex.: Lázaro da Silva" /></F>
+            <F label="CNPJ ou CPF"><input name="legalDoc" className="input" inputMode="numeric" defaultValue={s.legalDoc ?? ""} placeholder="000.000.000-00" /></F>
+            <F label="Endereço" className="sm:col-span-2"><input name="legalAddress" className="input" defaultValue={s.legalAddress ?? ""} /></F>
+            <F label="Cidade/UF (local da assinatura)"><input name="legalCity" className="input" defaultValue={s.legalCity ?? ""} placeholder="Abreu e Lima/PE" /></F>
+            <F label="Guardar contratos e recibos por (meses)"><input name="docsRetentionMonths" type="number" min={1} max={120} className="input" defaultValue={s.docsRetentionMonths} /></F>
+          </div>
+          <p className="mt-2 text-xs text-muted">Depois desse prazo, contratos e recibos antigos são apagados automaticamente — o contrato mais recente de cada cliente é sempre mantido. O cliente recebe a cópia por e-mail.</p>
+        </Section>
+
+        <Section title="Nota fiscal de serviço (NFS-e)" desc="Desligada: hoje cada pagamento gera um recibo. Ative quando tiver a conta PJ.">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="nfseEnabled" defaultChecked={s.nfseEnabled} /> Emitir NFS-e automaticamente a cada pagamento
+          </label>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <F label="Emissor">
+              <select name="nfseProvider" className="input" defaultValue={s.nfseProvider ?? ""}>
+                <option value="">— escolher —</option>
+                <option value="nacional">NFS-e Nacional (gov.br)</option>
+                <option value="focus">Focus NFe</option>
+                <option value="enotas">eNotas</option>
+              </select>
+            </F>
+            <F label="Inscrição municipal"><input name="nfseMunicipalReg" className="input" defaultValue={s.nfseMunicipalReg ?? ""} /></F>
+            <F label="Código do serviço (LC 116)"><input name="nfseServiceCode" className="input" defaultValue={s.nfseServiceCode ?? ""} placeholder="1.05" /></F>
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            {s.nfseEnabled
+              ? "✅ Ativada: novos pagamentos geram uma NFS-e com status \"em emissão\" na aba Notas, até a integração com o emissor ser concluída."
+              : "Só liga com CNPJ (14 dígitos) nos dados legais, inscrição municipal e emissor preenchidos. Até lá, os pagamentos geram recibos."}
+          </p>
         </Section>
 
         <Section title="Cobrança automática">

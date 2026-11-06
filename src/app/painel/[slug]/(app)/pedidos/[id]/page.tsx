@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
-import { formatPhone } from "@/core/region";
+import { formatCpf, formatPhone } from "@/core/region";
 import { Receipt } from "@/components/Receipt";
 import { PrintButton } from "@/components/PrintButton";
 import { ThermalPrintButton } from "@/components/ThermalPrint";
@@ -37,7 +37,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
           <PayBadge status={o.paymentStatus} locale={region.locale} />
         </div>
         <div className="card space-y-1 p-4 text-sm">
-          <p><span className="text-muted">Cliente:</span> {o.customerName} {o.customerPhone && `· ${formatPhone(o.customerPhone)}`}</p>
+          <p><span className="text-muted">Cliente:</span> {o.customerName} {o.customerPhone && `· ${formatPhone(o.customerPhone)}`}{o.customerDoc && ` · CPF ${formatCpf(o.customerDoc)}`}</p>
           <p><span className="text-muted">Tipo:</span> {L.orderType[o.type]} {o.tableLabel && `· ${o.tableLabel}`}</p>
           {o.address && <p><span className="text-muted">{T("Dirección:", "Endereço:")}</span> {o.address} {o.distanceKm != null && `(${o.distanceKm} km)`}</p>}
           {o.lat != null && o.lng != null && (
@@ -75,7 +75,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
             </p>
           ) : (
             <form action={issueInvoiceForOrder.bind(null, slug, o.id)} className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-              <input name="ruc" className="input" placeholder={T("RUC del cliente (opcional)", "CPF/CNPJ do cliente (opcional)")} />
+              <input name="ruc" className="input" defaultValue={o.customerDoc ?? ""} placeholder={T("RUC del cliente (opcional)", "CPF/CNPJ do cliente (opcional)")} />
               <input name="name" className="input" placeholder={T("Razón social", "Razão social")} defaultValue={o.customerName} />
               <button className="btn-primary">{T("Generar factura", "Gerar nota")}</button>
             </form>

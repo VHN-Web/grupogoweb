@@ -6,7 +6,6 @@ import { panelI18n } from "@/lib/panel-i18n";
 import { formatMinor, formatPyg } from "@/core/money";
 import { type OrderStatus } from "@/core/types";
 import { AutoRefresh } from "@/components/AutoRefresh";
-import { AutoPrinter } from "@/components/ThermalPrint";
 import { listAbandonedCarts, notifyOwnerAbandoned } from "@/services/intelligence";
 import { PayBadge } from "@/components/PayBadge";
 import { markOrderPaid, updateOrderStatus } from "./actions";
@@ -45,7 +44,6 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
   return (
     <div className="space-y-6">
       <AutoRefresh ms={5000} />
-      <AutoPrinter slug={slug} enabled={t.autoPrint} orderIds={orders.filter((o) => o.status !== "CANCELLED").map((o) => o.id)} />
       {(abandoned > 0 || pendingAppts > 0) && (
         <div className="flex flex-wrap gap-2">
           {pendingAppts > 0 && (

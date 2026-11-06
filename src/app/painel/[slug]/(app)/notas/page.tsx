@@ -1,4 +1,5 @@
 import { desc, eq } from "drizzle-orm";
+import { MoneyInput } from "@/components/forms/MoneyInput";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
@@ -59,7 +60,7 @@ export default async function FiscalPage({ params, searchParams }: { params: Pro
           <input name="issuedAt" type="date" className="input" />
           <input name="partyRuc" className="input" placeholder={dir === "ISSUED" ? `${region.taxIdLabel} ${T("del cliente", "do cliente")}` : `${region.taxIdLabel} ${T("del proveedor", "do fornecedor")}`} />
           <input name="partyName" className="input" placeholder={T("Razón social", "Razão social")} />
-          <input name="totalPyg" className="input" inputMode="decimal" placeholder={`Total ${sym}`} required />
+          <MoneyInput name="totalPyg" currency={t.currency as Currency} placeholder={`Total ${sym}`} required />
           {isPY ? (
             <select name="iva" className="input">
               <option value="10">IVA 10% incluido</option>

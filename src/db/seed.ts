@@ -3,6 +3,7 @@
 // Senha de todos os painéis demo: demo1234
 import "dotenv/config";
 import { sealCredentials } from "../lib/secrets";
+import { planToPt } from "../core/plans";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { hashPassword } from "@/lib/password";
 import { createDb, type DB } from "./client";
@@ -507,8 +508,17 @@ async function sealStoredCredentials(db: DB) {
   }
 }
 
+/** Admin em português: nomes e recursos dos planos cadastrados em espanhol passam para PT (o site do Paraguai traduz de volta). */
+async function plansToPortuguese(db: DB) {
+  for (const p of await db.query.plans.findMany()) {
+    const pt = planToPt(p);
+    if (pt.name !== p.name || pt.features !== p.features) await db.update(schema.plans).set(pt).where(eq(schema.plans.id, p.id));
+  }
+}
+
 async function demoExtras(db: DB) {
   await sealStoredCredentials(db);
+  await plansToPortuguese(db);
   const demos = await db.query.tenants.findMany({ where: inArray(schema.tenants.slug, STORES.map((s) => s.slug)) });
   for (const t of demos) {
     const pt = t.country === "BR";
@@ -598,7 +608,7 @@ async function main() {
       supportEmail: "suporte@goweboficial.com",
       // Em dev tudo usa o gateway SIMULADO. Em produção troque BRL para "mercadopago" em /admin/config.
       gatewayByCurrency: JSON.stringify({ PYG: "mock", USD: "mock", BRL: "mock" }),
-      manualInstructions: "Transferencia: Banco XXXX · Cuenta 000000 · Titular GoWeb\nEnviá el comprobante por WhatsApp.",
+      manualInstructions: "Pix ou transferência para a conta da GoWeb.\nEnvie o comprovante pelo WhatsApp do suporte.",
     })
     .onConflictDoNothing();
 

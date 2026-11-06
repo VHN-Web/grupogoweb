@@ -33,6 +33,18 @@ const FEATURE_PT: Record<string, string> = {
   "Equipo con login y permisos": "Equipe com login e permissões",
   "Informe de cierre de caja por e-mail/WhatsApp": "Relatório de fechamento de caixa por e-mail/WhatsApp",
 };
+const FEATURE_ES: Record<string, string> = Object.fromEntries(Object.entries(FEATURE_PT).map(([es, pt]) => [pt, es]));
+
+/** Funciona nos dois sentidos: o plano pode estar cadastrado em espanhol ou em português. */
 export function planFeature(f: string, locale: "es" | "pt"): string {
-  return locale === "pt" ? (FEATURE_PT[f.trim()] ?? f) : f;
+  const k = f.trim();
+  return locale === "pt" ? (FEATURE_PT[k] ?? f) : (FEATURE_ES[k] ?? f);
+}
+
+/** Converte nome e recursos cadastrados em espanhol para português (migração do admin). */
+export function planToPt(p: { name: string; features: string | null }) {
+  return {
+    name: planName(p.name, "pt"),
+    features: p.features == null ? null : p.features.split("\n").map((l) => planFeature(l, "pt")).join("\n"),
+  };
 }

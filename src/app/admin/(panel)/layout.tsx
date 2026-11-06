@@ -4,6 +4,7 @@ import { GoWebLogo } from "@/components/brand/GoWebLogo";
 import { adminLogout } from "./actions";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "GoWeb — Administração", robots: { index: false } };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requirePlatformAdmin();

@@ -4,6 +4,8 @@ import { setSession } from "@/lib/auth";
 import { audit, clearLimit, clientIp, isLimited, rateLimit } from "@/lib/security";
 import { AuthShell } from "@/components/brand/AuthShell";
 
+export const metadata = { title: "GoWeb — Administração", robots: { index: false } };
+
 async function login(f: FormData) {
   "use server";
   const expected = process.env.PLATFORM_ADMIN_PASSWORD ?? "";

@@ -6,6 +6,12 @@ import { audit, clearLimit, clientIp, isLimited, rateLimit } from "@/lib/securit
 import { AuthShell } from "@/components/brand/AuthShell";
 import { getRegion, tr } from "@/core/region";
 
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { name: true, country: true } });
+  return { title: `${t?.name ?? "GoWeb"} — ${t?.country === "BR" ? "Entrar no painel" : "Ingresar al panel"}`, robots: { index: false } };
+}
+
 export default async function Login({
   params,
   searchParams,

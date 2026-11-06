@@ -220,6 +220,8 @@ export const orders = pgTable(
     number: text("number").notNull(), // número curto aleatório para o cliente ("4821")
     customerName: text("customer_name").notNull(),
     customerPhone: text("customer_phone"),
+    customerDoc: text("customer_doc"), // CPF opcional (só dígitos) — "CPF na nota"
+    printedAt: timestamp("printed_at", { withTimezone: true }), // impressão automática (uma vez só)
     type: text("type").$type<OrderType>().notNull(),
     tableId: text("table_id").references(() => diningTables.id, { onDelete: "set null" }),
     tableLabel: text("table_label"), // snapshot
@@ -317,6 +319,18 @@ export const platformSettings = pgTable("platform_settings", {
   manualInstructions: text("manual_instructions"),
   invoiceDaysBefore: integer("invoice_days_before").notNull().default(5), // gera a fatura X dias antes do vencimento
   graceDays: integer("grace_days").notNull().default(7), // dias de atraso até suspender
+  // Dados da contratada (aparecem no contrato). Enquanto não houver CNPJ, vale o CPF do titular.
+  legalName: text("legal_name"), // razão social ou nome completo do titular
+  legalDoc: text("legal_doc"), // CNPJ ou CPF
+  legalAddress: text("legal_address"),
+  legalCity: text("legal_city"), // foro / cidade do contrato
+  // Nota fiscal de serviço (NFS-e): desligada até cadastrar a conta PJ
+  nfseEnabled: boolean("nfse_enabled").notNull().default(false),
+  nfseProvider: text("nfse_provider"), // "nacional" | "focus" | "enotas" (a integrar)
+  nfseMunicipalReg: text("nfse_municipal_reg"), // inscrição municipal
+  nfseServiceCode: text("nfse_service_code"), // item da lista de serviços (LC 116) — ex.: 1.03 / 1.05
+  // Retenção de contratos e notas/recibos no sistema (meses)
+  docsRetentionMonths: integer("docs_retention_months").notNull().default(12),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -394,9 +408,62 @@ export const invoices = pgTable(
     provider: text("provider"),
     providerRef: text("provider_ref"),
     checkoutUrl: text("checkout_url"),
+    // Aceite do resumo/contrato antes de pagar (Decreto 7.962/2013 e CDC art. 46)
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    acceptedIp: text("accepted_ip"),
+    acceptedUa: text("accepted_ua"),
     createdAt: createdAt(),
   },
   (t) => [index("invoices_customer_idx").on(t.customerId), index("invoices_status_idx").on(t.status, t.dueAt)],
+);
+
+// Contratos aceitos pelos clientes contratantes (cópia fiel do texto aceito)
+export const contracts = pgTable(
+  "contracts",
+  {
+    id: id(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    invoiceId: text("invoice_id"),
+    number: text("number").notNull(), // ex.: GW-2026-000123
+    version: text("version").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(), // texto completo, congelado no momento do aceite
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull(),
+    acceptedIp: text("accepted_ip"),
+    acceptedUa: text("accepted_ua"),
+    accessKey: text("access_key").notNull(), // link privado para o cliente baixar/imprimir
+    createdAt: createdAt(),
+  },
+  (t) => [index("contracts_customer_idx").on(t.customerId, t.createdAt)],
+);
+
+// Nota fiscal de serviço (NFS-e) ou, enquanto não houver PJ, recibo de pagamento
+export const serviceInvoices = pgTable(
+  "service_invoices",
+  {
+    id: id(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    invoiceId: text("invoice_id"),
+    kind: text("kind").$type<"RECEIPT" | "NFSE">().notNull(), // RECIBO (sem PJ) | NFS-e
+    status: text("status").$type<"ISSUED" | "PENDING" | "ERROR">().notNull(),
+    number: text("number").notNull(),
+    description: text("description").notNull(),
+    currency: text("currency").$type<Currency>().notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    takerName: text("taker_name").notNull(),
+    takerDoc: text("taker_doc"),
+    externalId: text("external_id"), // id/chave da NFS-e no provedor
+    pdfUrl: text("pdf_url"),
+    error: text("error"),
+    accessKey: text("access_key").notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("service_invoices_customer_idx").on(t.customerId, t.createdAt)],
 );
 
 export const adminTasks = pgTable("admin_tasks", {
@@ -565,6 +632,14 @@ export const customersRelations = relations(customers, ({ one, many }) => ({
   tenant: one(tenants, { fields: [customers.tenantId], references: [tenants.id] }),
   invoices: many(invoices),
   tasks: many(adminTasks),
+  contracts: many(contracts),
+  serviceInvoices: many(serviceInvoices),
+}));
+export const contractsRelations = relations(contracts, ({ one }) => ({
+  customer: one(customers, { fields: [contracts.customerId], references: [customers.id] }),
+}));
+export const serviceInvoicesRelations = relations(serviceInvoices, ({ one }) => ({
+  customer: one(customers, { fields: [serviceInvoices.customerId], references: [customers.id] }),
 }));
 export const invoicesRelations = relations(invoices, ({ one }) => ({
   customer: one(customers, { fields: [invoices.customerId], references: [customers.id] }),
@@ -589,3 +664,5 @@ export type Cart = typeof carts.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
 export type Staff = typeof staff.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type Contract = typeof contracts.$inferSelect;
+export type ServiceInvoice = typeof serviceInvoices.$inferSelect;

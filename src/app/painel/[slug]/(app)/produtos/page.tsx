@@ -1,11 +1,12 @@
 import { asc, desc, eq } from "drizzle-orm";
+import { MoneyInput } from "@/components/forms/MoneyInput";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
 import { CURRENCY_SYMBOL, minorToInput } from "@/core/money";
 import type { Currency } from "@/core/types";
 import type { Category, Product } from "@/db/schema";
-import { ILLUSTRATIONS, ILLUSTRATION_KEYS } from "@/core/illustrations";
+import { ILLUSTRATION_KEYS, illustrationLabel } from "@/core/illustrations";
 import { Illustration } from "@/components/Illustration";
 import { adjustStock, deleteCategory, deleteProduct, saveCategory, saveProduct } from "../actions";
 
@@ -89,7 +90,7 @@ export default async function ProductsPage({ params, searchParams }: { params: P
         </div>
       </div>
 
-      <aside className="space-y-4">
+      <aside className="order-first space-y-4 lg:order-none">
         <div className="card p-4">
           <h2 className="font-semibold">{T("Categorías", "Categorias")}</h2>
           <ul className="mt-3 space-y-2">
@@ -140,7 +141,7 @@ function ProductForm({ slug, cats, p, T, cur, pro }: { slug: string; cats: Categ
       </div>
       <div>
         <label className="label">{T("Precio", "Preço")} ({CURRENCY_SYMBOL[cur]})</label>
-        <input name="pricePyg" className="input" inputMode="decimal" defaultValue={minorToInput(p?.pricePyg, cur)} placeholder={cur === "PYG" ? "25000" : "24,90"} required />
+        <MoneyInput name="pricePyg" currency={cur} defaultMinor={p?.pricePyg ?? null} required />
       </div>
       <div className="sm:col-span-2">
         <label className="label">{T("Descripción", "Descrição")}</label>
@@ -154,6 +155,7 @@ function ProductForm({ slug, cats, p, T, cur, pro }: { slug: string; cats: Categ
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
+        <input name="newCategory" className="input mt-2" maxLength={40} placeholder={cats.length ? T("…o creá una nueva categoría", "…ou crie uma nova categoria") : T("Creá la primera categoría (ej.: Bebidas)", "Crie a primeira categoria (ex.: Bebidas)")} />
       </div>
       <div>
         <label className="label">{T("Foto (JPG/PNG/WEBP, máx. 4 MB)", "Foto (JPG/PNG/WEBP, máx. 4 MB)")}</label>
@@ -173,7 +175,7 @@ function ProductForm({ slug, cats, p, T, cur, pro }: { slug: string; cats: Categ
         <select name="illustration" className="input" defaultValue={p?.illustration ?? ""}>
           <option value="">{T("Ninguna", "Nenhuma")}</option>
           {ILLUSTRATION_KEYS.map((k) => (
-            <option key={k} value={k}>{ILLUSTRATIONS[k].label}</option>
+            <option key={k} value={k}>{illustrationLabel(k, cur === "BRL" ? "pt" : "es")}</option>
           ))}
         </select>
       </div>

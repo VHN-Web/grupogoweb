@@ -171,6 +171,16 @@ export async function saveSettings(f: FormData) {
       manualInstructions: str(f, "manualInstructions") || null,
       invoiceDaysBefore: Math.max(0, Number(str(f, "invoiceDaysBefore")) || 5),
       graceDays: Math.max(1, Number(str(f, "graceDays")) || 7),
+      legalName: str(f, "legalName") || null,
+      legalDoc: str(f, "legalDoc").replace(/[^\d./-]/g, "") || null,
+      legalAddress: str(f, "legalAddress") || null,
+      legalCity: str(f, "legalCity") || null,
+      // NFS-e só liga com CNPJ (14 dígitos), inscrição municipal e provedor preenchidos
+      nfseEnabled: f.get("nfseEnabled") === "on" && str(f, "legalDoc").replace(/\D/g, "").length === 14 && !!str(f, "nfseMunicipalReg") && !!str(f, "nfseProvider"),
+      nfseProvider: str(f, "nfseProvider") || null,
+      nfseMunicipalReg: str(f, "nfseMunicipalReg") || null,
+      nfseServiceCode: str(f, "nfseServiceCode") || null,
+      docsRetentionMonths: Math.min(120, Math.max(1, Number(str(f, "docsRetentionMonths")) || 12)),
       updatedAt: new Date(),
     })
     .where(eq(schema.platformSettings.id, "default"));
