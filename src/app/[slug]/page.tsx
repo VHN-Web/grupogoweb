@@ -17,7 +17,7 @@ async function load(slug: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const t = await load((await params).slug);
-  if (!t) return { title: "Atlas" };
+  if (!t) return { title: "GoWeb" };
   const pt = getRegion(t.country).locale === "pt";
   return {
     title: t.tagline ? `${t.name} — ${t.tagline}` : t.name,

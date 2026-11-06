@@ -2,7 +2,7 @@
 // Uso: npm run db:setup  (ou npm run db:seed)
 // Senha de todos os painéis demo: demo1234
 import "dotenv/config";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { createDb, type DB } from "./client";
 import * as schema from "./schema";
 import { provisionTenant } from "@/services/provision";
@@ -32,8 +32,8 @@ const PAYMENTS_BR = {
     { method: "CASH", provider: "cash", enabled: true, currencies: ["BRL"] },
     { method: "TRANSFER", provider: "transfer_manual", enabled: false, currencies: ["BRL"] },
   ],
-  pixKey: "demo@atlas.app",
-  pixHolder: "Demo Atlas",
+  pixKey: "suporte@goweboficial.com",
+  pixHolder: "Demo GoWeb",
   credentials: {},
 };
 
@@ -44,8 +44,8 @@ const PAYMENTS = {
     { method: "PIX", provider: "pix_manual", enabled: true, currencies: ["BRL"] },
     { method: "TRANSFER", provider: "transfer_manual", enabled: false, currencies: ["PYG"] },
   ],
-  pixKey: "demo@atlas.com.py",
-  pixHolder: "Demo Atlas",
+  pixKey: "suporte@goweboficial.com",
+  pixHolder: "Demo GoWeb",
   credentials: {},
 };
 
@@ -456,6 +456,16 @@ async function seedStore(db: DB, s: Store) {
 async function main() {
   const db = createDb();
   // --if-empty: usado no deploy — só cria as lojas demo se o banco ainda não tiver nenhum estabelecimento
+  // Rebrand Atlas -> GoWeb em bancos já existentes (idempotente)
+  await db
+    .update(schema.platformSettings)
+    .set({ companyName: "GoWeb" })
+    .where(eq(schema.platformSettings.companyName, "Atlas"));
+  await db
+    .update(schema.platformSettings)
+    .set({ supportEmail: "suporte@goweboficial.com" })
+    .where(isNull(schema.platformSettings.supportEmail));
+
   // --if-empty (deploy): NÃO apaga nada; só cria as lojas demo que ainda não existem.
   if (process.argv.includes("--if-empty")) {
     const existing = new Set((await db.query.tenants.findMany({ columns: { slug: true } })).map((t) => t.slug));
@@ -478,10 +488,11 @@ async function main() {
     .insert(schema.platformSettings)
     .values({
       id: "default",
-      companyName: "Atlas",
+      companyName: "GoWeb",
+      supportEmail: "suporte@goweboficial.com",
       // Em dev tudo usa o gateway SIMULADO. Em produção troque BRL para "mercadopago" em /admin/config.
       gatewayByCurrency: JSON.stringify({ PYG: "mock", USD: "mock", BRL: "mock" }),
-      manualInstructions: "Transferencia: Banco XXXX · Cuenta 000000 · Titular Atlas\nEnviá el comprobante por WhatsApp.",
+      manualInstructions: "Transferencia: Banco XXXX · Cuenta 000000 · Titular GoWeb\nEnviá el comprobante por WhatsApp.",
     })
     .onConflictDoNothing();
 

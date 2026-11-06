@@ -1,4 +1,4 @@
-// Atlas — modelo de dados multi-tenant (white-label).
+// GoWeb — modelo de dados multi-tenant (white-label).
 //
 // Convenções (IMPORTANTE para quem — humano ou IA — for mexer aqui):
 // - Todo dado de negócio pertence a um tenant (tenantId). Nunca consulte sem filtrar por tenantId.
@@ -41,7 +41,7 @@ const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull(
 
 export const tenants = pgTable("tenants", {
   id: id(),
-  slug: text("slug").notNull().unique(), // atlas.com.py/{slug}
+  slug: text("slug").notNull().unique(), // goweboficial.com/{slug}
   name: text("name").notNull(),
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").notNull().default("#16130F"),
@@ -274,8 +274,8 @@ export const fiscalDocuments = pgTable(
 
 export const platformSettings = pgTable("platform_settings", {
   id: text("id").primaryKey().default("default"), // linha única
-  companyName: text("company_name").notNull().default("Atlas"),
-  platformDomain: text("platform_domain"), // ex: atlas.com.py — habilita {slug}.atlas.com.py
+  companyName: text("company_name").notNull().default("GoWeb"),
+  platformDomain: text("platform_domain"), // ex: goweboficial.com — habilita {slug}.goweboficial.com
   supportWhatsapp: text("support_whatsapp"),
   supportEmail: text("support_email"),
   // Preço do domínio adicional (1º ano), por moeda

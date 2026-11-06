@@ -152,7 +152,7 @@ export async function saveSettings(f: FormData) {
   await db
     .update(schema.platformSettings)
     .set({
-      companyName: str(f, "companyName") || "Atlas",
+      companyName: str(f, "companyName") || "GoWeb",
       platformDomain: str(f, "platformDomain").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || null,
       supportWhatsapp: str(f, "supportWhatsapp") || null,
       supportEmail: str(f, "supportEmail") || null,

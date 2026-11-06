@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
 import { PanelNav } from "./PanelNav";
-import { AtlasLogo } from "@/components/brand/AtlasLogo";
+import { GoWebLogo } from "@/components/brand/GoWebLogo";
 import { toggleOpen, logout } from "./actions";
 
 export default async function PanelLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
@@ -10,10 +10,10 @@ export default async function PanelLayout({ children, params }: { children: Reac
   const tenant = await requireTenantAdmin(slug);
   const { T, locale } = panelI18n(tenant);
   return (
-    <div style={{ ["--brand" as string]: "#C9A24A" }} className="min-h-dvh">
+    <div style={{ ["--brand" as string]: "#3CC46B" }} className="min-h-dvh">
       <header className="no-print sticky top-0 z-20 bg-[#0E0E10] text-[#F4F1EA]">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <AtlasLogo height={18} />
+          <GoWebLogo height={24} />
           <span className="h-6 w-px bg-white/15" aria-hidden="true" />
           {tenant.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element

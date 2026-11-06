@@ -5,8 +5,8 @@ import { getSettings } from "@/services/billing";
 
 // Usado pelo middleware: descobre qual estabelecimento atende um host.
 //   www.donmario.com.py   -> domínio próprio do tenant
-//   donmario.atlas.com.py   -> subdomínio da plataforma
-//   atlas.com.py / www      -> site principal
+//   donmario.goweboficial.com   -> subdomínio da plataforma
+//   goweboficial.com / www      -> site principal
 export async function GET(req: Request) {
   const host = (new URL(req.url).searchParams.get("host") ?? "").toLowerCase().replace(/:\d+$/, "");
   if (!host) return NextResponse.json({});

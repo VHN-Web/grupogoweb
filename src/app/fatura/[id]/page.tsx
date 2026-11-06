@@ -8,7 +8,7 @@ import { getBillingProvider } from "@/adapters/billing/registry";
 import { gatewayMap, getSettings } from "@/services/billing";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { PayInvoice } from "./PayInvoice";
-import { AtlasLogo } from "@/components/brand/AtlasLogo";
+import { GoWebLogo } from "@/components/brand/GoWebLogo";
 import { getRegion, tr } from "@/core/region";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   return (
     <main className="mx-auto max-w-md px-5 py-10" lang={locale === "pt" ? "pt-BR" : "es"}>
       {inv.status === "OPEN" && <AutoRefresh ms={8000} />}
-      <AtlasLogo height={22} ink="#0E0E10" />
+      <GoWebLogo height={30} dark={false} />
       <h1 className="mt-2 text-2xl font-bold tracking-tight">{T("Factura de", "Fatura de")} {inv.customer.businessName}</h1>
       <p className="mt-1 text-sm text-muted">{inv.description}</p>
 

@@ -10,7 +10,7 @@ import { getTheme, type Theme, type ThemeId } from "@/core/themes";
 import { Illustration } from "@/components/Illustration";
 import { NameInput } from "@/components/forms/NameInput";
 import { PhoneInput } from "@/components/forms/PhoneInput";
-import { AtlasLogo } from "@/components/brand/AtlasLogo";
+import { GoWebLogo } from "@/components/brand/GoWebLogo";
 
 export type StoreProduct = {
   id: string;
@@ -217,7 +217,7 @@ export function Storefront({ data }: { data: StoreData }) {
             </section>
           ))}
           <p className="th-muted mt-10 flex items-center justify-center gap-1.5 text-[11px]">
-            {T("Hecho con", "Feito com")} <AtlasLogo height={10} ink="currentColor" />
+            {T("Hecho con", "Feito com")} <GoWebLogo height={14} ink="currentColor" />
           </p>
         </main>
       </div>

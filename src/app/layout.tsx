@@ -7,11 +7,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const pt = detectLocale(await headers()) === "pt";
   return pt
     ? {
-        title: "Atlas — Cardápio digital, pedidos e caixa",
+        title: "GoWeb — Cardápio digital, pedidos e caixa",
         description: "Cardápio e vitrine com QR, pedidos em tempo real, Pix, caixa e estoque para restaurantes, barbearias, perfumarias e lojas.",
       }
     : {
-        title: "Atlas — Menú digital, pedidos y caja",
+        title: "GoWeb — Menú digital, pedidos y caja",
         description: "Menú con QR, pedidos en tiempo real, caja multi-moneda y stock para restaurantes, bares, cafeterías y tiendas en Paraguay.",
       };
 }

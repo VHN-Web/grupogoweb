@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { AtlasLogo, ATLAS_GOLD } from "@/components/brand/AtlasLogo";
+import { GoWebLogo, BRAND, GW_NAVY } from "@/components/brand/GoWebLogo";
 import { Illustration } from "@/components/Illustration";
 import { formatMinor, formatPyg } from "@/core/money";
 import { THEMES, type ThemeId } from "@/core/themes";
@@ -142,7 +142,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
     getSettings(),
     db.query.plans.findMany({ where: eq(schema.plans.active, true), orderBy: asc(schema.plans.sortOrder) }),
   ]);
-  const wa = settings.supportWhatsapp ? `https://wa.me/${settings.supportWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(T("Hola! Quiero conocer Atlas para mi local.", "Olá! Quero conhecer o Atlas para o meu negócio."))}` : "#planes";
+  const wa = settings.supportWhatsapp ? `https://wa.me/${settings.supportWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(T("¡Hola! Quiero conocer GoWeb para mi negocio.", "Olá! Quero conhecer a GoWeb para o meu negócio."))}` : "#planes";
 
   return (
     <div style={{ background: IVORY, color: INK }} className="font-sans" lang={pt ? "pt-BR" : "es"}>
@@ -151,8 +151,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
       {/* NAV */}
       <header style={{ background: INK }} className="border-b border-[#2C2C31]">
         <nav className={`${wrap} flex flex-wrap items-center gap-x-7 gap-y-3 py-5`}>
-          <Link href="/" aria-label={T("Atlas, inicio", "Atlas, início")}>
-            <AtlasLogo height={30} />
+          <Link href="/" aria-label={T("GoWeb, inicio", "GoWeb, início")}>
+            <GoWebLogo height={38} />
           </Link>
           <div className="flex-1" />
           <a href="#modelos" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>{T("Modelos", "Modelos")}</a>
@@ -163,7 +163,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
             <a href="?lang=pt" className="px-2.5 py-2" style={{ background: pt ? "#2A2B2F" : "transparent", color: pt ? IVORY : MUTED }}>PT</a>
           </span>
           <Link href="/painel" className="rounded-xl border border-[#45454B] px-4 py-2.5 text-[15px] font-semibold text-[#F4F1EA]">{T("Ingresar", "Entrar")}</Link>
-          <a href={wa} className="rounded-xl px-4 py-2.5 text-[15px] font-bold" style={{ background: ATLAS_GOLD, color: INK }}>{T("Solicitar demo", "Pedir demonstração")}</a>
+          <a href={wa} className="rounded-xl px-4 py-2.5 text-[15px] font-bold" style={{ background: BRAND, color: INK }}>{T("Solicitar demo", "Pedir demonstração")}</a>
         </nav>
       </header>
 
@@ -171,7 +171,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
       <section style={{ background: INK, color: IVORY }} className="overflow-hidden">
         <div className={`${wrap} flex flex-wrap items-center gap-14 pb-24 pt-16 sm:pt-20`}>
           <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-7">
-            <span className="text-[13px] font-semibold uppercase tracking-[0.22em]" style={{ color: ATLAS_GOLD }}>{T("Restaurantes · Bares · Barberías · Tiendas", "Restaurantes · Barbearias · Perfumarias · Lojas")}</span>
+            <span className="text-[13px] font-semibold uppercase tracking-[0.22em]" style={{ color: BRAND }}>{T("Restaurantes · Bares · Barberías · Tiendas", "Restaurantes · Barbearias · Perfumarias · Lojas")}</span>
             <h1 style={{ fontFamily: H }} className="text-[clamp(42px,5.4vw,76px)] font-extrabold leading-[1.02] tracking-[-0.025em]">
               {T("Tu negocio,", "Seu negócio,")}
               <br />
@@ -184,7 +184,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
               )}
             </p>
             <div className="flex flex-wrap gap-3">
-              <a href={wa} className="rounded-2xl px-6 py-4 text-[17px] font-bold" style={{ background: ATLAS_GOLD, color: INK }}>{T("Quiero Atlas en mi local", "Quero o Atlas no meu negócio")}</a>
+              <a href={wa} className="rounded-2xl px-6 py-4 text-[17px] font-bold" style={{ background: BRAND, color: INK }}>{T("Quiero GoWeb en mi negocio", "Quero a GoWeb no meu negócio")}</a>
               <a href="#modelos" className="rounded-2xl border border-[#45454B] px-6 py-4 text-[17px] font-semibold">{T("Ver modelos en vivo", "Ver modelos ao vivo")}</a>
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1 text-sm" style={{ color: MUTED }}>
@@ -262,7 +262,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                   </div>
                   <div className="flex items-center justify-between px-4 py-3">
                     <span className="text-sm font-semibold">{d.kind}</span>
-                    <span className="text-sm font-semibold" style={{ color: "#8A6A1F" }}>{T("Ver →", "Ver →")}</span>
+                    <span className="text-sm font-semibold" style={{ color: GW_NAVY }}>{T("Ver →", "Ver →")}</span>
                   </div>
                 </Link>
               );
@@ -279,7 +279,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
             {FEATURES.map((f) => (
               <div key={f.t} className="flex flex-col gap-3.5 rounded-3xl border border-[#2C2C31] bg-[#141417] p-7">
                 <span className="grid h-12 w-12 place-items-center rounded-2xl" style={{ background: "#1F1F23" }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={ATLAS_GOLD} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={BRAND} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     {ICONS[f.icon]}
                   </svg>
                 </span>
@@ -301,8 +301,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                   ["03", "Empezás a vender", "Los pedidos llegan al panel; la caja y el stock se actualizan solos."],
                 ]
             ).map(([n, t, d]) => (
-              <div key={n} className="flex flex-col gap-3 border-t-2 pt-5" style={{ borderColor: ATLAS_GOLD }}>
-                <span style={{ fontFamily: H, color: ATLAS_GOLD }} className="text-[42px] font-extrabold leading-none">{n}</span>
+              <div key={n} className="flex flex-col gap-3 border-t-2 pt-5" style={{ borderColor: BRAND }}>
+                <span style={{ fontFamily: H, color: BRAND }} className="text-[42px] font-extrabold leading-none">{n}</span>
                 <h3 style={{ fontFamily: H }} className="text-2xl font-bold text-[#F4F1EA]">{t}</h3>
                 <p className="leading-relaxed" style={{ color: MUTED }}>{d}</p>
               </div>
@@ -319,8 +319,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
             {plans.map((p) => {
               const hi = p.interval === "YEARLY";
               return (
-                <div key={p.id} className="flex flex-col gap-5 rounded-3xl border-[1.5px] p-9" style={{ background: hi ? INK : "#FFFFFF", color: hi ? IVORY : INK, borderColor: hi ? ATLAS_GOLD : "#DDD6C8" }}>
-                  {hi ? <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider" style={{ background: ATLAS_GOLD, color: INK }}>{T("Más elegido", "Mais escolhido")}</span> : <span className="h-[30px]" />}
+                <div key={p.id} className="flex flex-col gap-5 rounded-3xl border-[1.5px] p-9" style={{ background: hi ? INK : "#FFFFFF", color: hi ? IVORY : INK, borderColor: hi ? BRAND : "#DDD6C8" }}>
+                  {hi ? <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider" style={{ background: BRAND, color: INK }}>{T("Más elegido", "Mais escolhido")}</span> : <span className="h-[30px]" />}
                   <h3 style={{ fontFamily: H }} className="text-3xl font-extrabold">{p.name}</h3>
                   <div className="flex flex-wrap items-baseline gap-2">
                     <span style={{ fontFamily: H }} className="text-[40px] font-extrabold tracking-tight">{pt ? formatMinor(p.priceBrlMinor, "BRL") : formatPyg(p.pricePyg)}</span>
@@ -339,13 +339,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                   <ul className="flex flex-col gap-3 text-[15.5px]">
                     {(p.features ?? "").split("\n").filter(Boolean).map((f) => (pt ? FEATURE_PT[f.trim()] ?? f : f)).map((f) => (
                       <li key={f} className="flex items-start gap-2.5">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ATLAS_GOLD} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={BRAND} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>
                         {f}
                       </li>
                     ))}
-                    {p.includesDomain && <li className="flex items-start gap-2.5"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ATLAS_GOLD} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>{T("Dominio propio incluido", "Domínio próprio incluso")}</li>}
+                    {p.includesDomain && <li className="flex items-start gap-2.5"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={BRAND} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>{T("Dominio propio incluido", "Domínio próprio incluso")}</li>}
                   </ul>
-                  <Link href={`/contratar?plano=${p.id}&lang=${locale}`} className="mt-auto rounded-2xl py-4 text-center font-bold" style={{ background: hi ? ATLAS_GOLD : INK, color: hi ? INK : IVORY }}>{T("Quiero este plan", "Quero este plano")}</Link>
+                  <Link href={`/contratar?plano=${p.id}&lang=${locale}`} className="mt-auto rounded-2xl py-4 text-center font-bold" style={{ background: hi ? BRAND : INK, color: hi ? INK : IVORY }}>{T("Quiero este plan", "Quero este plano")}</Link>
                 </div>
               );
             })}
@@ -372,14 +372,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
       <section style={{ background: INK }} className="py-24 text-center">
         <div className={`${wrap} flex flex-col items-center gap-6`}>
           <h2 style={{ fontFamily: H }} className="text-[clamp(36px,4.4vw,64px)] font-extrabold leading-[1.04] tracking-tight text-[#F4F1EA]">{T("Llevá tu negocio al siguiente nivel.", "Leve seu negócio para o próximo nível.")}</h2>
-          <p className="max-w-[560px] text-lg" style={{ color: MUTED }}>{T("Te mostramos Atlas funcionando con tu propio menú. Sin compromiso.", "Mostramos o Atlas funcionando com os seus produtos. Sem compromisso.")}</p>
-          <a href={wa} className="rounded-2xl px-8 py-4 text-lg font-bold" style={{ background: ATLAS_GOLD, color: INK }}>{T("Hablar por WhatsApp", "Falar no WhatsApp")}</a>
+          <p className="max-w-[560px] text-lg" style={{ color: MUTED }}>{T("Te mostramos GoWeb funcionando con tu propio menú. Sin compromiso.", "Mostramos a GoWeb funcionando com os seus produtos. Sem compromisso.")}</p>
+          <a href={wa} className="rounded-2xl px-8 py-4 text-lg font-bold" style={{ background: BRAND, color: INK }}>{T("Hablar por WhatsApp", "Falar no WhatsApp")}</a>
         </div>
       </section>
       <footer style={{ background: INK }} className="border-t border-[#2C2C31]">
         <div className={`${wrap} flex flex-wrap items-center justify-between gap-4 py-8 text-sm`} style={{ color: MUTED }}>
-          <AtlasLogo height={20} />
-          <span>© {new Date().getFullYear()} Atlas · {T("Sistema para gastronomía y comercios", "Sistema para gastronomia, serviços e comércio")}</span>
+          <span className="flex flex-col gap-1.5">
+            <GoWebLogo height={26} />
+            <span className="text-xs font-semibold" style={{ color: "#7FB8EE" }}>{T("Clic, Conectá, Vendé.", "Clique, Conecte, Venda.")}</span>
+          </span>
+          <span>© {new Date().getFullYear()} GoWeb · {T("Sistema para gastronomía y comercios", "Sistema para gastronomia, serviços e comércio")}</span>
         </div>
       </footer>
     </div>
@@ -389,7 +392,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
 function SectionTitle({ eyebrow, title, sub, dark }: { eyebrow: string; title: string; sub?: string; dark?: boolean }) {
   return (
     <div className="flex max-w-[720px] flex-col gap-3.5">
-      <span className="text-[13px] font-semibold uppercase tracking-[0.22em]" style={{ color: dark ? ATLAS_GOLD : "#8A6A1F" }}>{eyebrow}</span>
+      <span className="text-[13px] font-semibold uppercase tracking-[0.22em]" style={{ color: dark ? BRAND : GW_NAVY }}>{eyebrow}</span>
       <h2 style={{ fontFamily: H, color: dark ? IVORY : INK }} className="text-[clamp(32px,3.6vw,52px)] font-extrabold leading-[1.08] tracking-[-0.02em]">{title}</h2>
       {sub && <p className="text-lg" style={{ color: dark ? MUTED : "#5F5A52" }}>{sub}</p>}
     </div>

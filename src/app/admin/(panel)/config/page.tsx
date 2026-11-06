@@ -20,7 +20,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <Section title="Sua empresa">
           <div className="grid gap-3 sm:grid-cols-2">
             <F label="Nome comercial"><input name="companyName" className="input" defaultValue={s.companyName} /></F>
-            <F label="Domínio da plataforma"><input name="platformDomain" className="input" defaultValue={s.platformDomain ?? ""} placeholder="atlas.com.py" /></F>
+            <F label="Domínio da plataforma"><input name="platformDomain" className="input" defaultValue={s.platformDomain ?? ""} placeholder="goweboficial.com" /></F>
             <F label="WhatsApp de suporte"><input name="supportWhatsapp" className="input" defaultValue={s.supportWhatsapp ?? ""} /></F>
             <F label="E-mail de suporte"><input name="supportEmail" className="input" defaultValue={s.supportEmail ?? ""} /></F>
           </div>

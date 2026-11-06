@@ -1,4 +1,4 @@
-# Atlas — instruções para IA (Claude / Cursor)
+# GoWeb — instruções para IA (Claude / Cursor)
 
 Plataforma SaaS **multi-tenant white-label** para restaurantes, bares e lanchonetes no **Paraguai**:
 cardápio digital por QR, pedidos (mesa / retiro / delivery), pagamento multi-moeda (Gs., US$, R$),
@@ -31,7 +31,7 @@ src/adapters/      PONTOS DE EXTENSÃO (interfaces + implementações)
   storage/         Upload de imagens (Vercel Blob ou pasta .uploads/)
 src/core/themes.ts        Modelos de site (cores, fontes, banner, layout). Novo modelo = nova entrada aqui
 src/core/illustrations.ts Ilustrações SVG próprias usadas quando não há foto
-src/components/brand/     Logo Atlas (AtlasLogo/AtlasMark) e tela de login
+src/components/brand/     Logo GoWeb (GoWebLogo/GoWebMark) e tela de login
 src/services/      Casos de uso: orders, cash, fiscal, provision (cria tenant), billing (ciclo comercial)
 src/middleware.ts  Roteamento por domínio: domínio próprio / slug.dominio-da-plataforma -> /{slug}
 src/db/            schema.ts (Drizzle), client.ts, seed.ts
@@ -58,7 +58,7 @@ src/app/api/       orders, delivery-quote, payments/[provider]/webhook,
 7. **Billing**: faturas guardam o valor nas 3 moedas (definidos no plano, sem conversão). `markInvoicePaid` é idempotente e é o ÚNICO lugar que dispara efeitos (provisionar, reativar). Gateway por moeda em `platform_settings.gatewayByCurrency`.
 8. O admin da plataforma (sessão "platform") acessa qualquer `/painel/{slug}`.
 9. Novos valores de "enum" → adicionar em `src/core/types.ts` (e rótulos em `LABELS`).
-10. Identidade Atlas: ônix #0E0E10, marfim #F4F1EA, ouro #C9A24A; logo SEMPRE via `AtlasLogo` (nunca texto). O site do estabelecimento usa a marca DELE (tema + cor), com Atlas só no rodapé.
+10. Identidade GoWeb (goweboficial.com · suporte@goweboficial.com · "Clique, Conecte, Venda."): ônix #0E0E10, marfim #F4F1EA, verde #3CC46B, azul #1F7FD8, marinho #1D4F91; logo SEMPRE via `GoWebLogo`/`GoWebMark` (nunca texto). O site do estabelecimento usa a marca DELE (tema + cor), com GoWeb só no rodapé.
 11. Mobile-first. Componentes de cliente só quando houver interatividade.
 
 ## Comandos

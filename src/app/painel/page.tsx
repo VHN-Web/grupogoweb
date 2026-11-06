@@ -17,7 +17,7 @@ export default async function PanelEntry() {
       <form action={go} className="space-y-3">
         <label className="label" htmlFor="slug">{T("Dirección de tu menú", "Endereço do seu site")}</label>
         <div className="flex items-center rounded-xl border border-[#33333a] bg-[#18181b] pl-3.5 text-[15px]">
-          <span className="text-[#B9B3A7]">atlas.com.py/</span>
+          <span className="text-[#B9B3A7]">goweboficial.com/</span>
           <input id="slug" name="slug" className="w-full bg-transparent py-2.5 pr-3 text-[#F4F1EA] outline-none" placeholder={T("mi-local", "meu-negocio")} autoFocus />
         </div>
         <button className="btn-primary w-full py-3">{T("Continuar", "Continuar")}</button>

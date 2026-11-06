@@ -25,7 +25,7 @@ export function PanelNav({ slug, locale }: { slug: string; locale: "es" | "pt" }
           <Link
             key={i.href}
             href={href}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition ${active ? "bg-[#C9A24A] text-[#0E0E10]" : "text-[#B9B3A7] hover:bg-white/10 hover:text-white"}`}
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition ${active ? "bg-[#3CC46B] text-[#0E0E10]" : "text-[#B9B3A7] hover:bg-white/10 hover:text-white"}`}
           >
             {locale === "pt" ? i.pt : i.es}
           </Link>

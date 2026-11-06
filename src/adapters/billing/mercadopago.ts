@@ -69,7 +69,7 @@ export const mercadoPagoProvider: BillingProvider = {
         notification_url: input.notificationUrl,
         back_urls: { success: input.returnUrl, pending: input.returnUrl, failure: input.returnUrl },
         auto_return: "approved",
-        statement_descriptor: "ATLAS",
+        statement_descriptor: "GOWEB",
       }),
     });
     if (!res.ok) throw new Error(`Mercado Pago ${res.status}: ${await res.text()}`);

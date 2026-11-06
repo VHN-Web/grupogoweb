@@ -1,4 +1,4 @@
-# Atlas
+# GoWeb
 
 Cardápio digital com QR, pedidos, caixa e estoque para restaurantes, bares, cafeterias e lojas no Paraguai — multi-tenant e white-label.
 
@@ -28,7 +28,7 @@ npm run dev
 | Área | Status |
 |---|---|
 | Multi-tenant: 1 código, N estabelecimentos em `/{slug}` | ✅ |
-| Identidade Atlas (logo, página de vendas, painel, admin, logins) | ✅ |
+| Identidade GoWeb (logo, página de vendas, painel, admin, logins) | ✅ |
 | 6 modelos de site (Clássico, Hamburgueria, Restaurante, Cafeteria, Loja, Bar) | ✅ |
 | Banner de promoção, logo e fotos com upload; ilustrações quando não há foto | ✅ |
 | Criar estabelecimento (white-label: nome, logo, cor, mesas) em `/admin` | ✅ |

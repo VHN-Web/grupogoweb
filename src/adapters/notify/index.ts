@@ -20,7 +20,7 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: process.env.EMAIL_FROM ?? "Atlas <onboarding@resend.dev>", to: [to], subject, text }),
+      body: JSON.stringify({ from: process.env.EMAIL_FROM ?? "GoWeb <suporte@goweboficial.com>", to: [to], subject, text }),
     });
     if (!res.ok) return { status: "FAILED", error: `${res.status} ${await res.text()}` };
     return { status: "SENT" };
