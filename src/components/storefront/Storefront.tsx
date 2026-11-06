@@ -1,0 +1,850 @@
+"use client";
+
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { formatMinor, formatPyg, parseMajorToMinor, pygToMinor, minorToPyg, type Rates } from "@/core/money";
+import { LABELS, type Currency, type OrderType, type PaymentMethod } from "@/core/types";
+import type { PublicPaymentConfig } from "@/core/tenant-config";
+import { getTheme, type Theme, type ThemeId } from "@/core/themes";
+import { Illustration } from "@/components/Illustration";
+import { AtlasLogo } from "@/components/brand/AtlasLogo";
+
+export type StoreProduct = {
+  id: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  illustration: string | null;
+  pricePyg: number;
+  soldOut: boolean;
+  maxQty: number;
+};
+
+export type StoreData = {
+  slug: string;
+  name: string;
+  logoUrl: string | null;
+  primaryColor: string;
+  accentFg: string;
+  themeId: ThemeId;
+  tagline: string | null;
+  banner: {
+    tag: string | null;
+    title: string | null;
+    subtitle: string | null;
+    highlight: string | null;
+    imageUrl: string | null;
+    illustration: string | null;
+  };
+  address: string | null;
+  phone: string | null;
+  isOpen: boolean;
+  accepts: Record<OrderType, boolean>;
+  rates: Rates;
+  delivery: { freeOverPyg: number | null };
+  table: { code: string; label: string } | null;
+  invalidTable: boolean;
+  payment: PublicPaymentConfig;
+  groups: { id: string; name: string; products: StoreProduct[] }[];
+};
+
+type Cart = Record<string, number>;
+type View = "menu" | "cart" | "checkout";
+
+function useCart(slug: string) {
+  const key = `atlas_cart_${slug}`;
+  const [cart, setCart] = useState<Cart>({});
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) setCart(JSON.parse(raw));
+    } catch {}
+  }, [key]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(cart));
+    } catch {}
+  }, [key, cart]);
+  return [cart, setCart] as const;
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+}
+
+export function Storefront({ data }: { data: StoreData }) {
+  const theme = getTheme(data.themeId);
+  const [cart, setCart] = useCart(data.slug);
+  const [view, setView] = useState<View>("menu");
+  const [activeCat, setActiveCat] = useState(data.groups[0]?.id);
+
+  const all = useMemo(() => data.groups.flatMap((g) => g.products), [data.groups]);
+  const products = useMemo(() => new Map(all.map((p) => [p.id, p])), [all]);
+  const lines = Object.entries(cart)
+    .map(([id, qty]) => ({ product: products.get(id)!, qty }))
+    .filter((l) => l.product && l.qty > 0);
+  const count = lines.reduce((s, l) => s + l.qty, 0);
+  const subtotal = lines.reduce((s, l) => s + l.qty * l.product.pricePyg, 0);
+
+  const setQty = (id: string, qty: number) =>
+    setCart((c) => {
+      const p = products.get(id);
+      const n = { ...c };
+      const q = Math.max(0, Math.min(qty, p?.maxQty ?? 99));
+      if (q === 0) delete n[id];
+      else n[id] = q;
+      return n;
+    });
+
+  const vars = {
+    "--bg": theme.colors.bg,
+    "--fg": theme.colors.fg,
+    "--surface": theme.colors.surface,
+    "--muted": theme.colors.muted,
+    "--line": theme.colors.line,
+    "--brand": data.primaryColor,
+    "--brand-fg": data.accentFg,
+    "--font-h": theme.fonts.heading,
+    "--font-b": theme.fonts.body,
+  } as CSSProperties;
+
+  const tileFor = (i: number) => theme.colors.tiles[i % theme.colors.tiles.length];
+  const featured = theme.featured ? all.filter((p) => !p.soldOut).slice(0, 6) : [];
+
+  return (
+    <div style={vars} className="th min-h-dvh">
+      <div className="mx-auto max-w-xl pb-32">
+        <Hero data={data} theme={theme} />
+
+        {(data.table || data.invalidTable || !data.isOpen) && (
+          <div className="mt-4 space-y-2 px-5">
+            {data.table && (
+              <div className="th-accent rounded-xl px-4 py-2.5 text-sm font-semibold">Estás en la {data.table.label}. Tu pedido llega a tu mesa.</div>
+            )}
+            {data.invalidTable && (
+              <div className="rounded-xl bg-amber-100 px-4 py-2.5 text-sm text-amber-900">No reconocimos el QR de la mesa. Pedí ayuda al personal.</div>
+            )}
+            {!data.isOpen && (
+              <div className="th-surface th-muted rounded-xl border th-line px-4 py-2.5 text-sm">
+                El local está cerrado ahora. Podés ver el menú, pero no hacer pedidos.
+              </div>
+            )}
+          </div>
+        )}
+
+        {featured.length > 0 && (
+          <section className="mt-6">
+            <h2 className="th-h mb-3 px-5 text-[21px] font-bold">Lo más pedido</h2>
+            <div className="no-scrollbar flex gap-3 overflow-x-auto px-5">
+              {featured.map((p, i) => (
+                <div key={p.id} className="flex w-36 shrink-0 flex-col gap-1.5">
+                  <ProductImage p={p} tile={tileFor(i)} className="h-36 w-36" radius={theme.radius + 4} size={112} />
+                  <span className="text-sm font-bold leading-snug">{p.name}</span>
+                  <div className="flex items-center justify-between">
+                    <span className="th-muted text-[13px]">{formatPyg(p.pricePyg)}</span>
+                    {data.isOpen && !p.soldOut && <AddButton onClick={() => setQty(p.id, (cart[p.id] ?? 0) + 1)} label={p.name} round small />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Categorias */}
+        <nav
+          aria-label="Categorías"
+          className="no-scrollbar th-bg sticky top-0 z-10 mt-4 flex gap-2 overflow-x-auto px-5 py-3"
+          style={{ boxShadow: `0 1px 0 ${theme.colors.line}` }}
+        >
+          {data.groups.map((g) => (
+            <a
+              key={g.id}
+              href={`#c-${g.id}`}
+              onClick={() => setActiveCat(g.id)}
+              className={`shrink-0 rounded-full border px-4 py-2 text-[13px] font-semibold transition ${
+                activeCat === g.id ? "th-accent border-transparent" : "th-surface th-line"
+              }`}
+            >
+              {g.name}
+            </a>
+          ))}
+        </nav>
+
+        <main className="px-5">
+          {data.groups.length === 0 && <p className="th-muted py-16 text-center">El menú todavía está vacío.</p>}
+          {data.groups.map((g, gi) => (
+            <section key={g.id} id={`c-${g.id}`} className="scroll-mt-16 pt-6">
+              <h2
+                className={`th-h mb-3 ${theme.fonts.headingUpper ? "text-[22px] uppercase tracking-wide" : "text-[21px] font-bold"} ${
+                  theme.fonts.headingItalic ? "italic" : ""
+                }`}
+              >
+                {g.name}
+              </h2>
+              {theme.layout === "grid" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {g.products.map((p, i) => (
+                    <ProductCard key={p.id} p={p} theme={theme} tile={tileFor(gi * 3 + i)} qty={cart[p.id] ?? 0} onQty={(q) => setQty(p.id, q)} canOrder={data.isOpen} />
+                  ))}
+                </div>
+              ) : (
+                <ul className="flex flex-col gap-2.5">
+                  {g.products.map((p, i) => (
+                    <ProductRow key={p.id} p={p} theme={theme} tile={tileFor(gi * 3 + i)} qty={cart[p.id] ?? 0} onQty={(q) => setQty(p.id, q)} canOrder={data.isOpen} />
+                  ))}
+                </ul>
+              )}
+            </section>
+          ))}
+          <p className="th-muted mt-10 flex items-center justify-center gap-1.5 text-[11px]">
+            Hecho con <AtlasLogo height={10} ink="currentColor" />
+          </p>
+        </main>
+      </div>
+
+      {/* Barra do carrinho */}
+      {count > 0 && view === "menu" && (
+        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <button
+            onClick={() => setView("cart")}
+            className="th-accent flex w-full items-center justify-between px-5 py-4 text-[15px] font-bold shadow-xl shadow-black/25 transition active:scale-[.99]"
+            style={{ borderRadius: theme.radius }}
+          >
+            <span>Ver pedido · {count}</span>
+            <span>{formatPyg(subtotal)}</span>
+          </button>
+        </div>
+      )}
+
+      {view !== "menu" && (
+        <Sheet onClose={() => setView("menu")} title={view === "cart" ? "Tu pedido" : "Finalizar pedido"}>
+          {view === "cart" ? (
+            <CartView lines={lines} subtotal={subtotal} rates={data.rates} onQty={setQty} canOrder={data.isOpen} onNext={() => setView("checkout")} />
+          ) : (
+            <Checkout data={data} lines={lines} subtotal={subtotal} onBack={() => setView("cart")} onDone={() => setCart({})} />
+          )}
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ Hero / banner por tema
+
+function Logo({ data, size, ring }: { data: StoreData; size: number; ring?: string }) {
+  const style: CSSProperties = { width: size, height: size, boxShadow: ring ? `0 0 0 3px ${ring}` : undefined };
+  if (data.logoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={data.logoUrl} alt={`Logo de ${data.name}`} style={style} className="shrink-0 rounded-full object-cover" />;
+  }
+  return (
+    <div style={style} className="th-accent th-h grid shrink-0 place-items-center rounded-full text-[0.9em] font-bold">
+      <span style={{ fontSize: size * 0.36 }}>{initials(data.name)}</span>
+    </div>
+  );
+}
+
+function BannerArt({ data, size, className }: { data: StoreData; size: number; className?: string }) {
+  if (data.banner.imageUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={data.banner.imageUrl} alt="" className={`object-cover ${className ?? ""}`} />;
+  }
+  return <Illustration name={data.banner.illustration} size={size} className={className} />;
+}
+
+function StatusLine({ data, extra }: { data: StoreData; extra?: string | null }) {
+  return (
+    <span className="flex items-center gap-1.5 text-[12.5px] opacity-80">
+      <span className={`inline-block h-2 w-2 rounded-full ${data.isOpen ? "bg-emerald-400" : "bg-zinc-400"}`} />
+      {data.isOpen ? "Abierto" : "Cerrado"}
+      {extra && <span className="truncate">· {extra}</span>}
+    </span>
+  );
+}
+
+function Hero({ data, theme }: { data: StoreData; theme: Theme }) {
+  const b = data.banner;
+  const title = b.title || data.name;
+  const hasPhoto = !!b.imageUrl;
+  const heroStyle: CSSProperties = { background: theme.colors.heroBg, color: theme.colors.heroFg };
+
+  switch (theme.hero) {
+    case "promo":
+      return (
+        <header>
+          <div className="relative h-[300px] overflow-hidden" style={heroStyle}>
+            <div aria-hidden className="absolute inset-0" style={{ background: `repeating-linear-gradient(-45deg, ${theme.colors.heroAlt} 0 14px, transparent 14px 28px)` }} />
+            {hasPhoto ? (
+              <BannerArt data={data} size={230} className="absolute inset-y-0 right-0 h-full w-[55%]" />
+            ) : (
+              <div className="absolute -right-9 top-12">
+                <BannerArt data={data} size={230} />
+              </div>
+            )}
+            <div className="relative flex w-[200px] flex-col gap-1.5 pl-5 pt-14">
+              {b.tag && <span className="th-accent -rotate-3 self-start rounded-md px-2.5 py-1 text-xs font-extrabold uppercase">{b.tag}</span>}
+              <span className="th-h text-[42px] uppercase leading-[0.95]">{title}</span>
+              {b.highlight && <span className="th-h th-accent-text text-[26px]">{b.highlight}</span>}
+            </div>
+          </div>
+          <div className="relative -mt-9 flex items-end gap-3 px-5">
+            <Logo data={data} size={76} ring={data.primaryColor} />
+            <div className="flex min-w-0 flex-col gap-0.5 pb-1">
+              <h1 className="th-h truncate text-2xl uppercase">{data.name}</h1>
+              <StatusLine data={data} extra={data.tagline ?? data.address} />
+            </div>
+          </div>
+        </header>
+      );
+
+    case "circle":
+      return (
+        <header>
+          <div className="relative h-[280px] overflow-hidden" style={heroStyle}>
+            <div aria-hidden className="absolute -right-[70px] top-[30px] h-[280px] w-[280px] rounded-full" style={{ background: theme.colors.heroAlt }} />
+            {hasPhoto ? (
+              <BannerArt data={data} size={250} className="absolute -right-[60px] top-[40px] h-[260px] w-[260px] rounded-full" />
+            ) : (
+              <div className="absolute -right-10 top-[50px]">
+                <BannerArt data={data} size={250} />
+              </div>
+            )}
+            <div className="relative flex w-[180px] flex-col gap-2.5 pl-5 pt-16">
+              <span className="th-h text-[32px] font-bold italic leading-[1.05]">{title}</span>
+              {b.subtitle && <span className="text-[13px] opacity-75">{b.subtitle}</span>}
+              {b.highlight && <span className="th-accent self-start rounded-full px-3 py-1 text-xs font-bold">{b.highlight}</span>}
+            </div>
+          </div>
+          <div className="relative -mt-11 flex flex-col items-center gap-1.5 text-center">
+            <Logo data={data} size={86} ring={theme.colors.bg} />
+            <h1 className="th-h text-[28px] font-extrabold">{data.name}</h1>
+            {data.tagline && <span className="th-muted text-[12px] uppercase tracking-[0.2em]">{data.tagline}</span>}
+            <StatusLine data={data} />
+          </div>
+        </header>
+      );
+
+    case "card":
+      return (
+        <header className="px-5 pt-12">
+          <div className="flex items-center justify-between gap-3">
+            {data.logoUrl ? (
+              <div className="flex items-center gap-2.5">
+                <Logo data={data} size={44} />
+                <h1 className="th-h truncate text-2xl font-bold">{data.name}</h1>
+              </div>
+            ) : (
+              <h1 className="truncate text-[30px]" style={{ fontFamily: "Pacifico, cursive" }}>
+                {data.name}
+              </h1>
+            )}
+            <span className="th-surface shrink-0 rounded-full px-3 py-1.5 text-xs">
+              <span className={data.isOpen ? "text-emerald-600" : "text-zinc-400"}>●</span> {data.isOpen ? "Abierto" : "Cerrado"}
+            </span>
+          </div>
+          {(b.title || b.illustration || b.imageUrl) && (
+            <div className="relative mt-4 h-[196px] overflow-hidden" style={{ ...heroStyle, borderRadius: 28 }}>
+              {hasPhoto ? (
+                <BannerArt data={data} size={150} className="absolute inset-y-0 right-0 h-full w-[50%]" />
+              ) : (
+                <div className="absolute -bottom-1 -right-2.5">
+                  <BannerArt data={data} size={150} />
+                </div>
+              )}
+              <div className="relative flex w-[180px] flex-col gap-2 p-5 pt-6">
+                <span className="th-h text-[26px] font-extrabold leading-[1.05]">{title}</span>
+                {b.subtitle && <span className="text-[13px] opacity-80">{b.subtitle}</span>}
+                {b.highlight && <span className="th-accent self-start rounded-full px-3.5 py-2 text-sm font-bold">{b.highlight}</span>}
+              </div>
+            </div>
+          )}
+        </header>
+      );
+
+    case "showcase":
+      return (
+        <header className="px-5 pt-12">
+          <div className="flex items-center justify-between gap-3">
+            {data.logoUrl ? <Logo data={data} size={44} /> : <h1 className="th-h text-[28px] font-extrabold uppercase tracking-[0.08em]">{data.name}</h1>}
+            <span className="th-line shrink-0 rounded-full border px-3 py-1.5 text-xs">{data.tagline || (data.isOpen ? "Abierto" : "Cerrado")}</span>
+          </div>
+          {(b.title || b.illustration || b.imageUrl) && (
+            <div className="relative mt-4 h-[230px] overflow-hidden rounded-[26px]" style={heroStyle}>
+              {hasPhoto ? (
+                <BannerArt data={data} size={170} className="absolute inset-y-0 right-0 h-full w-[52%]" />
+              ) : (
+                <div className="absolute -right-3 top-8">
+                  <BannerArt data={data} size={170} />
+                </div>
+              )}
+              <div className="relative flex w-[175px] flex-col gap-2.5 p-5 pt-7">
+                {b.tag && (
+                  <span className="text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: theme.colors.heroAlt }}>
+                    {b.tag}
+                  </span>
+                )}
+                <span className="th-h text-[26px] font-extrabold leading-[1.05]">{title}</span>
+                {b.highlight && <span className="self-start rounded-full bg-white px-3.5 py-2 text-[13px] font-bold text-black">{b.highlight}</span>}
+              </div>
+            </div>
+          )}
+        </header>
+      );
+
+    case "glow":
+      return (
+        <header>
+          <div className="relative h-[320px] overflow-hidden" style={heroStyle}>
+            <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(circle at 75% 45%, ${theme.colors.heroAlt}, transparent 55%)` }} />
+            {hasPhoto ? (
+              <BannerArt data={data} size={210} className="absolute inset-y-0 right-0 h-full w-[50%] opacity-90" />
+            ) : (
+              <div className="absolute -right-5 top-[70px]">
+                <BannerArt data={data} size={210} />
+              </div>
+            )}
+            <div className="relative flex flex-col gap-1 pl-5 pt-12">
+              {data.logoUrl ? (
+                <Logo data={data} size={64} />
+              ) : (
+                <h1 className="th-h th-accent-text text-[52px] uppercase leading-[0.9] tracking-wide">{data.name}</h1>
+              )}
+              {data.tagline && <span className="text-[11px] uppercase tracking-[0.3em] opacity-90">{data.tagline}</span>}
+            </div>
+            {(b.title || b.highlight) && (
+              <div className="relative ml-5 mt-6 flex w-[175px] flex-col gap-0.5 rounded-2xl border-2 p-3" style={{ borderColor: data.primaryColor, background: "rgba(0,0,0,0.25)" }}>
+                {b.title && <span className="th-h text-[28px] uppercase leading-none">{b.title}</span>}
+                {b.highlight && <span className="th-accent-text text-[13px] font-bold">{b.highlight}</span>}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 px-5 pt-4 text-xs">
+            <span className="th-line rounded-full border px-3 py-1.5">
+              <span className={data.isOpen ? "text-emerald-400" : "text-zinc-400"}>●</span> {data.isOpen ? "Abierto" : "Cerrado"}
+            </span>
+            {data.address && <span className="th-line truncate rounded-full border px-3 py-1.5">{data.address}</span>}
+          </div>
+        </header>
+      );
+
+    default:
+      return (
+        <header className="px-5 pt-6">
+          <div className="flex items-center gap-3.5">
+            {data.logoUrl ? <Logo data={data} size={56} /> : <div className="th-accent th-h grid h-14 w-14 place-items-center rounded-2xl text-xl font-bold">{initials(data.name)}</div>}
+            <div className="min-w-0 flex-1">
+              <h1 className="th-h truncate text-xl font-bold tracking-tight">{data.name}</h1>
+              <StatusLine data={data} extra={data.tagline ?? data.address} />
+            </div>
+          </div>
+          {b.title && (
+            <div className="relative mt-4 flex min-h-[150px] overflow-hidden rounded-2xl" style={heroStyle}>
+              <div className="relative z-10 flex w-[60%] flex-col justify-center gap-2 p-5">
+                {b.tag && <span className="th-accent self-start rounded-md px-2 py-0.5 text-[11px] font-bold uppercase">{b.tag}</span>}
+                <span className="th-h text-2xl font-bold leading-tight">{b.title}</span>
+                {b.highlight && <span className="text-sm font-semibold opacity-90">{b.highlight}</span>}
+              </div>
+              {hasPhoto ? (
+                <BannerArt data={data} size={140} className="absolute inset-y-0 right-0 h-full w-[45%]" />
+              ) : (
+                <div className="absolute -bottom-2 right-0">
+                  <BannerArt data={data} size={140} />
+                </div>
+              )}
+            </div>
+          )}
+        </header>
+      );
+  }
+}
+
+// ------------------------------------------------------------------ produtos
+
+function ProductImage({ p, tile, className, radius, size }: { p: StoreProduct; tile: string; className: string; radius: number; size: number }) {
+  return (
+    <div className={`grid shrink-0 place-items-center overflow-hidden ${className}`} style={{ background: tile, borderRadius: radius }}>
+      {p.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
+      ) : p.illustration ? (
+        <Illustration name={p.illustration} size={size} />
+      ) : (
+        <span className="th-h text-2xl font-bold opacity-40">{initials(p.name)}</span>
+      )}
+    </div>
+  );
+}
+
+function AddButton({ onClick, label, round, small }: { onClick: () => void; label: string; round?: boolean; small?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Agregar ${label}`}
+      className={`th-accent grid shrink-0 place-items-center font-bold transition active:scale-95 ${small ? "h-8 w-8 text-lg" : "h-10 w-10 text-xl"} ${
+        round ? "rounded-full" : "rounded-xl"
+      }`}
+    >
+      +
+    </button>
+  );
+}
+
+function Stepper({ qty, onQty, max }: { qty: number; onQty: (q: number) => void; max: number }) {
+  return (
+    <div className="th-line th-bg flex h-10 items-center rounded-full border">
+      <button onClick={() => onQty(qty - 1)} className="h-10 w-9 text-lg font-semibold" aria-label="Quitar uno">
+        −
+      </button>
+      <span className="w-6 text-center text-sm font-bold tabular-nums">{qty}</span>
+      <button onClick={() => onQty(qty + 1)} disabled={qty >= max} className="h-10 w-9 text-lg font-semibold disabled:opacity-30" aria-label="Agregar uno">
+        +
+      </button>
+    </div>
+  );
+}
+
+function Qty({ p, qty, onQty, canOrder, round, small }: { p: StoreProduct; qty: number; onQty: (q: number) => void; canOrder: boolean; round?: boolean; small?: boolean }) {
+  if (p.soldOut) return <span className="th-muted text-[11px] font-bold uppercase tracking-wide">Agotado</span>;
+  if (!canOrder) return null;
+  if (qty === 0) return <AddButton onClick={() => onQty(1)} label={p.name} round={round} small={small} />;
+  return <Stepper qty={qty} onQty={onQty} max={p.maxQty} />;
+}
+
+function ProductRow({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
+  return (
+    <li className={`th-surface flex items-center gap-3.5 p-3 ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
+      <ProductImage p={p} tile={tile} className="h-[84px] w-[84px]" radius={theme.radius - 4} size={70} />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <h3 className={`th-h leading-tight ${theme.fonts.headingUpper ? "text-[19px] uppercase tracking-wide" : "text-[15.5px] font-bold"}`}>{p.name}</h3>
+        {p.description && <p className="th-muted line-clamp-2 text-[12.5px] leading-snug">{p.description}</p>}
+        <span className={`mt-1 text-[15px] font-bold ${theme.dark ? "th-accent-text" : ""}`}>{formatPyg(p.pricePyg)}</span>
+      </div>
+      <Qty p={p} qty={qty} onQty={onQty} canOrder={canOrder} />
+    </li>
+  );
+}
+
+function ProductCard({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
+  return (
+    <div className={`th-surface flex flex-col overflow-hidden border th-line ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
+      <ProductImage p={p} tile={tile} className="h-[130px] w-full" radius={0} size={110} />
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
+        <h3 className="th-h text-[15.5px] font-bold leading-tight">{p.name}</h3>
+        {p.description && <p className="th-muted line-clamp-2 text-[12px] leading-snug">{p.description}</p>}
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+          <span className="text-[13.5px] font-bold">{formatPyg(p.pricePyg)}</span>
+          <Qty p={p} qty={qty} onQty={onQty} canOrder={canOrder} round small />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ sheet, carrinho e checkout
+
+function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/50" onClick={onClose}>
+      <div className="th-bg flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
+        <div className="th-line flex items-center justify-between border-b px-5 py-4">
+          <h2 className="th-h text-lg font-bold">{title}</h2>
+          <button onClick={onClose} className="th-surface th-line grid h-9 w-9 place-items-center rounded-full border" aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+        <div className="overflow-y-auto px-5 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+type Line = { product: StoreProduct; qty: number };
+
+const box = "th-surface th-line rounded-2xl border";
+const primaryBtn = "th-accent w-full rounded-2xl py-4 text-[15px] font-bold transition active:scale-[.99] disabled:opacity-40";
+const ghostBtn = "th-surface th-line rounded-2xl border px-5 py-4 text-sm font-semibold";
+
+function CartView({ lines, subtotal, rates, onQty, onNext, canOrder }: { lines: Line[]; subtotal: number; rates: Rates; onQty: (id: string, q: number) => void; onNext: () => void; canOrder: boolean }) {
+  if (lines.length === 0) return <p className="th-muted py-10 text-center">Tu pedido está vacío.</p>;
+  return (
+    <div className="space-y-4">
+      <ul className={`${box} divide-y`} style={{ borderColor: "var(--line)" }}>
+        {lines.map((l) => (
+          <li key={l.product.id} className="th-line flex items-center gap-3 p-3.5">
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold">{l.product.name}</p>
+              <p className="th-muted text-[13px]">{formatPyg(l.product.pricePyg * l.qty)}</p>
+            </div>
+            <Stepper qty={l.qty} onQty={(q) => onQty(l.product.id, q)} max={l.product.maxQty} />
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-end justify-between px-1">
+        <span className="th-muted">Subtotal</span>
+        <div className="text-right">
+          <p className="text-xl font-bold">{formatPyg(subtotal)}</p>
+          <p className="th-muted text-xs">
+            ≈ {formatMinor(pygToMinor(subtotal, "USD", rates), "USD")} · {formatMinor(pygToMinor(subtotal, "BRL", rates), "BRL")}
+          </p>
+        </div>
+      </div>
+      <button onClick={onNext} disabled={!canOrder} className={primaryBtn}>
+        Continuar
+      </button>
+    </div>
+  );
+}
+
+type Quote = { state: "idle" } | { state: "loading" } | { state: "ok"; feePyg: number; distanceKm?: number; free?: boolean } | { state: "error"; message: string };
+
+function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; lines: Line[]; subtotal: number; onBack: () => void; onDone: () => void }) {
+  const router = useRouter();
+  const typeOptions = (["PICKUP", "DELIVERY"] as const).filter((t) => data.accepts[t]);
+  const [type, setType] = useState<OrderType>(data.table ? "DINE_IN" : typeOptions[0] ?? "PICKUP");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [quote, setQuote] = useState<Quote>({ state: "idle" });
+  const [notes, setNotes] = useState("");
+  const options = data.payment.options;
+  const [method, setMethod] = useState<PaymentMethod | undefined>(options[0]?.method);
+  const option = options.find((o) => o.method === method);
+  const [currency, setCurrency] = useState<Currency>(option?.currencies[0] ?? "PYG");
+  const [tendered, setTendered] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (option && !option.currencies.includes(currency)) setCurrency(option.currencies[0]);
+  }, [option, currency]);
+
+  useEffect(() => {
+    if (type !== "DELIVERY" || !coords) return;
+    let cancel = false;
+    setQuote({ state: "loading" });
+    fetch("/api/delivery-quote", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug: data.slug, ...coords, subtotalPyg: subtotal }),
+    })
+      .then((r) => r.json())
+      .then((q) => {
+        if (cancel) return;
+        if (q.ok) setQuote({ state: "ok", feePyg: q.feePyg, distanceKm: q.distanceKm, free: q.free });
+        else if (q.reason === "NO_STORE_LOCATION") setQuote({ state: "ok", feePyg: q.baseFeePyg ?? 0 });
+        else setQuote({ state: "error", message: q.reason === "OUT_OF_RANGE" ? `Fuera del área de delivery (${q.distanceKm} km)` : "No se pudo calcular" });
+      })
+      .catch(() => !cancel && setQuote({ state: "error", message: "No se pudo calcular" }));
+    return () => {
+      cancel = true;
+    };
+  }, [type, coords, subtotal, data.slug]);
+
+  const locate = () => {
+    if (!navigator.geolocation) return setQuote({ state: "error", message: "Tu navegador no comparte ubicación" });
+    setQuote({ state: "loading" });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => setQuote({ state: "error", message: "Permití el acceso a la ubicación para calcular el delivery" }),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
+
+  const deliveryFee = type === "DELIVERY" && quote.state === "ok" ? quote.feePyg : 0;
+  const total = subtotal + deliveryFee;
+  const totalInCurrency = pygToMinor(total, currency, data.rates);
+  const tenderedMinor = tendered ? parseMajorToMinor(tendered, currency) : null;
+  const tenderedPyg = tenderedMinor == null ? null : minorToPyg(tenderedMinor, currency, data.rates);
+  const change = tenderedPyg != null ? tenderedPyg - total : null;
+
+  const canSubmit =
+    name.trim().length >= 2 &&
+    !!method &&
+    !submitting &&
+    (type !== "DELIVERY" || (address.trim() && phone.trim() && quote.state === "ok")) &&
+    (method !== "CASH" || !tendered || (change != null && change >= 0));
+
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug: data.slug,
+          customerName: name,
+          customerPhone: phone || null,
+          type,
+          tableCode: data.table?.code ?? null,
+          address: type === "DELIVERY" ? address : null,
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
+          notes: notes || null,
+          items: lines.map((l) => ({ productId: l.product.id, quantity: l.qty })),
+          paymentMethod: method,
+          payCurrency: currency,
+          cashTenderedMinor: method === "CASH" ? tenderedMinor : null,
+        }),
+      });
+      const out = await res.json();
+      if (!res.ok) throw new Error(out.error ?? "No se pudo enviar el pedido");
+      onDone();
+      if (out.redirectUrl) window.location.href = out.redirectUrl;
+      else router.push(`/${data.slug}/pedido/${out.orderId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {data.table ? (
+        <div className={`${box} px-4 py-3 text-sm`}>
+          <span className="th-muted">Pedido para </span>
+          <b>{data.table.label}</b>
+        </div>
+      ) : (
+        <Segmented value={type} onChange={(v) => setType(v as OrderType)} options={typeOptions.map((t) => ({ value: t, label: LABELS.orderType[t] }))} />
+      )}
+
+      <div className="space-y-3">
+        <div>
+          <label className="label" htmlFor="name">Tu nombre</label>
+          <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Ej: Ana" />
+        </div>
+        {(type === "DELIVERY" || type === "PICKUP") && (
+          <div>
+            <label className="label" htmlFor="phone">WhatsApp / teléfono{type === "PICKUP" && " (opcional)"}</label>
+            <input id="phone" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="09xx xxx xxx" />
+          </div>
+        )}
+        {type === "DELIVERY" && (
+          <div className="space-y-2">
+            <label className="label" htmlFor="addr">Dirección de entrega</label>
+            <input id="addr" className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Calle, número, referencia" autoComplete="street-address" />
+            <button type="button" onClick={locate} className={`${ghostBtn} w-full py-3`}>
+              {coords ? "Ubicación compartida — actualizar" : "Compartir ubicación para calcular el delivery"}
+            </button>
+            {quote.state === "loading" && <p className="th-muted text-[13px]">Calculando delivery…</p>}
+            {quote.state === "error" && <p className="text-[13px] text-red-500">{quote.message}</p>}
+            {quote.state === "ok" && (
+              <p className="th-muted text-[13px]">
+                Delivery: <b style={{ color: "var(--fg)" }}>{quote.free ? "Gratis" : formatPyg(quote.feePyg)}</b>
+                {quote.distanceKm != null && ` · ${quote.distanceKm} km`}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <p className="label !mb-0">¿Cómo pagás?</p>
+        {options.length === 0 && <p className="text-sm text-red-500">El local no configuró medios de pago.</p>}
+        <div className="grid grid-cols-2 gap-2">
+          {options.map((o) => (
+            <button
+              key={o.method}
+              type="button"
+              onClick={() => setMethod(o.method)}
+              aria-pressed={method === o.method}
+              className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${method === o.method ? "th-accent border-transparent" : "th-surface th-line"}`}
+            >
+              {LABELS.paymentMethod[o.method]}
+            </button>
+          ))}
+        </div>
+        {option && option.currencies.length > 1 && (
+          <Segmented value={currency} onChange={(v) => setCurrency(v as Currency)} options={option.currencies.map((c) => ({ value: c, label: c === "PYG" ? "Gs." : c === "USD" ? "US$" : "R$" }))} />
+        )}
+        {method === "CASH" && (
+          <div>
+            <label className="label" htmlFor="tendered">¿Con cuánto pagás? (para el vuelto, opcional)</label>
+            <input id="tendered" className="input" value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" placeholder={currency === "PYG" ? "100.000" : "20"} />
+            {change != null && (
+              <p className={`mt-1.5 text-[13px] ${change < 0 ? "text-red-500" : "th-muted"}`}>
+                {change < 0 ? "El monto es menor al total" : <>Vuelto: <b style={{ color: "var(--fg)" }}>{formatPyg(change)}</b></>}
+              </p>
+            )}
+          </div>
+        )}
+        {method === "PIX" && data.payment.pixKey && (
+          <p className={`${box} px-4 py-3 text-[13px]`}>
+            Al confirmar te mostramos la clave Pix <b>{data.payment.pixKey}</b>.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className="label" htmlFor="notes">Observaciones (opcional)</label>
+        <textarea id="notes" className="input min-h-20" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Sin cebolla, bien cocido…" />
+      </div>
+
+      <div className={`${box} space-y-1.5 p-4 text-sm`}>
+        <Row k="Subtotal" v={formatPyg(subtotal)} />
+        {type === "DELIVERY" && <Row k="Delivery" v={quote.state === "ok" ? (quote.free ? "Gratis" : formatPyg(deliveryFee)) : "—"} />}
+        <div className="th-line my-2 border-t" />
+        <Row k={<b>Total</b>} v={<b className="text-lg">{formatPyg(total)}</b>} />
+        {currency !== "PYG" && <Row k={`En ${LABELS.currency[currency]}`} v={<b>{formatMinor(totalInCurrency, currency)}</b>} />}
+        {currency !== "PYG" && (
+          <p className="th-muted pt-1 text-xs">
+            Cotización del local: 1 {currency} = {formatPyg(data.rates[currency as "USD" | "BRL"])}
+          </p>
+        )}
+      </div>
+
+      {error && <p className="rounded-xl bg-red-100 px-4 py-3 text-sm text-red-800">{error}</p>}
+
+      <div className="flex gap-2">
+        <button onClick={onBack} className={ghostBtn}>
+          Volver
+        </button>
+        <button onClick={submit} disabled={!canSubmit} className={`${primaryBtn} flex-1`}>
+          {submitting ? "Enviando…" : `Confirmar · ${formatMinor(totalInCurrency, currency)}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: ReactNode; v: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="th-muted">{k}</span>
+      <span>{v}</span>
+    </div>
+  );
+}
+
+function Segmented({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
+  if (options.length <= 1) return null;
+  return (
+    <div className="th-surface th-line flex rounded-xl border p-1">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          aria-pressed={value === o.value}
+          className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${value === o.value ? "th-accent" : "th-muted"}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
