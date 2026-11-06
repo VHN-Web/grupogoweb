@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { LABELS, type OrderStatus } from "@/core/types";
+import { getLabels, type OrderStatus } from "@/core/types";
+import { getRegion, tr } from "@/core/region";
 import { parsePaymentConfig } from "@/core/tenant-config";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { Receipt } from "@/components/Receipt";
@@ -27,6 +28,9 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
   });
   if (!order) notFound();
 
+  const region = getRegion(tenant.country);
+  const T = tr(region.locale);
+  const LABELS = getLabels(region.locale);
   const steps = STEPS[order.type];
   const current = steps.indexOf(order.status);
   const cancelled = order.status === "CANCELLED";
@@ -41,7 +45,7 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
       <div className="no-print">
         <Link href={`/${slug}`} className="th-muted text-sm">← {tenant.name}</Link>
         <div className="mt-5 text-center">
-          <p className="th-muted text-sm">Tu número de pedido</p>
+          <p className="th-muted text-sm">{T("Tu número de pedido", "Número do seu pedido")}</p>
           <p className="th-h th-accent-text text-6xl font-black tracking-tight tabular-nums">{order.number}</p>
           <p className="th-muted mt-1 text-sm">
             {order.customerName}
@@ -50,7 +54,7 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
         </div>
 
         {cancelled ? (
-          <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-700">Pedido cancelado</p>
+          <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-700">{T("Pedido cancelado", "Pedido cancelado")}</p>
         ) : (
           <ol className="mt-8 grid grid-cols-4 gap-2">
             {steps.map((s, i) => (
@@ -66,28 +70,28 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
 
         {order.paymentStatus === "PENDING" && !cancelled && (
           <div className="th-surface th-line mt-6 rounded-2xl border p-4 text-sm">
-            <p className="font-semibold">Pago pendiente · {LABELS.paymentMethod[order.paymentMethod]}</p>
+            <p className="font-semibold">{T("Pago pendiente", "Pagamento pendente")} · {LABELS.paymentMethod[order.paymentMethod]}</p>
             <p className="th-muted mt-1">
               {order.paymentMethod === "PIX" && pay.pixKey
-                ? `Enviá el Pix a la clave ${pay.pixKey}${pay.pixHolder ? ` (${pay.pixHolder})` : ""} y mostrá el comprobante.`
+                ? T(`Enviá el Pix a la clave ${pay.pixKey}${pay.pixHolder ? ` (${pay.pixHolder})` : ""} y mostrá el comprobante.`, `Envie o Pix para a chave ${pay.pixKey}${pay.pixHolder ? ` (${pay.pixHolder})` : ""} e mostre o comprovante.`)
                 : order.paymentMethod === "TRANSFER" && pay.bankInfo
                   ? pay.bankInfo
                   : order.paymentMethod === "CASH"
-                    ? "Pagás en efectivo al recibir o en caja."
-                    : "Pagás al recibir o en caja."}
+                    ? T("Pagás en efectivo al recibir o en caja.", "Você paga em dinheiro ao receber ou no caixa.")
+                    : T("Pagás al recibir o en caja.", "Você paga ao receber ou no caixa.")}
             </p>
           </div>
         )}
         {order.paymentStatus === "FAILED" && (
-          <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">El pago fue rechazado. Avisá al personal o pagá en caja.</p>
+          <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{T("El pago fue rechazado. Avisá al personal o pagá en caja.", "O pagamento foi recusado. Avise a equipe ou pague no caixa.")}</p>
         )}
         {order.paymentStatus === "PAID" && (
-          <p className="mt-6 rounded-xl bg-emerald-50 px-4 py-3 text-center text-sm font-semibold text-emerald-800">Pago confirmado ✓</p>
+          <p className="mt-6 rounded-xl bg-emerald-50 px-4 py-3 text-center text-sm font-semibold text-emerald-800">{T("Pago confirmado", "Pagamento confirmado")} ✓</p>
         )}
 
         <div className="mt-8 mb-3 flex items-center justify-between">
-          <h2 className="th-muted text-[13px] font-semibold uppercase tracking-[.12em]">Comprobante</h2>
-          <PrintButton label="Imprimir / PDF" className="th-surface th-line rounded-xl border px-4 py-2.5 text-sm font-semibold" />
+          <h2 className="th-muted text-[13px] font-semibold uppercase tracking-[.12em]">{T("Comprobante", "Comprovante")}</h2>
+          <PrintButton label={T("Imprimir / PDF", "Imprimir / PDF")} className="th-surface th-line rounded-xl border px-4 py-2.5 text-sm font-semibold" />
         </div>
       </div>
       <div className="overflow-hidden rounded-2xl print:rounded-none">

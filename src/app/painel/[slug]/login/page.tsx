@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { setSession, verifyPassword } from "@/lib/auth";
 import { AuthShell } from "@/components/brand/AuthShell";
+import { getRegion, tr } from "@/core/region";
 
 export default async function Login({
   params,
@@ -13,8 +14,9 @@ export default async function Login({
 }) {
   const { slug } = await params;
   const { e } = await searchParams;
-  const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { id: true, name: true, primaryColor: true } });
+  const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { id: true, name: true, primaryColor: true, country: true } });
   if (!tenant) notFound();
+  const T = tr(getRegion(tenant.country).locale);
 
   async function login(formData: FormData) {
     "use server";
@@ -26,11 +28,11 @@ export default async function Login({
   }
 
   return (
-    <AuthShell eyebrow="Panel" title={tenant.name}>
+    <AuthShell eyebrow={T("Panel", "Painel")} title={tenant.name}>
       <form action={login} className="space-y-3">
-        <label className="label" htmlFor="password">Contraseña</label>
+        <label className="label" htmlFor="password">{T("Contraseña", "Senha")}</label>
         <input id="password" name="password" type="password" className="input" autoFocus required />
-        {e && <p className="text-sm text-red-400">Contraseña incorrecta</p>}
+        {e && <p className="text-sm text-red-400">{T("Contraseña incorrecta", "Senha incorreta")}</p>}
         <button className="btn-primary w-full py-3">Entrar</button>
       </form>
     </AuthShell>

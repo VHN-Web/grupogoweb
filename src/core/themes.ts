@@ -2,8 +2,8 @@
 // Cada tema define cores, fontes, o estilo do banner e o layout do cardápio.
 // A cor de destaque vem de tenant.primaryColor (o tema sugere uma padrão).
 
-export type ThemeId = "classic" | "burger" | "restaurant" | "cafe" | "store" | "bar";
-export type HeroStyle = "classic" | "promo" | "circle" | "card" | "showcase" | "glow";
+export type ThemeId = "classic" | "burger" | "restaurant" | "cafe" | "store" | "bar" | "barber" | "tech" | "perfume";
+export type HeroStyle = "classic" | "promo" | "circle" | "card" | "showcase" | "glow" | "pole" | "grid" | "luxe";
 
 export type Theme = {
   id: ThemeId;
@@ -130,6 +130,54 @@ export const THEMES: Record<ThemeId, Theme> = {
     accentFg: "#0F2A22",
     fonts: { heading: "'Bebas Neue', Impact, sans-serif", body: "'DM Sans', Inter, sans-serif", google: g("family=Bebas+Neue&family=DM+Sans:wght@400;500;700"), headingUpper: true },
     radius: 16,
+  },
+  barber: {
+    id: "barber",
+    labelEs: "Barbería",
+    segmentEs: "Barbería, peluquería, estética masculina",
+    label: "Barbearia",
+    segment: "Barbearia, salão, estética masculina",
+    hero: "pole",
+    layout: "list",
+    featured: true,
+    dark: true,
+    colors: { bg: "#141414", fg: "#EFE7DA", surface: "#1E1E1E", muted: "#A39B8F", line: "#2C2A27", heroBg: "#1B1A18", heroFg: "#EFE7DA", heroAlt: "#B3261E", tiles: ["#24211D", "#1F2328", "#2A1F1C"] },
+    accent: "#D4A657",
+    accentFg: "#141414",
+    fonts: { heading: "Oswald, Impact, sans-serif", body: "Inter, sans-serif", google: g("family=Oswald:wght@500;600;700&family=Inter:wght@400;600;700"), headingUpper: true },
+    radius: 10,
+  },
+  tech: {
+    id: "tech",
+    labelEs: "Tecnología",
+    segmentEs: "Informática, celulares, gamer, accesorios",
+    label: "Informática / Tecnologia",
+    segment: "Informática, celulares, games, acessórios",
+    hero: "grid",
+    layout: "grid",
+    featured: true,
+    dark: true,
+    colors: { bg: "#0B0F17", fg: "#E6EDF7", surface: "#121826", muted: "#8A97AD", line: "#1E2738", heroBg: "#0B0F17", heroFg: "#E6EDF7", heroAlt: "#22D3EE", tiles: ["#111B2B", "#161229", "#0F1F24"] },
+    accent: "#22D3EE",
+    accentFg: "#0B0F17",
+    fonts: { heading: "'Space Grotesk', Inter, sans-serif", body: "Inter, sans-serif", google: g("family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600;700") },
+    radius: 14,
+  },
+  perfume: {
+    id: "perfume",
+    labelEs: "Perfumería",
+    segmentEs: "Perfumes, cosméticos, belleza",
+    label: "Perfumaria / Cosméticos",
+    segment: "Perfumes, cosméticos, beleza",
+    hero: "luxe",
+    layout: "grid",
+    featured: false,
+    dark: false,
+    colors: { bg: "#FBF7F3", fg: "#2A1E22", surface: "#FFFFFF", muted: "#8A7A7E", line: "#EFE5DE", heroBg: "#2A1E22", heroFg: "#F7EDE6", heroAlt: "#C9A24A", tiles: ["#F6E6EC", "#F3ECE1", "#EAE6F2"] },
+    accent: "#8C3B5A",
+    accentFg: "#FFFFFF",
+    fonts: { heading: "'Cormorant Garamond', Georgia, serif", body: "Jost, Inter, sans-serif", google: g("family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Jost:wght@400;500;600"), headingItalic: true },
+    radius: 4,
   },
 };
 

@@ -19,6 +19,22 @@ type Store = {
   banner: { tag?: string; title: string; subtitle?: string; highlight?: string; ill: string };
   menu: Record<string, P[]>;
   payments?: object;
+  country?: "PY" | "BR";
+  lat?: number;
+  lng?: number;
+  phone?: string;
+};
+
+const PAYMENTS_BR = {
+  options: [
+    { method: "PIX", provider: "pix_manual", enabled: true, currencies: ["BRL"] },
+    { method: "CARD", provider: "mock_online", enabled: true, currencies: ["BRL"] },
+    { method: "CASH", provider: "cash", enabled: true, currencies: ["BRL"] },
+    { method: "TRANSFER", provider: "transfer_manual", enabled: false, currencies: ["BRL"] },
+  ],
+  pixKey: "demo@atlas.app",
+  pixHolder: "Demo Atlas",
+  credentials: {},
 };
 
 const PAYMENTS = {
@@ -153,24 +169,102 @@ const STORES: Store[] = [
       Picadas: [{ name: "Nachos Lúpulo", desc: "Cheddar, guacamole, jalapeño", price: 38000, ill: "nachos" }],
     },
   },
+  {
+    slug: "navalha",
+    name: "Barbearia Navalha",
+    theme: "barber",
+    color: "#D4A657",
+    tagline: "Cortes clássicos · Barba · Toalha quente",
+    address: "Rua XV de Novembro, Curitiba",
+    country: "BR",
+    lat: -25.4296,
+    lng: -49.2713,
+    phone: "+5541991234567",
+    banner: { tag: "Desde 2012", title: "Corte + Barba", subtitle: "Com toalha quente e cerveja gelada", highlight: "R$ 79,90", ill: "razor" },
+    payments: PAYMENTS_BR,
+    menu: {
+      Cortes: [
+        { name: "Corte clássico", desc: "Tesoura e máquina, lavagem inclusa", price: 4990, ill: "scissors" },
+        { name: "Degradê navalhado", desc: "Fade com acabamento na navalha", price: 5990, ill: "razor" },
+        { name: "Corte infantil", desc: "Até 12 anos", price: 3990, ill: "comb" },
+      ],
+      Barba: [
+        { name: "Barba completa", desc: "Toalha quente, navalha e balm", price: 3990, ill: "razor" },
+        { name: "Corte + Barba", desc: "O combo da casa", price: 7990, ill: "scissors" },
+      ],
+      Produtos: [
+        { name: "Pomada modeladora 120 g", desc: "Efeito matte, fixação média", price: 4500, ill: "pomade", stock: 14 },
+        { name: "Óleo para barba 30 ml", desc: "Cedro e sândalo", price: 3900, ill: "cream", stock: 9 },
+      ],
+    },
+  },
+  {
+    slug: "tecnoplus",
+    name: "TecnoPlus",
+    theme: "tech",
+    color: "#22D3EE",
+    tagline: "Informática · Celulares · Gamer",
+    address: "Av. Monseñor Rodríguez, Ciudad del Este",
+    banner: { tag: "Black week", title: "Notebooks con 15% off", highlight: "Desde Gs. 3.290.000", ill: "laptop" },
+    menu: {
+      Notebooks: [
+        { name: "Notebook Pro 14\"", desc: "Ryzen 7, 16 GB RAM, SSD 512 GB", price: 5490000, ill: "laptop", stock: 5 },
+        { name: "Notebook Air 13\"", desc: "Core i5, 8 GB, SSD 256 GB", price: 3290000, ill: "laptop", stock: 7 },
+      ],
+      Celulares: [
+        { name: "Smartphone X12 128 GB", desc: "Pantalla AMOLED 6,5\"", price: 1890000, ill: "phone", stock: 12 },
+        { name: "Smartphone Lite 64 GB", desc: "Batería 5000 mAh", price: 990000, ill: "phone", stock: 3 },
+      ],
+      Accesorios: [
+        { name: "Auriculares Bluetooth ANC", desc: "Cancelación de ruido · 30 h", price: 420000, ill: "headphones", stock: 18 },
+        { name: "Mouse gamer RGB", desc: "16.000 DPI, 7 botones", price: 185000, ill: "mouse", stock: 25 },
+      ],
+    },
+  },
+  {
+    slug: "essenza",
+    name: "Essenza",
+    theme: "perfume",
+    color: "#8C3B5A",
+    tagline: "Perfumaria · Cosméticos",
+    address: "Rua Oscar Freire, São Paulo",
+    country: "BR",
+    lat: -23.5617,
+    lng: -46.6702,
+    phone: "+5511987654321",
+    banner: { tag: "Dia das Mães", title: "Kits presenteáveis", highlight: "até 30% off", ill: "perfume" },
+    payments: PAYMENTS_BR,
+    menu: {
+      Perfumes: [
+        { name: "Eau de Parfum Rosé 100 ml", desc: "Floral · rosa, peônia e almíscar", price: 38990, ill: "perfume", stock: 8 },
+        { name: "Eau de Toilette Cedro 100 ml", desc: "Amadeirado · cedro e bergamota", price: 29990, ill: "perfume", stock: 6 },
+      ],
+      Maquiagem: [
+        { name: "Batom matte Vinho", desc: "Longa duração", price: 5990, ill: "lipstick", stock: 30 },
+        { name: "Batom cremoso Nude", desc: "Com manteiga de karité", price: 5490, ill: "lipstick", stock: 2 },
+      ],
+      Skincare: [{ name: "Hidratante facial 50 ml", desc: "Ácido hialurônico e vitamina C", price: 8990, ill: "cream", stock: 15 }],
+    },
+  },
 ];
 
 async function seedStore(db: DB, s: Store) {
-  const tenant = await provisionTenant(db, { name: s.name, slug: s.slug, password: "demo1234", theme: s.theme, primaryColor: s.color, tables: 8, lat: -25.5097, lng: -54.6111 });
+  const tenant = await provisionTenant(db, { name: s.name, slug: s.slug, password: "demo1234", theme: s.theme, primaryColor: s.color, tables: 8, lat: s.lat ?? -25.5097, lng: s.lng ?? -54.6111, country: s.country ?? "PY" });
+  const br = s.country === "BR";
   await db
     .update(schema.tenants)
     .set({
       isOpen: true,
       tagline: s.tagline,
       address: s.address,
-      phone: "+595 981 000000",
-      deliveryFreeOverPyg: 200000,
+      phone: s.phone ?? "+595981000000",
+      deliveryFreeOverPyg: br ? 15000 : 200000,
       bannerTag: s.banner.tag ?? null,
       bannerTitle: s.banner.title,
       bannerSubtitle: s.banner.subtitle ?? null,
       bannerHighlight: s.banner.highlight ?? null,
       bannerIllustration: s.banner.ill,
-      paymentConfig: JSON.stringify(PAYMENTS),
+      paymentConfig: JSON.stringify(s.payments ?? PAYMENTS),
     })
     .where(eq(schema.tenants.id, tenant.id));
   let order = 1;
@@ -196,10 +290,13 @@ async function seedStore(db: DB, s: Store) {
 async function main() {
   const db = createDb();
   // --if-empty: usado no deploy — só cria as lojas demo se o banco ainda não tiver nenhum estabelecimento
+  // --if-empty (deploy): NÃO apaga nada; só cria as lojas demo que ainda não existem.
   if (process.argv.includes("--if-empty")) {
-    const any = await db.query.tenants.findFirst({ columns: { id: true } });
-    if (any) {
-      console.log("Banco já tem dados — seed ignorado.");
+    const existing = new Set((await db.query.tenants.findMany({ columns: { slug: true } })).map((t) => t.slug));
+    if (existing.size > 0) {
+      const missing = STORES.filter((s) => !existing.has(s.slug));
+      for (const s of missing) await seedStore(db, s);
+      console.log(missing.length ? `Lojas demo adicionadas: ${missing.map((s) => s.slug).join(", ")}` : "Banco já tem dados — seed ignorado.");
       process.exit(0);
     }
   }

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
-import { formatMinor, formatPyg } from "@/core/money";
-import { LABELS, PAYMENT_METHODS } from "@/core/types";
+import { panelI18n } from "@/lib/panel-i18n";
+import { formatMinor } from "@/core/money";
+import { PAYMENT_METHODS, CURRENCIES } from "@/core/types";
+import { CURRENCY_SYMBOL } from "@/core/money";
 import { getOpenSession, listSessions, summarizeSession } from "@/services/cash";
 import { PayBadge } from "@/components/PayBadge";
 import { addCashMovement, closeCash, markOrderPaid, openCash } from "../actions";
@@ -13,6 +15,8 @@ export const dynamic = "force-dynamic";
 export default async function CashPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const t = await requireTenantAdmin(slug);
+  const { T, L, fm, fmtDate, region } = panelI18n(t);
+  const sym = CURRENCY_SYMBOL[t.currency as keyof typeof CURRENCY_SYMBOL];
   const session = await getOpenSession(t.id);
   const history = await listSessions(t.id, 10);
 
@@ -20,108 +24,108 @@ export default async function CashPage({ params }: { params: Promise<{ slug: str
     return (
       <div className="mx-auto max-w-md space-y-6">
         <div className="card p-6">
-          <h1 className="text-xl font-bold">Abrir caja</h1>
-          <p className="mt-1 text-sm text-muted">Los pedidos se asocian a la caja abierta para el cierre del día.</p>
+          <h1 className="text-xl font-bold">{T("Abrir caja", "Abrir caixa")}</h1>
+          <p className="mt-1 text-sm text-muted">{T("Los pedidos se asocian a la caja abierta para el cierre del día.", "Os pedidos ficam ligados ao caixa aberto para o fechamento do dia.")}</p>
           <form action={openCash.bind(null, slug)} className="mt-4 space-y-3">
-            <label className="label">Fondo inicial en efectivo (Gs.)</label>
-            <input name="openingAmountPyg" className="input" inputMode="numeric" defaultValue="0" />
-            <button className="btn-brand w-full">Abrir caja</button>
+            <label className="label">{T("Fondo inicial en efectivo", "Fundo de troco inicial")} ({sym})</label>
+            <input name="openingAmountPyg" className="input" inputMode="decimal" defaultValue="0" />
+            <button className="btn-brand w-full">{T("Abrir caja", "Abrir caixa")}</button>
           </form>
         </div>
-        <History items={history} />
+        <History items={history} T={T} fm={fm} fmtDate={fmtDate} />
       </div>
     );
   }
 
-  const s = await summarizeSession(t.id, session.id);
+  const s = await summarizeSession(t.id, session.id, t.currency);
   const orders = await db.query.orders.findMany({
     where: and(eq(schema.orders.tenantId, t.id), eq(schema.orders.cashSessionId, session.id)),
     orderBy: desc(schema.orders.createdAt),
   });
-  const opened = new Intl.DateTimeFormat("es-PY", { dateStyle: "short", timeStyle: "short", timeZone: "America/Asuncion" }).format(session.openedAt);
+  const opened = fmtDate(session.openedAt);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold">Caja abierta</h1>
-          <p className="text-sm text-muted">Desde {opened} · fondo {formatPyg(session.openingAmountPyg)}</p>
+          <h1 className="text-xl font-bold">{T("Caja abierta", "Caixa aberto")}</h1>
+          <p className="text-sm text-muted">{T("Desde", "Desde")} {opened} · {T("fondo", "fundo")} {fm(session.openingAmountPyg)}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat k="Cobrado" v={formatPyg(s.paidTotalPyg)} strong />
-        <Stat k="Por cobrar" v={formatPyg(s.pendingTotalPyg)} />
-        <Stat k="Pedidos" v={String(s.ordersCount)} />
-        <Stat k="Esperado en caja (Gs.)" v={formatPyg(s.expectedPygInDrawer)} strong />
+        <Stat k={T("Cobrado", "Recebido")} v={fm(s.paidTotalPyg)} strong />
+        <Stat k={T("Por cobrar", "A receber")} v={fm(s.pendingTotalPyg)} />
+        <Stat k={T("Pedidos", "Pedidos")} v={String(s.ordersCount)} />
+        <Stat k={`${T("Esperado en caja", "Esperado no caixa")} (${sym})`} v={fm(s.expectedPygInDrawer)} strong />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="card p-4">
-          <h2 className="font-semibold">Por medio de pago</h2>
+          <h2 className="font-semibold">{T("Por medio de pago", "Por forma de pagamento")}</h2>
           <ul className="mt-2 space-y-1.5 text-sm">
             {PAYMENT_METHODS.map((m) => (
-              <li key={m} className="flex justify-between"><span className="text-muted">{LABELS.paymentMethod[m]}</span><b>{formatPyg(s.byMethod[m])}</b></li>
+              <li key={m} className="flex justify-between"><span className="text-muted">{L.paymentMethod[m]}</span><b>{fm(s.byMethod[m])}</b></li>
             ))}
           </ul>
-          <h3 className="mt-4 text-sm font-semibold">Efectivo recibido por moneda</h3>
+          <h3 className="mt-4 text-sm font-semibold">{T("Efectivo recibido por moneda", "Dinheiro recebido por moeda")}</h3>
           <ul className="mt-1.5 space-y-1 text-sm">
-            <li className="flex justify-between"><span className="text-muted">Guaraníes</span><b>{formatMinor(s.cashByCurrency.PYG, "PYG")}</b></li>
-            <li className="flex justify-between"><span className="text-muted">Dólares</span><b>{formatMinor(s.cashByCurrency.USD, "USD")}</b></li>
-            <li className="flex justify-between"><span className="text-muted">Reales</span><b>{formatMinor(s.cashByCurrency.BRL, "BRL")}</b></li>
-            <li className="flex justify-between"><span className="text-muted">Vuelto entregado</span><b>-{formatPyg(s.changeGivenPyg)}</b></li>
+            {[t.currency, ...CURRENCIES.filter((c) => c !== t.currency && s.cashByCurrency[c] > 0)].map((c) => (
+              <li key={c} className="flex justify-between"><span className="text-muted">{CUR_NAME[c as keyof typeof CUR_NAME][region.locale]}</span><b>{formatMinor(s.cashByCurrency[c as keyof typeof s.cashByCurrency], c as keyof typeof CUR_NAME)}</b></li>
+            ))}
+            <li className="flex justify-between"><span className="text-muted">{T("Vuelto entregado", "Troco entregue")}</span><b>-{fm(s.changeGivenPyg)}</b></li>
           </ul>
         </div>
 
         <div className="card p-4">
-          <h2 className="font-semibold">Movimientos</h2>
+          <h2 className="font-semibold">{T("Movimientos", "Movimentações")}</h2>
           <form action={addCashMovement.bind(null, slug)} className="mt-3 grid grid-cols-[auto_1fr] gap-2">
             <select name="type" className="input w-auto">
-              <option value="OUT">Retiro / gasto</option>
-              <option value="IN">Ingreso</option>
+              <option value="OUT">{T("Retiro / gasto", "Sangria / despesa")}</option>
+              <option value="IN">{T("Ingreso", "Suprimento")}</option>
             </select>
-            <input name="amountPyg" className="input" inputMode="numeric" placeholder="Monto Gs." />
-            <input name="description" className="input col-span-2" placeholder="Descripción (ej: hielo, cambio)" />
-            <button className="btn-primary col-span-2">Registrar</button>
+            <input name="amountPyg" className="input" inputMode="decimal" placeholder={`${T("Monto", "Valor")} ${sym}`} />
+            <input name="description" className="input col-span-2" placeholder={T("Descripción (ej: hielo, cambio)", "Descrição (ex: gelo, troco)")} />
+            <button className="btn-primary col-span-2">{T("Registrar", "Registrar")}</button>
           </form>
           <ul className="mt-3 space-y-1 text-sm">
             {session.movements.map((m) => (
               <li key={m.id} className="flex justify-between gap-2">
                 <span className="truncate text-muted">{m.description}</span>
-                <b className={m.type === "OUT" ? "text-red-600" : "text-emerald-700"}>{m.type === "OUT" ? "-" : "+"}{formatPyg(m.amountPyg)}</b>
+                <b className={m.type === "OUT" ? "text-red-600" : "text-emerald-700"}>{m.type === "OUT" ? "-" : "+"}{fm(m.amountPyg)}</b>
               </li>
             ))}
           </ul>
         </div>
 
         <div className="card p-4">
-          <h2 className="font-semibold">Cerrar caja</h2>
-          <p className="mt-1 text-sm text-muted">Contá el efectivo en guaraníes. Esperado: <b className="text-ink">{formatPyg(s.expectedPygInDrawer)}</b></p>
+          <h2 className="font-semibold">{T("Cerrar caja", "Fechar caixa")}</h2>
+          <p className="mt-1 text-sm text-muted">{T("Contá el efectivo en", "Conte o dinheiro em")} {sym}. {T("Esperado", "Esperado")}: <b className="text-ink">{fm(s.expectedPygInDrawer)}</b></p>
           <form action={closeCash.bind(null, slug, session.id)} className="mt-3 space-y-2">
-            <input name="countedAmountPyg" className="input" inputMode="numeric" placeholder="Monto contado (Gs.)" required />
-            <textarea name="notes" className="input" placeholder="Observaciones (USD/BRL contados, diferencias…)" />
-            <button className="btn-brand w-full">Cerrar caja</button>
+            <input name="countedAmountPyg" className="input" inputMode="decimal" placeholder={`${T("Monto contado", "Valor contado")} (${sym})`} required />
+            <textarea name="notes" className="input" placeholder={T("Observaciones (otras monedas contadas, diferencias…)", "Observações (outras moedas, diferenças…)")} />
+            <button className="btn-brand w-full">{T("Cerrar caja", "Fechar caixa")}</button>
           </form>
         </div>
       </div>
 
       <div className="card divide-y divide-line">
-        <h2 className="px-4 py-3 font-semibold">Ventas de esta caja</h2>
-        {orders.length === 0 && <p className="px-4 py-4 text-sm text-muted">Sin ventas todavía.</p>}
+        <h2 className="px-4 py-3 font-semibold">{T("Ventas de esta caja", "Vendas deste caixa")}</h2>
+        {orders.length === 0 && <p className="px-4 py-4 text-sm text-muted">{T("Sin ventas todavía.", "Nenhuma venda ainda.")}</p>}
         {orders.map((o) => (
           <div key={o.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm">
             <Link href={`/painel/${slug}/pedidos/${o.id}`} className="w-14 font-bold tabular-nums hover:underline">#{o.number}</Link>
             <span className="min-w-24 flex-1 truncate">{o.customerName}</span>
-            <span className="text-muted">{LABELS.paymentMethod[o.paymentMethod]}{o.payCurrency !== "PYG" && ` (${o.payCurrency})`}</span>
-            <PayBadge status={o.status === "CANCELLED" ? "FAILED" : o.paymentStatus} />
-            <b className="w-28 text-right">{formatPyg(o.totalPyg)}</b>
+            <span className="text-muted">{L.paymentMethod[o.paymentMethod]}{o.payCurrency !== t.currency && ` (${o.payCurrency})`}</span>
+            <PayBadge status={o.status === "CANCELLED" ? "FAILED" : o.paymentStatus} locale={region.locale} />
+            <b className="w-28 text-right">{fm(o.totalPyg)}</b>
             {o.paymentStatus !== "PAID" && o.status !== "CANCELLED" && (
-              <form action={markOrderPaid.bind(null, slug, o.id)}><button className="btn-ghost px-2.5 py-1 text-xs">Cobrar</button></form>
+              <form action={markOrderPaid.bind(null, slug, o.id)}><button className="btn-ghost px-2.5 py-1 text-xs">{T("Cobrar", "Receber")}</button></form>
             )}
           </div>
         ))}
       </div>
-      <History items={history.filter((h) => h.closedAt)} />
+      <History items={history.filter((h) => h.closedAt)} T={T} fm={fm} fmtDate={fmtDate} />
     </div>
   );
 }
@@ -135,18 +139,34 @@ function Stat({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   );
 }
 
-function History({ items }: { items: Awaited<ReturnType<typeof listSessions>> }) {
+const CUR_NAME = {
+  PYG: { es: "Guaraníes", pt: "Guaranis" },
+  USD: { es: "Dólares", pt: "Dólares" },
+  BRL: { es: "Reales", pt: "Reais" },
+} as const;
+
+function History({
+  items,
+  T,
+  fm,
+  fmtDate,
+}: {
+  items: Awaited<ReturnType<typeof listSessions>>;
+  T: (es: string, pt: string) => string;
+  fm: (v: number) => string;
+  fmtDate: (d: Date) => string;
+}) {
   const closed = items.filter((i) => i.closedAt);
   if (!closed.length) return null;
-  const f = new Intl.DateTimeFormat("es-PY", { dateStyle: "short", timeStyle: "short", timeZone: "America/Asuncion" });
+  const f = { format: fmtDate };
   return (
     <div className="card p-4">
-      <h2 className="font-semibold">Cierres anteriores</h2>
+      <h2 className="font-semibold">{T("Cierres anteriores", "Fechamentos anteriores")}</h2>
       <ul className="mt-2 space-y-1 text-sm">
         {closed.map((c) => (
           <li key={c.id} className="flex justify-between gap-2">
             <span className="text-muted">{f.format(c.openedAt)} → {c.closedAt && f.format(c.closedAt)}</span>
-            <b>{formatPyg(c.countedAmountPyg ?? 0)}</b>
+            <b>{fm(c.countedAmountPyg ?? 0)}</b>
           </li>
         ))}
       </ul>

@@ -126,3 +126,12 @@ body {
   background: #c9a24a;
   color: #0e0e10;
 }
+
+/* Barbearia: poste listrado animado */
+@keyframes poleSlide {
+  from { background-position: 0 0; }
+  to { background-position: 0 128px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="poleSlide"] { animation: none !important; }
+}

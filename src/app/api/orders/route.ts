@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     return NextResponse.json(result, { status: 201 });
   } catch (e) {
     if (e instanceof OrderError) return NextResponse.json({ error: e.message, code: e.code }, { status: 400 });
-    if (e instanceof ZodError) return NextResponse.json({ error: "Revisá los datos del pedido", issues: e.issues }, { status: 400 });
+    if (e instanceof ZodError) return NextResponse.json({ error: "Revisá los datos del pedido · Revise os dados do pedido", issues: e.issues }, { status: 400 });
     console.error("[orders] erro", e);
     return NextResponse.json({ error: "Error interno. Intentá de nuevo." }, { status: 500 });
   }

@@ -56,7 +56,7 @@ export type CashSummary = {
   expectedPygInDrawer: number;
 };
 
-export async function summarizeSession(tenantId: string, sessionId: string): Promise<CashSummary> {
+export async function summarizeSession(tenantId: string, sessionId: string, baseCurrency: string = "PYG"): Promise<CashSummary> {
   const session = await db.query.cashSessions.findFirst({
     where: and(eq(schema.cashSessions.id, sessionId), eq(schema.cashSessions.tenantId, tenantId)),
     with: { movements: true },
@@ -91,7 +91,7 @@ export async function summarizeSession(tenantId: string, sessionId: string): Pro
       s.cashByCurrency[o.payCurrency] += received;
       const change = o.changeDuePyg ?? 0;
       s.changeGivenPyg += change;
-      if (o.payCurrency === "PYG") s.expectedPygInDrawer += received;
+      if (o.payCurrency === baseCurrency) s.expectedPygInDrawer += received;
       s.expectedPygInDrawer -= change;
     }
   }

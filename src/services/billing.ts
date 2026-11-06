@@ -27,6 +27,9 @@ import { CURRENCIES, type Currency } from "@/core/types";
 import { getBillingProvider } from "@/adapters/billing/registry";
 import { sendEmail, sendWhatsApp } from "@/adapters/notify";
 import { provisionTenant, RESERVED_SLUGS } from "./provision";
+import { getRegion, tr } from "@/core/region";
+
+const Tc = (c: { country?: string | null }) => tr(getRegion(c.country).locale);
 import { hashPassword } from "@/lib/password";
 import { appUrl, tenantPublicUrl } from "@/lib/urls";
 import type { Customer, Plan } from "@/db/schema";
@@ -99,6 +102,7 @@ export type NewCustomerInput = {
   domainName?: string | null;
   notes?: string | null;
   theme?: string | null;
+  country?: string;
 };
 
 export async function createCustomer(input: NewCustomerInput) {
@@ -122,6 +126,7 @@ export async function createCustomer(input: NewCustomerInput) {
       planId: plan.id,
       preferredCurrency: input.preferredCurrency,
       theme: getTheme(input.theme).id,
+      country: getRegion(input.country).country,
       wantsDomain: input.wantsDomain,
       domainName: input.wantsDomain ? input.domainName || null : null,
       notes: input.notes || null,
@@ -146,12 +151,18 @@ export async function createCustomer(input: NewCustomerInput) {
   if (isZero(amounts)) {
     await markInvoicePaid(inv.id, { provider: "free" });
   } else {
+    const T = Tc(customer);
     await notifyCustomer(
       customer,
-      `${settings.companyName}: pago de implementación`,
-      `Hola ${customer.contactName}! Gracias por elegir ${settings.companyName} para ${customer.businessName}.\n\n` +
-        `Para comenzar la implementación, realizá el pago (${amountsText(amounts)}) en el siguiente enlace. Podés elegir pagar en guaraníes, dólares o reales:\n${invoiceUrl(inv.id)}\n\n` +
-        `Apenas se confirme el pago empezamos a preparar tu sistema.`,
+      `${settings.companyName}: ${T("pago de implementación", "pagamento da implantação")}`,
+      T(
+        `Hola ${customer.contactName}! Gracias por elegir ${settings.companyName} para ${customer.businessName}.\n\n` +
+          `Para comenzar la implementación, realizá el pago (${amountsText(amounts)}) en el siguiente enlace. Podés elegir pagar en guaraníes, dólares o reales:\n${invoiceUrl(inv.id)}\n\n` +
+          `Apenas se confirme el pago empezamos a preparar tu sistema.`,
+        `Olá ${customer.contactName}! Obrigado por escolher a ${settings.companyName} para ${customer.businessName}.\n\n` +
+          `Para começarmos a implantação, faça o pagamento (${amountsText(amounts)}) no link abaixo (Pix, cartão ou boleto em reais, ou em dólares/guaranis):\n${invoiceUrl(inv.id)}\n\n` +
+          `Assim que o pagamento for confirmado começamos a preparar o seu sistema.`,
+      ),
     );
   }
   return customer;
@@ -240,7 +251,7 @@ async function onSetupPaid(customerId: string) {
     for (let i = 2; await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { id: true } }); i++) {
       slug = `${c.desiredSlug}-${i}`;
     }
-    const tenant = await provisionTenant(db, { name: c.businessName, slug, password: randomPassword(16), tables: 10, theme: c.theme });
+    const tenant = await provisionTenant(db, { name: c.businessName, slug, password: randomPassword(16), tables: 10, theme: c.theme, country: c.country });
     await db.update(schema.tenants).set({ ruc: c.ruc, phone: c.whatsapp }).where(eq(schema.tenants.id, tenant.id));
     tenantId = tenant.id;
   }
@@ -275,11 +286,14 @@ async function onSetupPaid(customerId: string) {
   }
   await db.insert(schema.adminTasks).values(tasks.map((t) => ({ ...t, customerId: c.id })));
 
+  const T = Tc(c);
   await notifyCustomer(
     c,
-    `${settings.companyName}: ¡pago recibido!`,
-    `Hola ${c.contactName}, recibimos el pago de la implementación de ${c.businessName}. ` +
-      `Ya estamos preparando tu sistema y te avisamos apenas esté listo.`,
+    `${settings.companyName}: ${T("¡pago recibido!", "pagamento recebido!")}`,
+    T(
+      `Hola ${c.contactName}, recibimos el pago de la implementación de ${c.businessName}. Ya estamos preparando tu sistema y te avisamos apenas esté listo.`,
+      `Olá ${c.contactName}, recebemos o pagamento da implantação de ${c.businessName}. Já estamos preparando o seu sistema e avisamos assim que estiver pronto.`,
+    ),
   );
 }
 
@@ -294,7 +308,12 @@ async function onSubscriptionPaid(customerId: string) {
     if (c.tenantId) await db.update(schema.tenants).set({ suspended: false }).where(eq(schema.tenants.id, c.tenantId));
   }
   const settings = await getSettings();
-  await notifyCustomer(c, `${settings.companyName}: pago confirmado`, `¡Gracias ${c.contactName}! Confirmamos el pago de tu suscripción.`);
+  const T = Tc(c);
+  await notifyCustomer(
+    c,
+    `${settings.companyName}: ${T("pago confirmado", "pagamento confirmado")}`,
+    T(`¡Gracias ${c.contactName}! Confirmamos el pago de tu suscripción.`, `Obrigado, ${c.contactName}! Confirmamos o pagamento da sua assinatura.`),
+  );
 }
 
 // ---------------------------------------------------------------- entrega
@@ -317,13 +336,20 @@ export async function deliverCustomer(customerId: string) {
     .where(eq(schema.customers.id, c.id));
 
   const site = tenantPublicUrl(c.tenant);
+  const T = Tc(c);
   await notifyCustomer(
     c,
-    `${settings.companyName}: ¡tu sistema está listo!`,
-    `Hola ${c.contactName}! El sistema de ${c.businessName} está listo.\n\n` +
-      `Menú para tus clientes: ${site}\n` +
-      `Panel: ${appUrl()}/painel/${c.tenant.slug}\nContraseña: ${password}\n(cambiala en Configuración)\n\n` +
-      `Tu primera ${c.plan.interval === "YEARLY" ? "anualidad" : "mensualidad"} (${amountsText(planPrice(c.plan))}) ya está disponible:\n${invoiceUrl(inv.id)}`,
+    `${settings.companyName}: ${T("¡tu sistema está listo!", "seu sistema está pronto!")}`,
+    T(
+      `Hola ${c.contactName}! El sistema de ${c.businessName} está listo.\n\n` +
+        `Menú para tus clientes: ${site}\n` +
+        `Panel: ${appUrl()}/painel/${c.tenant.slug}\nContraseña: ${password}\n(cambiala en Configuración)\n\n` +
+        `Tu primera ${c.plan.interval === "YEARLY" ? "anualidad" : "mensualidad"} (${amountsText(planPrice(c.plan))}) ya está disponible:\n${invoiceUrl(inv.id)}`,
+      `Olá ${c.contactName}! O sistema de ${c.businessName} está pronto.\n\n` +
+        `Cardápio/loja para seus clientes: ${site}\n` +
+        `Painel: ${appUrl()}/painel/${c.tenant.slug}\nSenha: ${password}\n(troque em Configurações)\n\n` +
+        `Sua primeira ${c.plan.interval === "YEARLY" ? "anuidade" : "mensalidade"} (${amountsText(planPrice(c.plan))}) já está disponível:\n${invoiceUrl(inv.id)}`,
+    ),
   );
   return { password };
 }
@@ -378,12 +404,15 @@ export async function runBillingCycle(now = new Date()) {
       const inv = await createSubscriptionInvoice(fresh, c.plan, next, end, next);
       await db.update(schema.customers).set({ nextBillingAt: end }).where(eq(schema.customers.id, c.id));
       out.invoicesCreated++;
+      const T = Tc(fresh);
+      const val = amountsText({ PYG: inv.amountPyg, USD: inv.amountUsdMinor, BRL: inv.amountBrlMinor });
       await notifyCustomer(
         fresh,
-        `${settings.companyName}: nueva factura`,
-        `Hola ${c.contactName}, tu factura de ${c.businessName} vence el ${fmtDate(next)}.\n` +
-          `Valor: ${amountsText({ PYG: inv.amountPyg, USD: inv.amountUsdMinor, BRL: inv.amountBrlMinor })}\n` +
-          `Pagá aquí (guaraníes, dólares o reales): ${invoiceUrl(inv.id)}`,
+        `${settings.companyName}: ${T("nueva factura", "nova fatura")}`,
+        T(
+          `Hola ${c.contactName}, tu factura de ${c.businessName} vence el ${fmtDate(next)}.\nValor: ${val}\nPagá aquí (guaraníes, dólares o reales): ${invoiceUrl(inv.id)}`,
+          `Olá ${c.contactName}, sua fatura de ${c.businessName} vence em ${fmtDate(next)}.\nValor: ${val}\nPague aqui: ${invoiceUrl(inv.id)}`,
+        ),
       );
       next = end;
     }
@@ -405,20 +434,26 @@ export async function runBillingCycle(now = new Date()) {
       await db.update(schema.customers).set({ status: "SUSPENDED" }).where(eq(schema.customers.id, c.id));
       if (c.tenantId) await db.update(schema.tenants).set({ suspended: true }).where(eq(schema.tenants.id, c.tenantId));
       out.suspended++;
+      const T = Tc(c);
       await notifyCustomer(
         c,
-        `${settings.companyName}: servicio suspendido`,
-        `Hola ${c.contactName}, el menú de ${c.businessName} fue suspendido por falta de pago. ` +
-          `Al pagar se reactiva automáticamente: ${invoiceUrl(inv.id)}`,
+        `${settings.companyName}: ${T("servicio suspendido", "serviço suspenso")}`,
+        T(
+          `Hola ${c.contactName}, el menú de ${c.businessName} fue suspendido por falta de pago. Al pagar se reactiva automáticamente: ${invoiceUrl(inv.id)}`,
+          `Olá ${c.contactName}, o site de ${c.businessName} foi suspenso por falta de pagamento. Ao pagar ele é reativado automaticamente: ${invoiceUrl(inv.id)}`,
+        ),
       );
     } else if (state === "PAST_DUE" && c.status === "ACTIVE") {
       await db.update(schema.customers).set({ status: "PAST_DUE" }).where(eq(schema.customers.id, c.id));
       out.pastDue++;
+      const T = Tc(c);
       await notifyCustomer(
         c,
-        `${settings.companyName}: factura vencida`,
-        `Hola ${c.contactName}, tu factura venció el ${fmtDate(inv.dueAt)}. ` +
-          `Para evitar la suspensión del servicio en ${settings.graceDays} días, pagá aquí: ${invoiceUrl(inv.id)}`,
+        `${settings.companyName}: ${T("factura vencida", "fatura vencida")}`,
+        T(
+          `Hola ${c.contactName}, tu factura venció el ${fmtDate(inv.dueAt)}. Para evitar la suspensión del servicio en ${settings.graceDays} días, pagá aquí: ${invoiceUrl(inv.id)}`,
+          `Olá ${c.contactName}, sua fatura venceu em ${fmtDate(inv.dueAt)}. Para evitar a suspensão do serviço em ${settings.graceDays} dias, pague aqui: ${invoiceUrl(inv.id)}`,
+        ),
       );
     }
   }

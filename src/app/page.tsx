@@ -6,6 +6,8 @@ import { Illustration } from "@/components/Illustration";
 import { formatMinor, formatPyg } from "@/core/money";
 import { THEMES, type ThemeId } from "@/core/themes";
 import { getSettings } from "@/services/billing";
+import { headers } from "next/headers";
+import { detectLocale, tr, type Locale } from "@/core/region";
 
 export const dynamic = "force-dynamic";
 
@@ -15,21 +17,32 @@ const MUTED = "#B9B3A7";
 const H = "'Bricolage Grotesque', Inter, sans-serif";
 
 // Lojas de demonstração criadas pelo seed (npm run db:setup)
-const DEMOS: { slug: string; name: string; theme: ThemeId; art: string; kind: string }[] = [
-  { kind: "Hamburguesería", slug: "brasa-burger", name: "Brasa Burger", theme: "burger", art: "burger" },
-  { kind: "Restaurante", slug: "nonna-lucia", name: "Nonna Lucía", theme: "restaurant", art: "pizza" },
-  { kind: "Cafetería", slug: "cafe-morena", name: "Café Morena", theme: "cafe", art: "coffee" },
-  { kind: "Tienda", slug: "kira", name: "KIRA", theme: "store", art: "dress" },
-  { kind: "Bar · Cervecería", slug: "lupulo", name: "Lúpulo", theme: "bar", art: "beer" },
+const DEMOS: { slug: string; name: string; theme: ThemeId; art: string; kind: [string, string] }[] = [
+  { kind: ["Hamburguesería", "Hamburgueria"], slug: "brasa-burger", name: "Brasa Burger", theme: "burger", art: "burger" },
+  { kind: ["Barbería", "Barbearia"], slug: "navalha", name: "Navalha", theme: "barber", art: "razor" },
+  { kind: ["Restaurante", "Restaurante"], slug: "nonna-lucia", name: "Nonna Lucía", theme: "restaurant", art: "pizza" },
+  { kind: ["Informática", "Informática"], slug: "tecnoplus", name: "TecnoPlus", theme: "tech", art: "laptop" },
+  { kind: ["Cafetería", "Cafeteria"], slug: "cafe-morena", name: "Café Morena", theme: "cafe", art: "coffee" },
+  { kind: ["Perfumería", "Perfumaria"], slug: "essenza", name: "Essenza", theme: "perfume", art: "perfume" },
+  { kind: ["Tienda de ropa", "Loja de roupas"], slug: "kira", name: "KIRA", theme: "store", art: "dress" },
+  { kind: ["Bar · Cervecería", "Bar · Cervejaria"], slug: "lupulo", name: "Lúpulo", theme: "bar", art: "beer" },
 ];
 
-const FEATURES = [
+const FEATURES_ES = [
   { icon: "qr", t: "Menú con QR por mesa", d: "Cada mesa tiene su código. El cliente escanea, elige y pide sin descargar nada." },
   { icon: "bell", t: "Pedidos en tiempo real", d: "Cocina y caja ven cada pedido al instante, con número, mesa y nombre del cliente." },
   { icon: "cash", t: "Caja multi-moneda", d: "Cobrá en guaraníes, dólares o reales con tu cotización del día. El vuelto se calcula solo." },
   { icon: "box", t: "Control de stock", d: "Los productos se descuentan con cada venta y se marcan como agotados automáticamente." },
   { icon: "route", t: "Delivery con distancia", d: "La tarifa se recalcula según la ubicación del cliente, con radio máximo y envío gratis." },
   { icon: "doc", t: "Comprobantes y facturas", d: "Comprobante automático en cada pedido y registro de facturas. Preparado para SIFEN." },
+];
+const FEATURES_PT = [
+  { icon: "qr", t: "Cardápio com QR por mesa", d: "Cada mesa tem seu código. O cliente escaneia, escolhe e pede sem baixar nada." },
+  { icon: "bell", t: "Pedidos em tempo real", d: "Cozinha e caixa veem cada pedido na hora, com número, mesa e nome do cliente." },
+  { icon: "cash", t: "Caixa e Pix", d: "Receba por Pix, cartão ou dinheiro. Fechamento de caixa com troco calculado automaticamente." },
+  { icon: "box", t: "Controle de estoque", d: "Os produtos são baixados a cada venda e marcados como esgotados automaticamente." },
+  { icon: "route", t: "Delivery por distância", d: "A taxa é recalculada pela localização do cliente, com raio máximo e frete grátis." },
+  { icon: "doc", t: "Comprovantes e notas", d: "Comprovante automático em cada pedido e registro das notas fiscais emitidas e recebidas." },
 ];
 
 const ICONS: Record<string, React.ReactNode> = {
@@ -76,39 +89,68 @@ const ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
-const FAQ = [
+const FAQ_PT = [
+  ["Meus clientes precisam baixar um app?", "Não. Eles escaneiam o QR com a câmera e o cardápio abre no navegador do celular."],
+  ["Funciona para barbearia, perfumaria e loja de informática?", "Sim. Tem modelos prontos para hamburguerias, restaurantes, cafeterias, bares, barbearias, perfumarias, lojas de roupa e de tecnologia."],
+  ["Quem cadastra o cardápio ou os produtos?", "Nós fazemos a implantação: cadastramos seus produtos, logo, cores e mesas."],
+  ["Posso usar meu próprio domínio?", "Sim. No plano anual o domínio está incluso; no mensal é um adicional."],
+  ["Como recebo os pagamentos?", "Pix, cartão na maquininha ou dinheiro — você escolhe o que aceita no painel."],
+];
+
+const FAQ_ES = [
   ["¿Mis clientes tienen que descargar una app?", "No. Escanean el QR con la cámara y el menú abre en el navegador del celular."],
   ["¿Puedo cobrar en dólares y reales?", "Sí. Definís la cotización del día y el sistema convierte el total y calcula el vuelto en guaraníes."],
   ["¿Quién carga el menú?", "Nosotros hacemos la implementación: cargamos tu menú, tu logo, tus colores y tus mesas."],
   ["¿Puedo usar mi propio dominio?", "Sí. En el plan anual el dominio está incluido; en el mensual se agrega como adicional."],
-  ["¿Sirve para tiendas, no solo restaurantes?", "Sí. Hay modelos para hamburgueserías, restaurantes, cafeterías, bares y tiendas."],
+  ["¿Sirve para tiendas, no solo restaurantes?", "Sí. Hay modelos para hamburgueserías, restaurantes, cafeterías, bares, barberías, perfumerías, tiendas de ropa y de informática."],
 ];
+
+// Tradução das features padrão dos planos (texto editável no admin; o que não estiver aqui aparece como cadastrado)
+const FEATURE_PT: Record<string, string> = {
+  "Menú QR y pedidos ilimitados": "Cardápio QR e pedidos ilimitados",
+  "Caja, stock y comprobantes": "Caixa, estoque e comprovantes",
+  "Pagos en Gs., US$ y R$": "Pagamentos por Pix, cartão e dinheiro",
+  "Dominio propio opcional (adicional)": "Domínio próprio opcional (adicional)",
+  "100% de las funciones": "100% dos recursos",
+  "Implementación prioritaria": "Implantação prioritária",
+  "Soporte por WhatsApp": "Suporte por WhatsApp",
+};
 
 const wrap = "mx-auto w-full max-w-[1200px] px-6 sm:px-8";
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ lang?: string }> }) {
+  const sp = await searchParams;
+  const locale: Locale = sp.lang === "pt" || sp.lang === "es" ? sp.lang : detectLocale(await headers());
+  const pt = locale === "pt";
+  const T = tr(locale);
+  const FEATURES = pt ? FEATURES_PT : FEATURES_ES;
+  const FAQ = pt ? FAQ_PT : FAQ_ES;
   const [settings, plans] = await Promise.all([
     getSettings(),
     db.query.plans.findMany({ where: eq(schema.plans.active, true), orderBy: asc(schema.plans.sortOrder) }),
   ]);
-  const wa = settings.supportWhatsapp ? `https://wa.me/${settings.supportWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent("Hola! Quiero conocer Atlas para mi local.")}` : "#planes";
+  const wa = settings.supportWhatsapp ? `https://wa.me/${settings.supportWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(T("Hola! Quiero conocer Atlas para mi local.", "Olá! Quero conhecer o Atlas para o meu negócio."))}` : "#planes";
 
   return (
-    <div style={{ background: IVORY, color: INK }} className="font-sans">
+    <div style={{ background: IVORY, color: INK }} className="font-sans" lang={pt ? "pt-BR" : "es"}>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Anton&display=swap" precedence="default" />
 
       {/* NAV */}
       <header style={{ background: INK }} className="border-b border-[#2C2C31]">
         <nav className={`${wrap} flex flex-wrap items-center gap-x-7 gap-y-3 py-5`}>
-          <Link href="/" aria-label="Atlas, inicio">
+          <Link href="/" aria-label={T("Atlas, inicio", "Atlas, início")}>
             <AtlasLogo height={30} />
           </Link>
           <div className="flex-1" />
-          <a href="#modelos" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>Modelos</a>
-          <a href="#funciones" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>Funciones</a>
-          <a href="#planes" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>Planes</a>
-          <Link href="/painel" className="rounded-xl border border-[#45454B] px-4 py-2.5 text-[15px] font-semibold text-[#F4F1EA]">Ingresar</Link>
-          <a href={wa} className="rounded-xl px-4 py-2.5 text-[15px] font-bold" style={{ background: ATLAS_GOLD, color: INK }}>Solicitar demo</a>
+          <a href="#modelos" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>{T("Modelos", "Modelos")}</a>
+          <a href="#funciones" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>{T("Funciones", "Recursos")}</a>
+          <a href="#planes" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>{T("Planes", "Planos")}</a>
+          <span className="flex overflow-hidden rounded-xl border border-[#45454B] text-[13px] font-bold">
+            <a href="?lang=es" className="px-2.5 py-2" style={{ background: pt ? "transparent" : "#2A2B2F", color: pt ? MUTED : IVORY }}>ES</a>
+            <a href="?lang=pt" className="px-2.5 py-2" style={{ background: pt ? "#2A2B2F" : "transparent", color: pt ? IVORY : MUTED }}>PT</a>
+          </span>
+          <Link href="/painel" className="rounded-xl border border-[#45454B] px-4 py-2.5 text-[15px] font-semibold text-[#F4F1EA]">{T("Ingresar", "Entrar")}</Link>
+          <a href={wa} className="rounded-xl px-4 py-2.5 text-[15px] font-bold" style={{ background: ATLAS_GOLD, color: INK }}>{T("Solicitar demo", "Pedir demonstração")}</a>
         </nav>
       </header>
 
@@ -116,23 +158,26 @@ export default async function Home() {
       <section style={{ background: INK, color: IVORY }} className="overflow-hidden">
         <div className={`${wrap} flex flex-wrap items-center gap-14 pb-24 pt-16 sm:pt-20`}>
           <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-7">
-            <span className="text-[13px] font-semibold uppercase tracking-[0.22em]" style={{ color: ATLAS_GOLD }}>Restaurantes · Bares · Cafeterías · Tiendas</span>
+            <span className="text-[13px] font-semibold uppercase tracking-[0.22em]" style={{ color: ATLAS_GOLD }}>{T("Restaurantes · Bares · Barberías · Tiendas", "Restaurantes · Barbearias · Perfumarias · Lojas")}</span>
             <h1 style={{ fontFamily: H }} className="text-[clamp(42px,5.4vw,76px)] font-extrabold leading-[1.02] tracking-[-0.025em]">
-              Tu negocio,
+              {T("Tu negocio,", "Seu negócio,")}
               <br />
-              bajo control total.
+              {T("bajo control total.", "sob controle total.")}
             </h1>
             <p className="max-w-[540px] text-[19px] leading-relaxed" style={{ color: MUTED }}>
-              Menú con QR, pedidos en tiempo real, caja multi-moneda y stock. Un sitio con la cara de tu marca, sin instalar nada.
+              {T(
+                "Menú con QR, pedidos en tiempo real, caja multi-moneda y stock. Un sitio con la cara de tu marca, sin instalar nada.",
+                "Cardápio e vitrine com QR, pedidos em tempo real, caixa, Pix e estoque. Um site com a cara da sua marca, sem instalar nada.",
+              )}
             </p>
             <div className="flex flex-wrap gap-3">
-              <a href={wa} className="rounded-2xl px-6 py-4 text-[17px] font-bold" style={{ background: ATLAS_GOLD, color: INK }}>Quiero Atlas en mi local</a>
-              <a href="#modelos" className="rounded-2xl border border-[#45454B] px-6 py-4 text-[17px] font-semibold">Ver modelos en vivo</a>
+              <a href={wa} className="rounded-2xl px-6 py-4 text-[17px] font-bold" style={{ background: ATLAS_GOLD, color: INK }}>{T("Quiero Atlas en mi local", "Quero o Atlas no meu negócio")}</a>
+              <a href="#modelos" className="rounded-2xl border border-[#45454B] px-6 py-4 text-[17px] font-semibold">{T("Ver modelos en vivo", "Ver modelos ao vivo")}</a>
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1 text-sm" style={{ color: MUTED }}>
-              <span>✓ Guaraníes, dólares y reales</span>
-              <span>✓ Sin app: solo QR</span>
-              <span>✓ Implementación incluida</span>
+              <span>{T("✓ Guaraníes, dólares y reales", "✓ Pix, cartão e dinheiro")}</span>
+              <span>{T("✓ Sin app: solo QR", "✓ Sem app: só QR")}</span>
+              <span>{T("✓ Implementación incluida", "✓ Implantação inclusa")}</span>
             </div>
           </div>
 
@@ -145,15 +190,15 @@ export default async function Home() {
                   <div className="absolute -right-6 top-8"><Illustration name="burger" size={170} /></div>
                   <div className="relative flex w-[140px] flex-col gap-1 pl-4 pt-10">
                     <span className="-rotate-3 self-start rounded bg-[#FFC20E] px-2 py-0.5 text-[10px] font-extrabold text-black">PROMO</span>
-                    <span className="text-[30px] uppercase leading-[0.95]" style={{ fontFamily: "Anton, Impact, sans-serif" }}>Combo doble</span>
-                    <span className="text-lg text-[#FFC20E]" style={{ fontFamily: "Anton, Impact, sans-serif" }}>Gs. 59.000</span>
+                    <span className="text-[30px] uppercase leading-[0.95]" style={{ fontFamily: "Anton, Impact, sans-serif" }}>{T("Combo doble", "Combo duplo")}</span>
+                    <span className="text-lg text-[#FFC20E]" style={{ fontFamily: "Anton, Impact, sans-serif" }}>{T("Gs. 59.000", "R$ 39,90")}</span>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 p-3">
                   {[
-                    ["burger", "Doble Brasa", "Gs. 52.000"],
-                    ["fries", "Papas Brasa", "Gs. 18.000"],
-                    ["soda", "Gaseosa", "Gs. 9.000"],
+                    ["burger", "Doble Brasa", T("Gs. 52.000", "R$ 34,90")],
+                    ["fries", T("Papas Brasa", "Batata Brasa"), T("Gs. 18.000", "R$ 14,90")],
+                    ["soda", T("Gaseosa", "Refrigerante"), T("Gs. 9.000", "R$ 7,00")],
                   ].map(([a, n, p]) => (
                     <div key={n} className="flex items-center gap-3 rounded-2xl bg-[#1E1E1E] p-2.5">
                       <span className="grid h-14 w-14 place-items-center rounded-xl bg-[#2A2416]"><Illustration name={a} size={48} /></span>
@@ -162,20 +207,23 @@ export default async function Home() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-auto m-3 flex justify-between rounded-2xl bg-[#FFC20E] px-4 py-3 text-sm font-extrabold text-black"><span>Ver pedido · 2</span><span>Gs. 70.000</span></div>
+                <div className="mt-auto m-3 flex justify-between rounded-2xl bg-[#FFC20E] px-4 py-3 text-sm font-extrabold text-black"><span>{T("Ver pedido · 2", "Ver pedido · 2")}</span><span>{T("Gs. 70.000", "R$ 49,80")}</span></div>
               </div>
             </div>
             <div className="absolute left-0 top-16 flex w-[230px] flex-col gap-1.5 rounded-[18px] bg-white p-4 text-[#0E0E10] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
-              <span className="text-xs text-[#6A655C]">Nuevo pedido · Mesa 4</span>
+              <span className="text-xs text-[#6A655C]">{T("Nuevo pedido · Mesa 4", "Novo pedido · Mesa 4")}</span>
               <span style={{ fontFamily: H }} className="text-3xl font-extrabold">#4821</span>
-              <span className="text-[13px]">1× Doble Brasa · 1× Papas</span>
-              <div className="mt-1 flex items-center justify-between"><b className="text-sm">US$ 9,60</b><span className="rounded-full bg-[#DDEFE7] px-2.5 py-1 text-[11px] font-bold text-[#1F6F55]">Pagado</span></div>
+              <span className="text-[13px]">{T("1× Doble Brasa · 1× Papas", "1× Doble Brasa · 1× Batata")}</span>
+              <div className="mt-1 flex items-center justify-between"><b className="text-sm">{T("US$ 9,60", "R$ 49,80")}</b><span className="rounded-full bg-[#DDEFE7] px-2.5 py-1 text-[11px] font-bold text-[#1F6F55]">{T("Pagado", "Pago · Pix")}</span></div>
             </div>
             <div className="absolute bottom-16 right-0 flex w-[230px] flex-col gap-2.5 rounded-[18px] border border-[#3A3A40] bg-[#2A2B2F] p-4 text-[13px] text-[#F4F1EA] shadow-[0_24px_50px_rgba(0,0,0,0.45)]">
-              <span className="text-xs" style={{ color: MUTED }}>Caja de hoy (ejemplo)</span>
-              <div className="flex justify-between"><span>Guaraníes</span><b>Gs. 1.840.000</b></div>
-              <div className="flex justify-between"><span>Dólares</span><b>US$ 120,00</b></div>
-              <div className="flex justify-between"><span>Reales</span><b>R$ 310,00</b></div>
+              <span className="text-xs" style={{ color: MUTED }}>{T("Caja de hoy (ejemplo)", "Caixa de hoje (exemplo)")}</span>
+              {(pt
+                ? [["Pix", "R$ 1.840,00"], ["Cartão", "R$ 960,00"], ["Dinheiro", "R$ 310,00"]]
+                : [["Guaraníes", "Gs. 1.840.000"], ["Dólares", "US$ 120,00"], ["Reales", "R$ 310,00"]]
+              ).map(([k, v]) => (
+                <div key={k} className="flex justify-between"><span>{k}</span><b>{v}</b></div>
+              ))}
             </div>
           </div>
         </div>
@@ -184,7 +232,7 @@ export default async function Home() {
       {/* MODELOS */}
       <section id="modelos" className="py-24">
         <div className={`${wrap} flex flex-col gap-12`}>
-          <SectionTitle eyebrow="Modelos" title="Un sitio con la cara de tu negocio." sub="Elegí el modelo, tu logo y tus colores. Tocá uno para probarlo en vivo." />
+          <SectionTitle eyebrow={T("Modelos", "Modelos")} title={T("Un sitio con la cara de tu negocio.", "Um site com a cara do seu negócio.")} sub={T("Elegí el modelo, tu logo y tus colores. Tocá uno para probarlo en vivo.", "Escolha o modelo, seu logo e suas cores. Toque em um para testar ao vivo.")} />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
             {DEMOS.map((d) => {
               const th = THEMES[d.theme];
@@ -200,8 +248,8 @@ export default async function Home() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-sm font-semibold">{d.kind}</span>
-                    <span className="text-sm font-semibold" style={{ color: "#8A6A1F" }}>Ver →</span>
+                    <span className="text-sm font-semibold">{T(d.kind[0], d.kind[1])}</span>
+                    <span className="text-sm font-semibold" style={{ color: "#8A6A1F" }}>{T("Ver →", "Ver →")}</span>
                   </div>
                 </Link>
               );
@@ -213,7 +261,7 @@ export default async function Home() {
       {/* FUNCIONES */}
       <section id="funciones" style={{ background: INK }} className="py-24">
         <div className={`${wrap} flex flex-col gap-12`}>
-          <SectionTitle dark eyebrow="Funciones" title="Todo lo que tu local necesita. Nada que sobre." />
+          <SectionTitle dark eyebrow={T("Funciones", "Recursos")} title={T("Todo lo que tu local necesita. Nada que sobre.", "Tudo o que o seu negócio precisa. Nada sobrando.")} />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
             {FEATURES.map((f) => (
               <div key={f.t} className="flex flex-col gap-3.5 rounded-3xl border border-[#2C2C31] bg-[#141417] p-7">
@@ -228,11 +276,18 @@ export default async function Home() {
             ))}
           </div>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-8 pt-6">
-            {[
-              ["01", "Lo configuramos por vos", "Cargamos tu menú, tu marca y tus mesas. Vos solo revisás."],
-              ["02", "Imprimís tus QR", "Uno por mesa y uno general para Instagram, WhatsApp y el mostrador."],
-              ["03", "Empezás a vender", "Los pedidos llegan al panel; la caja y el stock se actualizan solos."],
-            ].map(([n, t, d]) => (
+            {(pt
+              ? [
+                  ["01", "A gente configura pra você", "Cadastramos seus produtos, sua marca e suas mesas. Você só revisa."],
+                  ["02", "Você imprime seus QR", "Um por mesa e um geral para Instagram, WhatsApp e balcão."],
+                  ["03", "Começa a vender", "Os pedidos chegam no painel; caixa e estoque se atualizam sozinhos."],
+                ]
+              : [
+                  ["01", "Lo configuramos por vos", "Cargamos tu menú, tu marca y tus mesas. Vos solo revisás."],
+                  ["02", "Imprimís tus QR", "Uno por mesa y uno general para Instagram, WhatsApp y el mostrador."],
+                  ["03", "Empezás a vender", "Los pedidos llegan al panel; la caja y el stock se actualizan solos."],
+                ]
+            ).map(([n, t, d]) => (
               <div key={n} className="flex flex-col gap-3 border-t-2 pt-5" style={{ borderColor: ATLAS_GOLD }}>
                 <span style={{ fontFamily: H, color: ATLAS_GOLD }} className="text-[42px] font-extrabold leading-none">{n}</span>
                 <h3 style={{ fontFamily: H }} className="text-2xl font-bold text-[#F4F1EA]">{t}</h3>
@@ -246,32 +301,38 @@ export default async function Home() {
       {/* PLANES */}
       <section id="planes" className="py-24">
         <div className={`${wrap} flex flex-col gap-12`}>
-          <SectionTitle eyebrow="Planes" title="Simple de contratar. Pagás como prefieras." sub="Guaraníes, dólares o reales." />
+          <SectionTitle eyebrow={T("Planes", "Planos")} title={T("Simple de contratar. Pagás como prefieras.", "Simples de contratar. Pague como preferir.")} sub={T("Guaraníes, dólares o reales.", "Pix, cartão ou boleto — em reais.")} />
           <div className="grid max-w-[940px] grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-5">
             {plans.map((p) => {
               const hi = p.interval === "YEARLY";
               return (
                 <div key={p.id} className="flex flex-col gap-5 rounded-3xl border-[1.5px] p-9" style={{ background: hi ? INK : "#FFFFFF", color: hi ? IVORY : INK, borderColor: hi ? ATLAS_GOLD : "#DDD6C8" }}>
-                  {hi ? <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider" style={{ background: ATLAS_GOLD, color: INK }}>Más elegido</span> : <span className="h-[30px]" />}
+                  {hi ? <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider" style={{ background: ATLAS_GOLD, color: INK }}>{T("Más elegido", "Mais escolhido")}</span> : <span className="h-[30px]" />}
                   <h3 style={{ fontFamily: H }} className="text-3xl font-extrabold">{p.name}</h3>
                   <div className="flex flex-wrap items-baseline gap-2">
-                    <span style={{ fontFamily: H }} className="text-[40px] font-extrabold tracking-tight">{formatPyg(p.pricePyg)}</span>
-                    <span style={{ color: hi ? MUTED : "#5F5A52" }}>/ {hi ? "año" : "mes"}</span>
+                    <span style={{ fontFamily: H }} className="text-[40px] font-extrabold tracking-tight">{pt ? formatMinor(p.priceBrlMinor, "BRL") : formatPyg(p.pricePyg)}</span>
+                    <span style={{ color: hi ? MUTED : "#5F5A52" }}>/ {hi ? T("año", "ano") : T("mes", "mês")}</span>
                   </div>
                   <p className="text-sm" style={{ color: hi ? MUTED : "#5F5A52" }}>
-                    o {formatMinor(p.priceUsdMinor, "USD")} · {formatMinor(p.priceBrlMinor, "BRL")}
-                    {p.setupPyg > 0 && <> · implementación {formatPyg(p.setupPyg)}</>}
+                    {pt ? (
+                      <>{p.setupBrlMinor > 0 ? <>+ implantação {formatMinor(p.setupBrlMinor, "BRL")}</> : "implantação inclusa"}</>
+                    ) : (
+                      <>
+                        o {formatMinor(p.priceUsdMinor, "USD")} · {formatMinor(p.priceBrlMinor, "BRL")}
+                        {p.setupPyg > 0 && <> · implementación {formatPyg(p.setupPyg)}</>}
+                      </>
+                    )}
                   </p>
                   <ul className="flex flex-col gap-3 text-[15.5px]">
-                    {(p.features ?? "").split("\n").filter(Boolean).map((f) => (
+                    {(p.features ?? "").split("\n").filter(Boolean).map((f) => (pt ? FEATURE_PT[f.trim()] ?? f : f)).map((f) => (
                       <li key={f} className="flex items-start gap-2.5">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ATLAS_GOLD} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>
                         {f}
                       </li>
                     ))}
-                    {p.includesDomain && <li className="flex items-start gap-2.5"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ATLAS_GOLD} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>Dominio propio incluido</li>}
+                    {p.includesDomain && <li className="flex items-start gap-2.5"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ATLAS_GOLD} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>{T("Dominio propio incluido", "Domínio próprio incluso")}</li>}
                   </ul>
-                  <a href={wa} className="mt-auto rounded-2xl py-4 text-center font-bold" style={{ background: hi ? ATLAS_GOLD : INK, color: hi ? INK : IVORY }}>Quiero este plan</a>
+                  <a href={wa} className="mt-auto rounded-2xl py-4 text-center font-bold" style={{ background: hi ? ATLAS_GOLD : INK, color: hi ? INK : IVORY }}>{T("Quiero este plan", "Quero este plano")}</a>
                 </div>
               );
             })}
@@ -282,7 +343,7 @@ export default async function Home() {
       {/* FAQ */}
       <section className="pb-24">
         <div className={`${wrap} flex flex-wrap gap-12`}>
-          <h2 style={{ fontFamily: H }} className="flex-[1_1_280px] text-[clamp(32px,3.2vw,46px)] font-extrabold leading-tight tracking-tight">Preguntas frecuentes</h2>
+          <h2 style={{ fontFamily: H }} className="flex-[1_1_280px] text-[clamp(32px,3.2vw,46px)] font-extrabold leading-tight tracking-tight">{T("Preguntas frecuentes", "Perguntas frequentes")}</h2>
           <div className="min-w-0 flex-[2_1_520px] border-t border-[#DDD6C8]">
             {FAQ.map(([q, a]) => (
               <details key={q} className="border-b border-[#DDD6C8] py-5">
@@ -297,15 +358,15 @@ export default async function Home() {
       {/* CTA */}
       <section style={{ background: INK }} className="py-24 text-center">
         <div className={`${wrap} flex flex-col items-center gap-6`}>
-          <h2 style={{ fontFamily: H }} className="text-[clamp(36px,4.4vw,64px)] font-extrabold leading-[1.04] tracking-tight text-[#F4F1EA]">Llevá tu negocio al siguiente nivel.</h2>
-          <p className="max-w-[560px] text-lg" style={{ color: MUTED }}>Te mostramos Atlas funcionando con tu propio menú. Sin compromiso.</p>
-          <a href={wa} className="rounded-2xl px-8 py-4 text-lg font-bold" style={{ background: ATLAS_GOLD, color: INK }}>Hablar por WhatsApp</a>
+          <h2 style={{ fontFamily: H }} className="text-[clamp(36px,4.4vw,64px)] font-extrabold leading-[1.04] tracking-tight text-[#F4F1EA]">{T("Llevá tu negocio al siguiente nivel.", "Leve seu negócio para o próximo nível.")}</h2>
+          <p className="max-w-[560px] text-lg" style={{ color: MUTED }}>{T("Te mostramos Atlas funcionando con tu propio menú. Sin compromiso.", "Mostramos o Atlas funcionando com os seus produtos. Sem compromisso.")}</p>
+          <a href={wa} className="rounded-2xl px-8 py-4 text-lg font-bold" style={{ background: ATLAS_GOLD, color: INK }}>{T("Hablar por WhatsApp", "Falar no WhatsApp")}</a>
         </div>
       </section>
       <footer style={{ background: INK }} className="border-t border-[#2C2C31]">
         <div className={`${wrap} flex flex-wrap items-center justify-between gap-4 py-8 text-sm`} style={{ color: MUTED }}>
           <AtlasLogo height={20} />
-          <span>© {new Date().getFullYear()} Atlas · Sistema para gastronomía y comercios</span>
+          <span>© {new Date().getFullYear()} Atlas · {T("Sistema para gastronomía y comercios", "Sistema para gastronomia, serviços e comércio")}</span>
         </div>
       </footer>
     </div>

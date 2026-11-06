@@ -8,6 +8,8 @@ export type DeliveryRules = {
   perKmPyg: number;
   maxKm: number;
   freeOverPyg: number | null;
+  /** passo de arredondamento em minor units (PYG 500; BRL 50 = R$ 0,50) */
+  roundStep?: number;
 };
 
 export type DeliveryQuote =
@@ -15,8 +17,8 @@ export type DeliveryQuote =
   | { ok: false; reason: "OUT_OF_RANGE" | "NO_LOCATION"; distanceKm?: number };
 
 /** Arredonda taxas para múltiplos de Gs. 500 (troco prático). */
-export function roundFee(pyg: number): number {
-  return Math.ceil(pyg / 500) * 500;
+export function roundFee(v: number, step = 500): number {
+  return Math.ceil(v / step) * step;
 }
 
 export function quoteDelivery(
@@ -30,6 +32,6 @@ export function quoteDelivery(
   if (rules.freeOverPyg != null && subtotalPyg >= rules.freeOverPyg) {
     return { ok: true, feePyg: 0, distanceKm: d, free: true };
   }
-  const fee = roundFee(rules.baseFeePyg + rules.perKmPyg * d);
+  const fee = roundFee(rules.baseFeePyg + rules.perKmPyg * d, rules.roundStep ?? 500);
   return { ok: true, feePyg: fee, distanceKm: d, free: false };
 }

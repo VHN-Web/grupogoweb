@@ -15,9 +15,14 @@ export function nextStatus(o: Pick<Order, "status" | "type">): OrderStatus | nul
   }
 }
 
-export const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
-  PREPARING: "Preparar",
-  READY: "Marcar listo",
-  OUT_FOR_DELIVERY: "Salió a entregar",
-  COMPLETED: "Entregado",
+const NEXT: Partial<Record<OrderStatus, [string, string]>> = {
+  PREPARING: ["Preparar", "Preparar"],
+  READY: ["Marcar listo", "Marcar pronto"],
+  OUT_FOR_DELIVERY: ["Salió a entregar", "Saiu para entrega"],
+  COMPLETED: ["Entregado", "Entregue"],
 };
+
+export function nextLabel(s: OrderStatus, locale: "es" | "pt"): string {
+  const l = NEXT[s];
+  return l ? l[locale === "pt" ? 1 : 0] : "";
+}

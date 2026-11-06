@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { parseMajorToMinor } from "@/core/money";
+import { COUNTRIES, getRegion, isValidE164 } from "@/core/region";
 import { clearSession, hashPassword, requireTenantAdmin } from "@/lib/auth";
 import { randomTableCode } from "@/core/codes";
 import { CURRENCIES, ORDER_STATUSES, PAYMENT_METHODS, type Currency, type OrderStatus, type PaymentMethod } from "@/core/types";
@@ -37,6 +39,8 @@ const num = (f: FormData, k: string) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+/** Valor monetário digitado em unidade maior da moeda base do tenant → minor units. */
+const money = (f: FormData, k: string, cur: string) => parseMajorToMinor(str(f, k), cur as Currency) ?? 0;
 const bool = (f: FormData, k: string) => f.get(k) === "on" || f.get(k) === "true";
 const base = (slug: string) => `/painel/${slug}`;
 
@@ -93,7 +97,7 @@ export async function saveProduct(slug: string, f: FormData) {
     imageUrl,
     illustration: isIllustration(ill) ? ill : null,
     categoryId: optStr(f, "categoryId"),
-    pricePyg: int(f, "pricePyg"),
+    pricePyg: money(f, "pricePyg", t.currency),
     active: bool(f, "active"),
     trackStock: bool(f, "trackStock"),
   };
@@ -159,20 +163,20 @@ export async function deleteCategory(slug: string, id: string) {
 // ---------------- Caixa ----------------
 export async function openCash(slug: string, f: FormData) {
   const t = await requireTenantAdmin(slug);
-  await openSession(t.id, int(f, "openingAmountPyg"));
+  await openSession(t.id, money(f, "openingAmountPyg", t.currency));
   revalidatePath(`${base(slug)}/caixa`);
 }
 
 export async function closeCash(slug: string, sessionId: string, f: FormData) {
   const t = await requireTenantAdmin(slug);
-  await closeSession(t.id, sessionId, int(f, "countedAmountPyg"), optStr(f, "notes") ?? undefined);
+  await closeSession(t.id, sessionId, money(f, "countedAmountPyg", t.currency), optStr(f, "notes") ?? undefined);
   revalidatePath(`${base(slug)}/caixa`);
 }
 
 export async function addCashMovement(slug: string, f: FormData) {
   const t = await requireTenantAdmin(slug);
   const type = str(f, "type") === "IN" ? "IN" : "OUT";
-  const amount = int(f, "amountPyg");
+  const amount = money(f, "amountPyg", t.currency);
   if (amount <= 0) return;
   await addMovement(t.id, type, amount, str(f, "description") || (type === "IN" ? "Suprimento" : "Retiro"));
   revalidatePath(`${base(slug)}/caixa`);
@@ -181,7 +185,7 @@ export async function addCashMovement(slug: string, f: FormData) {
 // ---------------- Notas fiscais ----------------
 export async function registerFiscalDoc(slug: string, f: FormData) {
   const t = await requireTenantAdmin(slug);
-  const total = int(f, "totalPyg");
+  const total = money(f, "totalPyg", t.currency);
   if (total <= 0) return;
   const ivaMode = str(f, "iva");
   await db.insert(schema.fiscalDocuments).values({
@@ -292,7 +296,7 @@ export async function saveGeneral(slug: string, f: FormData) {
     .update(schema.tenants)
     .set({
       name: str(f, "name") || t.name,
-      phone: optStr(f, "phone"),
+      phone: isValidE164(str(f, "phone")) ? str(f, "phone") : null,
       address: optStr(f, "address"),
       ruc: optStr(f, "ruc"),
       acceptsDineIn: bool(f, "acceptsDineIn"),
@@ -303,27 +307,51 @@ export async function saveGeneral(slug: string, f: FormData) {
   revalidatePath(base(slug), "layout");
 }
 
+/** País/moeda do estabelecimento. Trocar a moeda NÃO converte preços já cadastrados. */
+export async function saveRegion(slug: string, f: FormData) {
+  const t = await requireTenantAdmin(slug);
+  const country = str(f, "country");
+  if (!(COUNTRIES as readonly string[]).includes(country)) throw new Error("País inválido");
+  const r = getRegion(country);
+  const changedCurrency = r.currency !== t.currency;
+  await db
+    .update(schema.tenants)
+    .set({
+      country,
+      currency: r.currency,
+      ...(changedCurrency ? { rateUsd: r.defaultRates.USD, rateBrl: r.defaultRates.BRL, ratePyg: r.defaultRates.PYG } : {}),
+    })
+    .where(eq(schema.tenants.id, t.id));
+  revalidatePath(base(slug), "layout");
+  revalidatePath(`/${t.slug}`);
+}
+
 export async function saveRates(slug: string, f: FormData) {
   const t = await requireTenantAdmin(slug);
   const usd = num(f, "rateUsd");
   const brl = num(f, "rateBrl");
+  const pyg = num(f, "ratePyg");
   await db
     .update(schema.tenants)
-    .set({ rateUsd: usd && usd > 0 ? usd : t.rateUsd, rateBrl: brl && brl > 0 ? brl : t.rateBrl })
+    .set({
+      rateUsd: usd && usd > 0 ? usd : t.rateUsd,
+      rateBrl: brl && brl > 0 ? brl : t.rateBrl,
+      ratePyg: pyg && pyg > 0 ? pyg : t.ratePyg,
+    })
     .where(eq(schema.tenants.id, t.id));
   revalidatePath(base(slug), "layout");
 }
 
 export async function saveDelivery(slug: string, f: FormData) {
   const t = await requireTenantAdmin(slug);
-  const freeOver = str(f, "deliveryFreeOverPyg") ? int(f, "deliveryFreeOverPyg") : null;
+  const freeOver = str(f, "deliveryFreeOverPyg") ? money(f, "deliveryFreeOverPyg", t.currency) : null;
   await db
     .update(schema.tenants)
     .set({
       lat: num(f, "lat"),
       lng: num(f, "lng"),
-      deliveryBaseFeePyg: int(f, "deliveryBaseFeePyg"),
-      deliveryPerKmPyg: int(f, "deliveryPerKmPyg"),
+      deliveryBaseFeePyg: money(f, "deliveryBaseFeePyg", t.currency),
+      deliveryPerKmPyg: money(f, "deliveryPerKmPyg", t.currency),
       deliveryMaxKm: num(f, "deliveryMaxKm") ?? t.deliveryMaxKm,
       deliveryFreeOverPyg: freeOver,
     })

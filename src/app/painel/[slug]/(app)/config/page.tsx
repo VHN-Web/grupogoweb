@@ -1,9 +1,13 @@
 import { requireTenantAdmin } from "@/lib/auth";
-import { CURRENCIES, LABELS, PAYMENT_METHODS } from "@/core/types";
+import { CURRENCIES, PAYMENT_METHODS, type Currency } from "@/core/types";
+import { panelI18n } from "@/lib/panel-i18n";
+import { COUNTRIES, REGIONS } from "@/core/region";
+import { CURRENCY_SYMBOL, minorToInput } from "@/core/money";
+import { PhoneInput } from "@/components/forms/PhoneInput";
 import { parseFiscalConfig, parsePaymentConfig } from "@/core/tenant-config";
 import { listPaymentProviders } from "@/adapters/payments/registry";
 import { listFiscalProviders } from "@/adapters/fiscal/providers";
-import { changePassword, saveDelivery, saveFiscal, saveGeneral, savePayments, saveRates } from "../actions";
+import { changePassword, saveDelivery, saveFiscal, saveGeneral, savePayments, saveRates, saveRegion } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -13,35 +17,57 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
   const pay = parsePaymentConfig(t.paymentConfig);
   const fiscal = parseFiscalConfig(t.fiscalConfig);
   const providers = listPaymentProviders();
+  const { T, L, region, base } = panelI18n(t);
+  const sym = CURRENCY_SYMBOL[base];
+  const mi = (v: number | null | undefined) => minorToInput(v, base);
+  const others = CURRENCIES.filter((c) => c !== base);
+  const rateField: Record<Currency, "rateUsd" | "rateBrl" | "ratePyg"> = { USD: "rateUsd", BRL: "rateBrl", PYG: "ratePyg" };
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-xl font-bold">Configuración</h1>
+      <h1 className="text-xl font-bold">{T("Configuración", "Configurações")}</h1>
 
-      <Section title="Datos del local" desc="Logo, colores y banner están en Apariencia.">
+      <Section title={T("Datos del local", "Dados do estabelecimento")} desc={T("Logo, colores y banner están en Apariencia.", "Logo, cores e banner ficam em Aparência.")}>
         <form action={saveGeneral.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
-          <Field label="Nombre"><input name="name" className="input" defaultValue={t.name} /></Field>
-          <Field label="Teléfono / WhatsApp"><input name="phone" className="input" defaultValue={t.phone ?? ""} /></Field>
-          <Field label="RUC"><input name="ruc" className="input" defaultValue={t.ruc ?? ""} /></Field>
-          <Field label="Dirección" wide><input name="address" className="input" defaultValue={t.address ?? ""} /></Field>
+          <Field label={T("Nombre", "Nome")}><input name="name" className="input" defaultValue={t.name} /></Field>
+          <Field label={T("Teléfono / WhatsApp", "Telefone / WhatsApp")}><PhoneInput name="phone" defaultValue={t.phone} defaultCountry={t.country} locale={region.locale} /></Field>
+          <Field label={region.taxIdLabel}><input name="ruc" className="input" defaultValue={t.ruc ?? ""} /></Field>
+          <Field label={T("Dirección", "Endereço")} wide><input name="address" className="input" defaultValue={t.address ?? ""} /></Field>
           <div className="flex flex-wrap gap-4 text-sm sm:col-span-2">
-            <label className="flex items-center gap-2"><input type="checkbox" name="acceptsDineIn" defaultChecked={t.acceptsDineIn} /> Pedidos en mesa (QR)</label>
-            <label className="flex items-center gap-2"><input type="checkbox" name="acceptsPickup" defaultChecked={t.acceptsPickup} /> Retiro en local</label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="acceptsDineIn" defaultChecked={t.acceptsDineIn} /> {T("Pedidos en mesa (QR)", "Pedidos na mesa (QR)")}</label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="acceptsPickup" defaultChecked={t.acceptsPickup} /> {T("Retiro en local", "Retirada no local")}</label>
             <label className="flex items-center gap-2"><input type="checkbox" name="acceptsDelivery" defaultChecked={t.acceptsDelivery} /> Delivery</label>
           </div>
-          <Save />
+          <Save label={T("Guardar", "Salvar")} />
         </form>
       </Section>
 
-      <Section title="Cotización del día" desc="Cuántos guaraníes vale cada moneda. Se usa para cobrar y calcular el vuelto.">
+      <Section title={T("País y moneda", "País e moeda")} desc={T("Define idioma del menú, moneda base, formato del teléfono y documento fiscal.", "Define idioma do cardápio, moeda base, formato do telefone e documento fiscal.")}>
+        <form action={saveRegion.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
+          <Field label={T("País", "País")}>
+            <select name="country" defaultValue={t.country} className="input">
+              {COUNTRIES.map((c) => (
+                <option key={c} value={c}>{T(REGIONS[c].name.es, REGIONS[c].name.pt)} — {REGIONS[c].currency}</option>
+              ))}
+            </select>
+          </Field>
+          <p className="self-end text-xs text-muted">{T("Atención: cambiar la moneda no convierte los precios ya cargados.", "Atenção: trocar a moeda não converte os preços já cadastrados.")}</p>
+          <Save label={T("Guardar", "Salvar")} />
+        </form>
+      </Section>
+
+      <Section title={T("Cotización del día", "Cotação do dia")} desc={T(`Cuánto vale cada moneda en ${sym}. Se usa para cobrar y calcular el vuelto.`, `Quanto vale cada moeda em ${sym}. Usado para cobrar e calcular o troco.`)}>
         <form action={saveRates.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
-          <Field label="1 US$ = Gs."><input name="rateUsd" className="input" inputMode="decimal" defaultValue={t.rateUsd} /></Field>
-          <Field label="1 R$ = Gs."><input name="rateBrl" className="input" inputMode="decimal" defaultValue={t.rateBrl} /></Field>
-          <Save />
+          {others.map((c) => (
+            <Field key={c} label={`1 ${CURRENCY_SYMBOL[c]} = ${sym}`}>
+              <input name={rateField[c]} className="input" inputMode="decimal" defaultValue={t[rateField[c]]} />
+            </Field>
+          ))}
+          <Save label={T("Guardar", "Salvar")} />
         </form>
       </Section>
 
-      <Section title="Medios de pago" desc="Elegí qué medios aceptás, en qué monedas y qué integración procesa cada uno.">
+      <Section title={T("Medios de pago", "Formas de pagamento")} desc={T("Elegí qué medios aceptás, en qué monedas y qué integración procesa cada uno.", "Escolha quais formas aceita, em quais moedas e qual integração processa cada uma.")}>
         <form action={savePayments.bind(null, slug)} className="space-y-3">
           {PAYMENT_METHODS.map((m) => {
             const o = pay.options.find((x) => x.method === m);
@@ -50,12 +76,12 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
               <div key={m} className="rounded-xl border border-line p-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="flex min-w-32 items-center gap-2 font-semibold">
-                    <input type="checkbox" name={`${m}_enabled`} defaultChecked={o?.enabled ?? false} /> {LABELS.paymentMethod[m]}
+                    <input type="checkbox" name={`${m}_enabled`} defaultChecked={o?.enabled ?? false} /> {L.paymentMethod[m]}
                   </label>
                   <select name={`${m}_provider`} defaultValue={o?.provider} className="input w-auto flex-1 py-2 text-sm">
                     {compatible.map((p) => (
                       <option key={p.id} value={p.id} disabled={!p.available}>
-                        {p.label}{!p.available ? " — próximamente" : ""}
+                        {p.label}{!p.available ? T(" — próximamente", " — em breve") : ""}
                       </option>
                     ))}
                   </select>
@@ -71,33 +97,33 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
             );
           })}
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Clave Pix"><input name="pixKey" className="input" defaultValue={pay.pixKey ?? ""} /></Field>
+            <Field label={T("Clave Pix", "Chave Pix")}><input name="pixKey" className="input" defaultValue={pay.pixKey ?? ""} /></Field>
             <Field label="Titular Pix"><input name="pixHolder" className="input" defaultValue={pay.pixHolder ?? ""} /></Field>
-            <Field label="Datos para transferencia" wide>
-              <textarea name="bankInfo" className="input" defaultValue={pay.bankInfo ?? ""} placeholder="Banco, cuenta, titular, CI/RUC" />
+            <Field label={T("Datos para transferencia", "Dados para transferência")} wide>
+              <textarea name="bankInfo" className="input" defaultValue={pay.bankInfo ?? ""} placeholder={T("Banco, cuenta, titular, CI/RUC", "Banco, agência, conta, titular, CPF/CNPJ")} />
             </Field>
           </div>
-          <p className="text-xs text-muted">Las credenciales de gateways (Bancard, Pagopar) se cargarán aquí cuando la integración esté activa.</p>
-          <Save />
+          <p className="text-xs text-muted">{T("Las credenciales de gateways (Bancard, Pagopar) se cargarán aquí cuando la integración esté activa.", "As credenciais de gateways serão configuradas aqui quando a integração estiver ativa.")}</p>
+          <Save label={T("Guardar", "Salvar")} />
         </form>
       </Section>
 
-      <Section title="Delivery" desc="Tarifa = base + (km × precio por km), redondeada a Gs. 500. La distancia se calcula con la ubicación del cliente.">
+      <Section title="Delivery" desc={T(`Tarifa = base + (km × precio por km), redondeada a ${base === "PYG" ? "Gs. 500" : `${sym} 0,50`}. La distancia se calcula con la ubicación del cliente.`, `Taxa = base + (km × preço por km), arredondada para ${base === "PYG" ? "Gs. 500" : `${sym} 0,50`}. A distância é calculada pela localização do cliente.`)}>
         <form action={saveDelivery.bind(null, slug)} className="grid gap-3 sm:grid-cols-3">
-          <Field label="Latitud del local"><input name="lat" className="input" defaultValue={t.lat ?? ""} placeholder="-25.5097" /></Field>
-          <Field label="Longitud del local"><input name="lng" className="input" defaultValue={t.lng ?? ""} placeholder="-54.6111" /></Field>
-          <Field label="Radio máximo (km)"><input name="deliveryMaxKm" className="input" defaultValue={t.deliveryMaxKm} /></Field>
-          <Field label="Tarifa base (Gs.)"><input name="deliveryBaseFeePyg" className="input" defaultValue={t.deliveryBaseFeePyg} /></Field>
-          <Field label="Por km (Gs.)"><input name="deliveryPerKmPyg" className="input" defaultValue={t.deliveryPerKmPyg} /></Field>
-          <Field label="Gratis desde (Gs.)"><input name="deliveryFreeOverPyg" className="input" defaultValue={t.deliveryFreeOverPyg ?? ""} placeholder="vacío = nunca" /></Field>
-          <p className="text-xs text-muted sm:col-span-3">Tip: en Google Maps, tocá tu local y copiá las coordenadas.</p>
-          <Save />
+          <Field label={T("Latitud del local", "Latitude do local")}><input name="lat" className="input" defaultValue={t.lat ?? ""} placeholder="-25.5097" /></Field>
+          <Field label={T("Longitud del local", "Longitude do local")}><input name="lng" className="input" defaultValue={t.lng ?? ""} placeholder="-54.6111" /></Field>
+          <Field label={T("Radio máximo (km)", "Raio máximo (km)")}><input name="deliveryMaxKm" className="input" defaultValue={t.deliveryMaxKm} /></Field>
+          <Field label={`${T("Tarifa base", "Taxa base")} (${sym})`}><input name="deliveryBaseFeePyg" className="input" inputMode="decimal" defaultValue={mi(t.deliveryBaseFeePyg)} /></Field>
+          <Field label={`${T("Por km", "Por km")} (${sym})`}><input name="deliveryPerKmPyg" className="input" inputMode="decimal" defaultValue={mi(t.deliveryPerKmPyg)} /></Field>
+          <Field label={`${T("Gratis desde", "Grátis a partir de")} (${sym})`}><input name="deliveryFreeOverPyg" className="input" inputMode="decimal" defaultValue={mi(t.deliveryFreeOverPyg)} placeholder={T("vacío = nunca", "vazio = nunca")} /></Field>
+          <p className="text-xs text-muted sm:col-span-3">{T("Tip: en Google Maps, tocá tu local y copiá las coordenadas.", "Dica: no Google Maps, toque no seu local e copie as coordenadas.")}</p>
+          <Save label={T("Guardar", "Salvar")} />
         </form>
       </Section>
 
-      <Section title="Facturación" desc="Manual (talonario) hoy. SIFEN (factura electrónica) queda listo para activar.">
+      <Section title={T("Facturación", "Notas fiscais")} desc={T("Manual (talonario) hoy. SIFEN (factura electrónica) queda listo para activar.", "Registro manual hoje. Emissão eletrônica (NF-e/NFC-e) virá como integração.")}>
         <form action={saveFiscal.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
-          <Field label="Modo">
+          <Field label={T("Modo", "Modo")}>
             <select name="provider" defaultValue={fiscal.provider} className="input">
               {listFiscalProviders().map((p) => (
                 <option key={p.id} value={p.id} disabled={!p.available}>{p.label}</option>
@@ -105,19 +131,19 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
             </select>
           </Field>
           <Field label="Timbrado"><input name="timbrado" className="input" defaultValue={fiscal.timbrado ?? ""} /></Field>
-          <Field label="Establecimiento"><input name="establishment" className="input" defaultValue={fiscal.establishment} /></Field>
-          <Field label="Punto de expedición"><input name="expeditionPoint" className="input" defaultValue={fiscal.expeditionPoint} /></Field>
+          <Field label={T("Establecimiento", "Estabelecimento")}><input name="establishment" className="input" defaultValue={fiscal.establishment} /></Field>
+          <Field label={T("Punto de expedición", "Série")}><input name="expeditionPoint" className="input" defaultValue={fiscal.expeditionPoint} /></Field>
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input type="checkbox" name="autoIssue" defaultChecked={fiscal.autoIssue} /> Registrar factura automáticamente al cobrar un pedido
+            <input type="checkbox" name="autoIssue" defaultChecked={fiscal.autoIssue} /> {T("Registrar factura automáticamente al cobrar un pedido", "Registrar nota automaticamente ao receber um pedido")}
           </label>
-          <Save />
+          <Save label={T("Guardar", "Salvar")} />
         </form>
       </Section>
 
-      <Section title="Seguridad">
+      <Section title={T("Seguridad", "Segurança")}>
         <form action={changePassword.bind(null, slug)} className="flex flex-wrap gap-2">
-          <input name="password" type="password" minLength={8} className="input max-w-xs" placeholder="Nueva contraseña (mín. 8)" required />
-          <button className="btn-primary">Cambiar contraseña</button>
+          <input name="password" type="password" minLength={8} className="input max-w-xs" placeholder={T("Nueva contraseña (mín. 8)", "Nova senha (mín. 8)")} required />
+          <button className="btn-primary">{T("Cambiar contraseña", "Alterar senha")}</button>
         </form>
       </Section>
     </div>
@@ -143,10 +169,10 @@ function Field({ label, wide, children }: { label: string; wide?: boolean; child
   );
 }
 
-function Save() {
+function Save({ label = "Guardar" }: { label?: string }) {
   return (
     <div className="sm:col-span-full">
-      <button className="btn-brand">Guardar</button>
+      <button className="btn-brand">{label}</button>
     </div>
   );
 }

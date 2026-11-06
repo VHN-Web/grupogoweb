@@ -6,6 +6,8 @@ import { parsePaymentConfig, publicPaymentConfig } from "@/core/tenant-config";
 import { getPaymentProvider } from "@/adapters/payments/registry";
 import { Storefront, type StoreData } from "@/components/storefront/Storefront";
 import { getTheme, readableOn } from "@/core/themes";
+import { getRegion, tenantRates } from "@/core/region";
+import type { Currency } from "@/core/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,7 @@ async function load(slug: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const t = await load((await params).slug);
-  return { title: t ? `${t.name} — Menú` : "Menú" };
+  return { title: t ? `${t.name} — ${getRegion(t.country).locale === "pt" ? "Cardápio" : "Menú"}` : "Menú" };
 }
 
 export default async function StorePage({
@@ -33,11 +35,12 @@ export default async function StorePage({
     return (
       <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-2 px-6 text-center">
         <p className="text-xl font-bold">{tenant.name}</p>
-        <p className="text-sm text-muted">El menú no está disponible en este momento.</p>
+        <p className="text-sm text-muted">{getRegion(tenant.country).locale === "pt" ? "O cardápio não está disponível no momento." : "El menú no está disponible en este momento."}</p>
       </main>
     );
   }
 
+  const region0 = getRegion(tenant.country);
   const [cats, prods] = await Promise.all([
     db.query.categories.findMany({ where: eq(schema.categories.tenantId, tenant.id), orderBy: asc(schema.categories.sortOrder) }),
     db.query.products.findMany({
@@ -68,12 +71,16 @@ export default async function StorePage({
 
   const groups = [
     ...cats.map((c) => ({ id: c.id, name: c.name, products: prods.filter((p) => p.categoryId === c.id) })),
-    { id: "_other", name: "Otros", products: prods.filter((p) => !p.categoryId || !cats.some((c) => c.id === p.categoryId)) },
+    { id: "_other", name: region0.locale === "pt" ? "Outros" : "Otros", products: prods.filter((p) => !p.categoryId || !cats.some((c) => c.id === p.categoryId)) },
   ].filter((g) => g.products.length > 0);
 
   const theme = getTheme(tenant.theme);
+  const region = getRegion(tenant.country);
   const data: StoreData = {
     slug: tenant.slug,
+    locale: region.locale,
+    currency: tenant.currency as Currency,
+    country: tenant.country,
     name: tenant.name,
     logoUrl: tenant.logoUrl,
     primaryColor: tenant.primaryColor,
@@ -92,7 +99,7 @@ export default async function StorePage({
     phone: tenant.phone,
     isOpen: tenant.isOpen,
     accepts: { DINE_IN: tenant.acceptsDineIn, PICKUP: tenant.acceptsPickup, DELIVERY: tenant.acceptsDelivery },
-    rates: { USD: tenant.rateUsd, BRL: tenant.rateBrl },
+    rates: tenantRates(tenant),
     delivery: { freeOverPyg: tenant.deliveryFreeOverPyg },
     table: table ? { code: table.code, label: table.label } : null,
     invalidTable: Boolean(mesa && !table),

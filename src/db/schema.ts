@@ -2,7 +2,9 @@
 //
 // Convenções (IMPORTANTE para quem — humano ou IA — for mexer aqui):
 // - Todo dado de negócio pertence a um tenant (tenantId). Nunca consulte sem filtrar por tenantId.
-// - Valores em GUARANÍES são inteiros (PYG não tem centavos). Colunas *_pyg.
+// - Valores do estabelecimento ficam na MOEDA BASE dele (tenants.currency), em unidade menor.
+//   As colunas chamadas *_pyg guardam esse valor (nome histórico: o sistema nasceu só PYG).
+//   Exceção: invoices.amount_pyg/usd/brl (billing da plataforma) é sempre por moeda.
 // - Valores em moeda estrangeira ficam em UNIDADE MENOR (centavos de USD/BRL). Colunas *_minor.
 // - Colunas "enum" são text tipadas com os unions de src/core/types.ts.
 import { relations } from "drizzle-orm";
@@ -60,9 +62,14 @@ export const tenants = pgTable("tenants", {
   acceptsPickup: boolean("accepts_pickup").notNull().default(true),
   acceptsDelivery: boolean("accepts_delivery").notNull().default(true),
 
-  // Câmbio manual: guaraníes por 1 unidade da moeda
+  // Região: país define idioma, moeda base e formato de telefone (src/core/region.ts)
+  country: text("country").notNull().default("PY"),
+  currency: text("currency").$type<Currency>().notNull().default("PYG"), // moeda base dos preços
+
+  // Câmbio manual: unidades da moeda BASE por 1 unidade da moeda
   rateUsd: doublePrecision("rate_usd").notNull().default(7300),
   rateBrl: doublePrecision("rate_brl").notNull().default(1300),
+  ratePyg: doublePrecision("rate_pyg").notNull().default(0.00075),
 
   // Delivery
   lat: doublePrecision("lat"),
@@ -320,6 +327,7 @@ export const customers = pgTable(
       .references(() => plans.id),
     preferredCurrency: text("preferred_currency").$type<Currency>().notNull().default("PYG"),
     theme: text("theme").notNull().default("classic"), // modelo de site escolhido na contratação
+    country: text("country").notNull().default("PY"), // país do estabelecimento
     wantsDomain: boolean("wants_domain").notNull().default(false),
     domainName: text("domain_name"), // domínio desejado
     status: text("status").$type<CustomerStatus>().notNull().default("AWAITING_SETUP_PAYMENT"),

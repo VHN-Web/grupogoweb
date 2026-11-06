@@ -7,6 +7,7 @@ import { randomTableCode, slugify } from "@/core/codes";
 import { DEFAULT_PAYMENT_CONFIG } from "@/core/tenant-config";
 import { hashPassword } from "@/lib/password";
 import { getTheme } from "@/core/themes";
+import { getRegion } from "@/core/region";
 
 export type ProvisionInput = {
   name: string;
@@ -18,6 +19,8 @@ export type ProvisionInput = {
   theme?: string;
   lat?: number | null;
   lng?: number | null;
+  /** País (PY/BR): define moeda base, idioma, cotações, delivery e meios de pagamento padrão */
+  country?: string;
 };
 
 export const RESERVED_SLUGS = new Set(["painel", "admin", "api", "pay", "_next", "static", "login", "registro"]);
@@ -28,6 +31,8 @@ export async function provisionTenant(db: DB, input: ProvisionInput) {
   const exists = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { id: true } });
   if (exists) throw new Error("Esse slug já está em uso");
 
+  const region = getRegion(input.country);
+  const tableWord = region.locale === "pt" ? "Mesa" : "Mesa";
   return db.transaction(async (tx) => {
     const [tenant] = await tx
       .insert(schema.tenants)
@@ -39,7 +44,15 @@ export async function provisionTenant(db: DB, input: ProvisionInput) {
         logoUrl: input.logoUrl ?? null,
         lat: input.lat ?? null,
         lng: input.lng ?? null,
-        paymentConfig: JSON.stringify(DEFAULT_PAYMENT_CONFIG),
+        country: region.country,
+        currency: region.currency,
+        rateUsd: region.defaultRates.USD,
+        rateBrl: region.defaultRates.BRL,
+        ratePyg: region.defaultRates.PYG,
+        deliveryBaseFeePyg: region.delivery.baseFee,
+        deliveryPerKmPyg: region.delivery.perKm,
+        deliveryFreeOverPyg: region.delivery.freeOver,
+        paymentConfig: JSON.stringify({ ...DEFAULT_PAYMENT_CONFIG, options: region.payments }),
         adminPasswordHash: hashPassword(input.password),
       })
       .returning();
@@ -47,7 +60,7 @@ export async function provisionTenant(db: DB, input: ProvisionInput) {
     const n = input.tables ?? 10;
     if (n > 0) {
       await tx.insert(schema.diningTables).values(
-        Array.from({ length: n }, (_, i) => ({ tenantId: tenant.id, label: `Mesa ${i + 1}`, code: randomTableCode() })),
+        Array.from({ length: n }, (_, i) => ({ tenantId: tenant.id, label: `${tableWord} ${i + 1}`, code: randomTableCode() })),
       );
     }
     return tenant;

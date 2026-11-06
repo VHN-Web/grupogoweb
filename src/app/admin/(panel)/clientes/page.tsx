@@ -8,6 +8,9 @@ import { Flash } from "@/components/Flash";
 import { StatusPill } from "@/components/StatusPill";
 import { newCustomer } from "../actions";
 import { THEMES, THEME_IDS } from "@/core/themes";
+import { NameInput } from "@/components/forms/NameInput";
+import { PhoneInput } from "@/components/forms/PhoneInput";
+import { COUNTRIES, REGIONS } from "@/core/region";
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const sp = await searchParams;
@@ -27,11 +30,18 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           <form action={newCustomer} className="mt-4 grid gap-3 sm:grid-cols-2">
             <F label="Nome do estabelecimento"><input name="businessName" className="input" required /></F>
             <F label="Endereço do cardápio (slug)"><input name="slug" className="input" placeholder="gerado do nome se vazio" /></F>
-            <F label="Nome do responsável"><input name="contactName" className="input" required /></F>
+            <F label="País do estabelecimento">
+              <select name="country" className="input" defaultValue="PY">
+                {COUNTRIES.map((c) => (
+                  <option key={c} value={c}>{REGIONS[c].name.pt} — moeda {REGIONS[c].currency}, idioma {REGIONS[c].locale === "pt" ? "português" : "espanhol"}</option>
+                ))}
+              </select>
+            </F>
+            <F label="Nome do responsável"><NameInput name="contactName" required /></F>
             <F label="E-mail (recebe cobranças e acessos)"><input name="email" type="email" className="input" required /></F>
-            <F label="WhatsApp (opcional)"><input name="whatsapp" className="input" placeholder="+595 9xx xxx xxx" /></F>
+            <F label="WhatsApp (opcional)"><PhoneInput name="whatsapp" defaultCountry="PY" locale="pt" /></F>
             <label className="flex items-center gap-2 self-end pb-3 text-sm"><input type="checkbox" name="whatsappOptIn" defaultChecked /> Cliente aceita receber avisos por WhatsApp</label>
-            <F label="RUC (opcional)"><input name="ruc" className="input" /></F>
+            <F label="RUC / CNPJ / CPF (opcional)"><input name="ruc" className="input" /></F>
             <F label="Moeda preferida para pagar">
               <select name="currency" className="input" defaultValue="PYG">
                 <option value="PYG">Guaraníes (Gs.)</option>

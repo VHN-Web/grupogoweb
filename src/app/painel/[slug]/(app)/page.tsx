@@ -2,24 +2,26 @@ import Link from "next/link";
 import { and, desc, eq, gte } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
+import { panelI18n } from "@/lib/panel-i18n";
 import { formatMinor, formatPyg } from "@/core/money";
-import { LABELS, type OrderStatus } from "@/core/types";
+import { type OrderStatus } from "@/core/types";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { PayBadge } from "@/components/PayBadge";
 import { markOrderPaid, updateOrderStatus } from "./actions";
-import { NEXT_LABEL, nextStatus } from "./order-flow";
+import { nextLabel, nextStatus } from "./order-flow";
 
 export const dynamic = "force-dynamic";
 
-const COLUMNS: { title: string; statuses: OrderStatus[] }[] = [
-  { title: "Nuevos", statuses: ["RECEIVED"] },
-  { title: "En preparación", statuses: ["PREPARING"] },
-  { title: "Listos / en camino", statuses: ["READY", "OUT_FOR_DELIVERY"] },
+const COLUMNS: { es: string; pt: string; statuses: OrderStatus[] }[] = [
+  { es: "Nuevos", pt: "Novos", statuses: ["RECEIVED"] },
+  { es: "En preparación", pt: "Em preparo", statuses: ["PREPARING"] },
+  { es: "Listos / en camino", pt: "Prontos / em rota", statuses: ["READY", "OUT_FOR_DELIVERY"] },
 ];
 
 export default async function OrdersBoard({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const t = await requireTenantAdmin(slug);
+  const { T, L, fm, fmtDate, region } = panelI18n(t);
   const since = new Date(Date.now() - 1000 * 60 * 60 * 24);
   const orders = await db.query.orders.findMany({
     where: and(eq(schema.orders.tenantId, t.id), gte(schema.orders.createdAt, since)),
@@ -33,15 +35,15 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
     <div className="space-y-6">
       <AutoRefresh ms={5000} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat k="Pedidos (24h)" v={String(today.length)} />
-        <Stat k="Vendido (24h)" v={formatPyg(today.reduce((s, o) => s + o.totalPyg, 0))} />
-        <Stat k="Cobrado" v={formatPyg(today.filter((o) => o.paymentStatus === "PAID").reduce((s, o) => s + o.totalPyg, 0))} />
-        <Stat k="Por cobrar" v={formatPyg(today.filter((o) => o.paymentStatus !== "PAID").reduce((s, o) => s + o.totalPyg, 0))} />
+        <Stat k={T("Pedidos (24h)", "Pedidos (24h)")} v={String(today.length)} />
+        <Stat k={T("Vendido (24h)", "Vendido (24h)")} v={fm(today.reduce((s, o) => s + o.totalPyg, 0))} />
+        <Stat k={T("Cobrado", "Recebido")} v={fm(today.filter((o) => o.paymentStatus === "PAID").reduce((s, o) => s + o.totalPyg, 0))} />
+        <Stat k={T("Por cobrar", "A receber")} v={fm(today.filter((o) => o.paymentStatus !== "PAID").reduce((s, o) => s + o.totalPyg, 0))} />
       </div>
 
       {!t.isOpen && (
         <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          El local está <b>cerrado</b>: los clientes ven el menú pero no pueden pedir. Usá el botón de arriba para abrir.
+          {T("El local está cerrado: los clientes ven el menú pero no pueden pedir. Usá el botón de arriba para abrir.", "O estabelecimento está fechado: os clientes veem o cardápio mas não podem pedir. Use o botão acima para abrir.")}
         </p>
       )}
 
@@ -49,9 +51,9 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
         {COLUMNS.map((col) => {
           const list = orders.filter((o) => col.statuses.includes(o.status)).reverse();
           return (
-            <section key={col.title} className="rounded-2xl bg-white/60 p-3 ring-1 ring-line">
+            <section key={T(col.es, col.pt)} className="rounded-2xl bg-white/60 p-3 ring-1 ring-line">
               <h2 className="mb-3 flex items-center justify-between px-1 text-[13px] font-semibold uppercase tracking-[.12em] text-muted">
-                {col.title}
+                {T(col.es, col.pt)}
                 <span className="rounded-full bg-ink px-2 py-0.5 text-[11px] text-white">{list.length}</span>
               </h2>
               <div className="space-y-3">
@@ -67,10 +69,10 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
                           </Link>
                           <p className="text-sm font-semibold">{o.customerName}</p>
                           <p className="text-xs text-muted">
-                            {o.tableLabel ?? LABELS.orderType[o.type]} · {timeAgo(o.createdAt)}
+                            {o.tableLabel ?? L.orderType[o.type]} · {timeAgo(o.createdAt, region.locale)}
                           </p>
                         </div>
-                        <PayBadge status={o.paymentStatus} />
+                        <PayBadge status={o.paymentStatus} locale={region.locale} />
                       </div>
                       <ul className="mt-2.5 space-y-0.5 border-t border-line pt-2.5 text-sm">
                         {o.items.map((i) => (
@@ -84,21 +86,21 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
                       {o.type === "DELIVERY" && o.address && <p className="mt-2 text-xs text-muted">📍 {o.address}</p>}
                       <div className="mt-2.5 flex items-start justify-between gap-3 text-sm">
                         <span className="text-muted">
-                          {LABELS.paymentMethod[o.paymentMethod]}
+                          {L.paymentMethod[o.paymentMethod]}
                           {o.payCurrency !== "PYG" && ` · ${formatMinor(o.payAmountMinor, o.payCurrency)}`}
-                          {o.changeDuePyg ? ` · vuelto ${formatPyg(o.changeDuePyg)}` : ""}
+                          {o.changeDuePyg ? ` · ${T("vuelto", "troco")} ${fm(o.changeDuePyg)}` : ""}
                         </span>
-                        <b className="shrink-0 whitespace-nowrap">{formatPyg(o.totalPyg)}</b>
+                        <b className="shrink-0 whitespace-nowrap">{fm(o.totalPyg)}</b>
                       </div>
                       <div className="mt-3 flex gap-2">
                         {o.paymentStatus !== "PAID" && (
                           <form action={markOrderPaid.bind(null, slug, o.id)}>
-                            <button className="btn-ghost px-3 py-2 text-xs">Cobrado</button>
+                            <button className="btn-ghost px-3 py-2 text-xs">{T("Cobrado", "Recebido")}</button>
                           </form>
                         )}
                         {next && (
                           <form action={updateOrderStatus.bind(null, slug, o.id, next)} className="flex-1">
-                            <button className="btn-brand w-full py-2 text-xs">{NEXT_LABEL[next]}</button>
+                            <button className="btn-brand w-full py-2 text-xs">{nextLabel(next, region.locale)}</button>
                           </form>
                         )}
                       </div>
@@ -113,15 +115,15 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
 
       {finished.length > 0 && (
         <section>
-          <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-[.12em] text-muted">Finalizados (24h)</h2>
+          <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-[.12em] text-muted">{T("Finalizados (24h)", "Finalizados (24h)")}</h2>
           <div className="card divide-y divide-line">
             {finished.map((o) => (
               <Link key={o.id} href={`/painel/${slug}/pedidos/${o.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-paper">
                 <b className="w-14 tabular-nums">#{o.number}</b>
                 <span className="flex-1 truncate">{o.customerName}</span>
-                <span className={o.status === "CANCELLED" ? "text-red-600" : "text-muted"}>{LABELS.orderStatus[o.status]}</span>
-                <PayBadge status={o.paymentStatus} />
-                <b className="w-28 text-right">{formatPyg(o.totalPyg)}</b>
+                <span className={o.status === "CANCELLED" ? "text-red-600" : "text-muted"}>{L.orderStatus[o.status]}</span>
+                <PayBadge status={o.paymentStatus} locale={region.locale} />
+                <b className="w-28 text-right">{fm(o.totalPyg)}</b>
               </Link>
             ))}
           </div>
@@ -140,9 +142,10 @@ function Stat({ k, v }: { k: string; v: string }) {
   );
 }
 
-function timeAgo(d: Date) {
+function timeAgo(d: Date, locale: "es" | "pt") {
   const m = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (m < 1) return "ahora";
-  if (m < 60) return `hace ${m} min`;
-  return `hace ${Math.floor(m / 60)} h`;
+  const pt = locale === "pt";
+  if (m < 1) return pt ? "agora" : "ahora";
+  if (m < 60) return pt ? `há ${m} min` : `hace ${m} min`;
+  return pt ? `há ${Math.floor(m / 60)} h` : `hace ${Math.floor(m / 60)} h`;
 }

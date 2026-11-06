@@ -4,9 +4,10 @@ import { z } from "zod";
 import { db, schema } from "@/db";
 import { randomOrderNumber } from "@/core/codes";
 import { quoteDelivery } from "@/core/delivery";
-import { changeDuePyg, pygToMinor, type Rates } from "@/core/money";
+import { changeDue, fromBase, type Rates } from "@/core/money";
+import { getRegion, isValidE164, isValidName, tr } from "@/core/region";
 import { parsePaymentConfig } from "@/core/tenant-config";
-import { CURRENCIES, ORDER_TYPES, PAYMENT_METHODS, type OrderStatus, type PaymentStatus } from "@/core/types";
+import { CURRENCIES, ORDER_TYPES, PAYMENT_METHODS, type Currency, type OrderStatus, type PaymentStatus } from "@/core/types";
 import { getPaymentProvider } from "@/adapters/payments/registry";
 import { getDistanceProvider } from "@/adapters/distance";
 import { getExchangeRateProvider } from "@/adapters/exchange-rates";
@@ -20,8 +21,10 @@ export class OrderError extends Error {
 
 export const createOrderSchema = z.object({
   slug: z.string(),
-  customerName: z.string().trim().min(2).max(60),
-  customerPhone: z.string().trim().max(30).optional().nullable(),
+  // Nome: só letras (com acentos), espaços, apóstrofo e hífen
+  customerName: z.string().trim().min(2).max(60).refine(isValidName, "nombre inválido"),
+  // Telefone em formato internacional E.164, com o tamanho exato do país (inclui DDD)
+  customerPhone: z.string().trim().max(20).refine(isValidE164, "teléfono inválido").optional().nullable(),
   type: z.enum(ORDER_TYPES),
   tableCode: z.string().trim().max(20).optional().nullable(),
   address: z.string().trim().max(200).optional().nullable(),
@@ -71,6 +74,7 @@ export async function quoteDeliveryForTenant(slug: string, lat: number, lng: num
     baseFeePyg: tenant.deliveryBaseFeePyg,
     perKmPyg: tenant.deliveryPerKmPyg,
     maxKm: tenant.deliveryMaxKm,
+    roundStep: tenant.currency === "PYG" ? 500 : 50,
     freeOverPyg: tenant.deliveryFreeOverPyg,
   });
 }
@@ -79,17 +83,19 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   const input = createOrderSchema.parse(raw);
   const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, input.slug) });
   if (!tenant) throw new OrderError("NOT_FOUND", "Local no encontrado");
-  if (tenant.suspended) throw new OrderError("SUSPENDED", "El local no está disponible en este momento");
-  if (!tenant.isOpen) throw new OrderError("CLOSED", "El local está cerrado en este momento");
+  const T = tr(getRegion(tenant.country).locale);
+  const base = tenant.currency as Currency;
+  if (tenant.suspended) throw new OrderError("SUSPENDED", T("El local no está disponible en este momento", "O estabelecimento não está disponível no momento"));
+  if (!tenant.isOpen) throw new OrderError("CLOSED", T("El local está cerrado en este momento", "O estabelecimento está fechado no momento"));
 
-  if (input.type === "DINE_IN" && !tenant.acceptsDineIn) throw new OrderError("TYPE", "No acepta pedidos en mesa");
-  if (input.type === "PICKUP" && !tenant.acceptsPickup) throw new OrderError("TYPE", "No acepta retiro en local");
-  if (input.type === "DELIVERY" && !tenant.acceptsDelivery) throw new OrderError("TYPE", "No hace delivery");
+  if (input.type === "DINE_IN" && !tenant.acceptsDineIn) throw new OrderError("TYPE", T("No acepta pedidos en mesa", "Não aceita pedidos na mesa"));
+  if (input.type === "PICKUP" && !tenant.acceptsPickup) throw new OrderError("TYPE", T("No acepta retiro en local", "Não aceita retirada no local"));
+  if (input.type === "DELIVERY" && !tenant.acceptsDelivery) throw new OrderError("TYPE", T("No hace delivery", "Não faz delivery"));
 
   // ---- Mesa
   let table: schema.DiningTable | undefined;
   if (input.type === "DINE_IN") {
-    if (!input.tableCode) throw new OrderError("TABLE", "Escaneá el QR de tu mesa");
+    if (!input.tableCode) throw new OrderError("TABLE", T("Escaneá el QR de tu mesa", "Escaneie o QR da sua mesa"));
     table = await db.query.diningTables.findFirst({
       where: and(
         eq(schema.diningTables.tenantId, tenant.id),
@@ -97,7 +103,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
         eq(schema.diningTables.active, true),
       ),
     });
-    if (!table) throw new OrderError("TABLE", "Mesa no encontrada");
+    if (!table) throw new OrderError("TABLE", T("Mesa no encontrada", "Mesa não encontrada"));
   }
 
   // ---- Itens (preço SEMPRE recalculado no servidor)
@@ -109,13 +115,13 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   const qtyByProduct = new Map<string, number>();
   const lines = input.items.map((i) => {
     const p = byId.get(i.productId);
-    if (!p) throw new OrderError("PRODUCT", "Un producto ya no está disponible");
+    if (!p) throw new OrderError("PRODUCT", T("Un producto ya no está disponible", "Um produto não está mais disponível"));
     qtyByProduct.set(p.id, (qtyByProduct.get(p.id) ?? 0) + i.quantity);
     return { product: p, quantity: i.quantity, notes: i.notes ?? null };
   });
   for (const [pid, qty] of qtyByProduct) {
     const p = byId.get(pid)!;
-    if (p.trackStock && p.stock < qty) throw new OrderError("STOCK", `Sin stock suficiente: ${p.name}`);
+    if (p.trackStock && p.stock < qty) throw new OrderError("STOCK", T(`Sin stock suficiente: ${p.name}`, `Sem estoque suficiente: ${p.name}`));
   }
   const subtotalPyg = lines.reduce((s, l) => s + l.product.pricePyg * l.quantity, 0);
 
@@ -123,14 +129,14 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   let deliveryFeePyg = 0;
   let distanceKm: number | null = null;
   if (input.type === "DELIVERY") {
-    if (!input.address) throw new OrderError("ADDRESS", "Indicá la dirección de entrega");
-    if (input.lat == null || input.lng == null) throw new OrderError("ADDRESS", "Compartí tu ubicación para calcular el delivery");
+    if (!input.address) throw new OrderError("ADDRESS", T("Indicá la dirección de entrega", "Informe o endereço de entrega"));
+    if (input.lat == null || input.lng == null) throw new OrderError("ADDRESS", T("Compartí tu ubicación para calcular el delivery", "Compartilhe sua localização para calcular a entrega"));
     const q = await quoteDeliveryForTenant(tenant.slug, input.lat, input.lng, subtotalPyg);
     if (!q.ok) {
-      if (q.reason === "OUT_OF_RANGE") throw new OrderError("RANGE", "Tu dirección está fuera del área de delivery");
+      if (q.reason === "OUT_OF_RANGE") throw new OrderError("RANGE", T("Tu dirección está fuera del área de delivery", "Seu endereço está fora da área de entrega"));
       if (q.reason === "NO_STORE_LOCATION") {
         deliveryFeePyg = tenant.deliveryBaseFeePyg; // local sem coordenadas: cobra taxa base
-      } else throw new OrderError("ADDRESS", "No pudimos calcular el delivery");
+      } else throw new OrderError("ADDRESS", T("No pudimos calcular el delivery", "Não conseguimos calcular a entrega"));
     } else {
       deliveryFeePyg = q.feePyg;
       distanceKm = q.distanceKm;
@@ -141,21 +147,21 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   // ---- Pagamento
   const payCfg = parsePaymentConfig(tenant.paymentConfig);
   const option = payCfg.options.find((o) => o.enabled && o.method === input.paymentMethod);
-  if (!option) throw new OrderError("PAYMENT", "Medio de pago no disponible");
-  if (!option.currencies.includes(input.payCurrency)) throw new OrderError("PAYMENT", "Moneda no aceptada para este medio");
+  if (!option) throw new OrderError("PAYMENT", T("Medio de pago no disponible", "Forma de pagamento indisponível"));
+  if (!option.currencies.includes(input.payCurrency)) throw new OrderError("PAYMENT", T("Moneda no aceptada para este medio", "Moeda não aceita para esta forma de pagamento"));
   const provider = getPaymentProvider(option.provider);
-  if (!provider.available) throw new OrderError("PAYMENT", "Medio de pago no disponible");
+  if (!provider.available) throw new OrderError("PAYMENT", T("Medio de pago no disponible", "Forma de pagamento indisponível"));
 
   const rates: Rates = await getExchangeRateProvider().getRates(tenant);
-  const exchangeRate = input.payCurrency === "PYG" ? 1 : rates[input.payCurrency];
-  const payAmountMinor = pygToMinor(totalPyg, input.payCurrency, rates);
+  const exchangeRate = input.payCurrency === base ? 1 : rates[input.payCurrency];
+  const payAmountMinor = fromBase(totalPyg, base, input.payCurrency, rates);
 
   let cashTenderedMinor: number | null = null;
   let change: number | null = null;
   if (input.paymentMethod === "CASH" && input.cashTenderedMinor) {
-    if (input.cashTenderedMinor < payAmountMinor) throw new OrderError("CASH", "El monto en efectivo es menor al total");
+    if (input.cashTenderedMinor < payAmountMinor) throw new OrderError("CASH", T("El monto en efectivo es menor al total", "O valor em dinheiro é menor que o total"));
     cashTenderedMinor = input.cashTenderedMinor;
-    change = changeDuePyg(totalPyg, cashTenderedMinor, input.payCurrency, rates);
+    change = changeDue(totalPyg, cashTenderedMinor, input.payCurrency, base, rates);
   }
 
   // ---- Persistência atômica (pedido + itens + baixa de estoque)
@@ -174,7 +180,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
         break;
       }
     }
-    if (!number) throw new OrderError("NUMBER", "Intentá de nuevo");
+    if (!number) throw new OrderError("NUMBER", T("Intentá de nuevo", "Tente novamente"));
 
     const openSession = await tx.query.cashSessions.findFirst({
       where: and(eq(schema.cashSessions.tenantId, tenant.id), isNull(schema.cashSessions.closedAt)),
@@ -230,7 +236,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
         .set({ stock: sql`${schema.products.stock} - ${qty}` })
         .where(and(eq(schema.products.id, pid), gte(schema.products.stock, qty)))
         .returning({ id: schema.products.id });
-      if (updated.length === 0) throw new OrderError("STOCK", `Sin stock suficiente: ${p.name}`);
+      if (updated.length === 0) throw new OrderError("STOCK", T(`Sin stock suficiente: ${p.name}`, `Sem estoque suficiente: ${p.name}`));
       await tx.insert(schema.stockMovements).values({ tenantId: tenant.id, productId: pid, delta: -qty, reason: "ORDER", orderId: o.id });
     }
     return o;

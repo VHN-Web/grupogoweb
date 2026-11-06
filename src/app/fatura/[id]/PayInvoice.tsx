@@ -3,7 +3,8 @@ import { useState } from "react";
 
 type Opt = { currency: "PYG" | "USD" | "BRL"; label: string; amount: string; available: boolean; via: string };
 
-export function PayInvoice({ invoiceId, options, defaultCurrency }: { invoiceId: string; options: Opt[]; defaultCurrency: Opt["currency"] }) {
+export function PayInvoice({ invoiceId, options, defaultCurrency, locale = "es" }: { invoiceId: string; options: Opt[]; defaultCurrency: Opt["currency"]; locale?: "es" | "pt" }) {
+  const T = (es: string, pt: string) => (locale === "pt" ? pt : es);
   const first = options.find((o) => o.available && o.currency === defaultCurrency) ?? options.find((o) => o.available);
   const [cur, setCur] = useState(first?.currency);
   const [busy, setBusy] = useState(false);
@@ -33,7 +34,7 @@ export function PayInvoice({ invoiceId, options, defaultCurrency }: { invoiceId:
 
   return (
     <div className="mt-6 space-y-3">
-      <p className="label !mb-0">¿En qué moneda querés pagar?</p>
+      <p className="label !mb-0">{T("¿En qué moneda querés pagar?", "Em qual moeda você quer pagar?")}</p>
       {options.map((o) => (
         <button
           key={o.currency}
@@ -48,7 +49,7 @@ export function PayInvoice({ invoiceId, options, defaultCurrency }: { invoiceId:
         >
           <span>
             <span className="block font-semibold">{o.label}</span>
-            <span className={`text-xs ${cur === o.currency ? "text-white/70" : "text-muted"}`}>{o.available ? o.via : "No disponible"}</span>
+            <span className={`text-xs ${cur === o.currency ? "text-white/70" : "text-muted"}`}>{o.available ? o.via : T("No disponible", "Indisponível")}</span>
           </span>
           <span className="text-lg font-bold">{o.amount}</span>
         </button>
@@ -56,13 +57,13 @@ export function PayInvoice({ invoiceId, options, defaultCurrency }: { invoiceId:
       {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       {manual ? (
         <div className="card whitespace-pre-line p-4 text-sm">
-          <p className="font-semibold">Pagá {manual.amount}</p>
+          <p className="font-semibold">{T("Pagá", "Pague")} {manual.amount}</p>
           <p className="mt-1 text-muted">{manual.text}</p>
-          <p className="mt-2 text-xs text-muted">Confirmamos manualmente y esta página se actualiza sola.</p>
+          <p className="mt-2 text-xs text-muted">{T("Confirmamos manualmente y esta página se actualiza sola.", "Confirmamos manualmente e esta página se atualiza sozinha.")}</p>
         </div>
       ) : (
         <button onClick={pay} disabled={!cur || busy} className="btn-primary w-full py-4 text-[15px]">
-          {busy ? "Abriendo pago…" : "Pagar ahora"}
+          {busy ? T("Abriendo pago…", "Abrindo pagamento…") : T("Pagar ahora", "Pagar agora")}
         </button>
       )}
     </div>

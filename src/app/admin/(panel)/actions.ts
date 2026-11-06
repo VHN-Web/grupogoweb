@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { clearSession, requirePlatformAdmin } from "@/lib/auth";
+import { isValidE164, isValidName } from "@/core/region";
 import { CURRENCIES, type Currency } from "@/core/types";
 import { parseMajorToMinor } from "@/core/money";
 import {
@@ -33,7 +34,11 @@ export async function newCustomer(f: FormData) {
   await requirePlatformAdmin();
   let id = "";
   try {
+    if (!isValidName(str(f, "contactName"))) throw new Error("Nome do responsável inválido (use apenas letras).");
+    const wa = str(f, "whatsapp");
+    if (wa && !isValidE164(wa)) throw new Error("WhatsApp inválido para o país escolhido.");
     const c = await createCustomer({
+      country: str(f, "country") || "PY",
       businessName: str(f, "businessName"),
       contactName: str(f, "contactName"),
       email: str(f, "email"),

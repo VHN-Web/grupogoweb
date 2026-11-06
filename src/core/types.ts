@@ -66,7 +66,7 @@ export const PLATFORM_LABELS = {
   invoiceStatus: { OPEN: "Em aberto", PAID: "Paga", CANCELLED: "Cancelada" },
 } as const;
 
-// Rótulos em espanhol (mercado PY). Centralizados para facilitar i18n depois.
+// Rótulos por idioma. Use getLabels(locale).
 export const LABELS = {
   paymentMethod: { CASH: "Efectivo", CARD: "Tarjeta", PIX: "Pix", TRANSFER: "Transferencia" },
   paymentStatus: { PENDING: "Pendiente", PAID: "Pagado", FAILED: "Fallido", REFUNDED: "Reembolsado" },
@@ -81,3 +81,22 @@ export const LABELS = {
   },
   currency: { PYG: "Guaraníes (Gs.)", USD: "Dólares (US$)", BRL: "Reales (R$)" },
 } as const;
+
+export const LABELS_PT = {
+  paymentMethod: { CASH: "Dinheiro", CARD: "Cartão", PIX: "Pix", TRANSFER: "Transferência" },
+  paymentStatus: { PENDING: "Pendente", PAID: "Pago", FAILED: "Recusado", REFUNDED: "Reembolsado" },
+  orderType: { DINE_IN: "Na mesa", PICKUP: "Retirada no local", DELIVERY: "Delivery" },
+  orderStatus: {
+    RECEIVED: "Recebido",
+    PREPARING: "Em preparo",
+    READY: "Pronto",
+    OUT_FOR_DELIVERY: "Saiu para entrega",
+    COMPLETED: "Entregue",
+    CANCELLED: "Cancelado",
+  },
+  currency: { PYG: "Guaranis (Gs.)", USD: "Dólares (US$)", BRL: "Reais (R$)" },
+} as const;
+
+export function getLabels(locale: "es" | "pt" | string | null | undefined): typeof LABELS {
+  return (locale === "pt" ? LABELS_PT : LABELS) as typeof LABELS;
+}

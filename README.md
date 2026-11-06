@@ -93,3 +93,9 @@ Regras puras em `src/core`, integrações atrás de interfaces em `src/adapters`
 
 ## Próximos passos
 Veja [`docs/ROADMAP.md`](./docs/ROADMAP.md) — inclui prompts prontos para colar no Cursor.
+
+
+## Paraguai e Brasil
+Cada estabelecimento tem um país (PY ou BR). Isso define idioma do site e do painel (espanhol/português), moeda base (Gs./R$), formato de telefone/WhatsApp (PY 9 dígitos · BR DDD + 9 dígitos), documento (RUC/CNPJ) e meios de pagamento padrão (no Brasil: Pix, cartão e dinheiro). A página de vendas abre em português para visitantes do Brasil (troca manual em ES/PT).
+
+Modelos de site: Clássico, Hamburgueria, Restaurante, Cafeteria, Loja, Bar, **Barbearia**, **Informática/Tecnologia** e **Perfumaria/Cosméticos**.

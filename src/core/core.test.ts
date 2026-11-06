@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { changeDuePyg, formatMinor, formatPyg, minorToPyg, parseMajorToMinor, pygToMinor } from "./money";
+import { changeDue, formatMinor, formatPyg, toBase, parseMajorToMinor, fromBase } from "./money";
+import { isValidE164, isValidName, isValidPhone, sanitizeName, sanitizePhone, toE164, formatPhone } from "./region";
 import { quoteDelivery, roundFee } from "./delivery";
 import { randomOrderNumber, randomTableCode, slugify } from "./codes";
 import { parsePaymentConfig, publicPaymentConfig, DEFAULT_PAYMENT_CONFIG } from "./tenant-config";
 import { haversineKm } from "@/adapters/distance";
 import { ivaIncluded } from "@/adapters/fiscal/FiscalProvider";
 
-const rates = { USD: 7300, BRL: 1300 };
+const rates = { USD: 7300, BRL: 1300, PYG: 1 };
+const pygToMinor = (a: number, c: "PYG" | "USD" | "BRL", r: typeof rates) => fromBase(a, "PYG", c, r);
+const minorToPyg = (a: number, c: "PYG" | "USD" | "BRL", r: typeof rates) => toBase(a, c, "PYG", r);
+const changeDuePyg = (t: number, m: number, c: "PYG" | "USD" | "BRL", r: typeof rates) => changeDue(t, m, c, "PYG", r);
 
 describe("money", () => {
   it("converte PYG para USD arredondando para cima", () => {
@@ -87,5 +91,45 @@ describe("fiscal", () => {
   it("IVA incluído", () => {
     expect(ivaIncluded(110000, 10)).toBe(10000);
     expect(ivaIncluded(105000, 5)).toBe(5000);
+  });
+});
+
+describe("moeda base BRL (Brasil)", () => {
+  const br = { BRL: 1, USD: 5.5, PYG: 0.00075 };
+  it("converte reais para dólares e guaranis", () => {
+    expect(fromBase(5500, "BRL", "USD", br)).toBe(1000); // R$ 55,00 -> US$ 10,00
+    expect(fromBase(7500, "BRL", "PYG", br)).toBe(100000); // R$ 75,00 -> Gs. 100.000
+    expect(fromBase(1234, "BRL", "BRL", br)).toBe(1234);
+  });
+  it("troco em reais quando paga em dólar", () => {
+    expect(changeDue(4000, 1000, "USD", "BRL", br)).toBe(1500); // US$10 = R$55 ; total R$40 -> R$15
+  });
+  it("parse de valores", () => {
+    expect(parseMajorToMinor("1.234,50", "BRL")).toBe(123450);
+    expect(parseMajorToMinor("12.5", "BRL")).toBe(1250);
+  });
+});
+
+describe("nome e telefone", () => {
+  it("nome aceita só letras", () => {
+    expect(sanitizeName("Ana2 María!! O'Neil")).toBe("Ana María O'Neil");
+    expect(isValidName("João da Silva")).toBe(true);
+    expect(isValidName("J0ão")).toBe(false);
+    expect(isValidName("A")).toBe(false);
+  });
+  it("telefone do Paraguai: 9 dígitos, aceita o 0 inicial", () => {
+    expect(sanitizePhone("0981-123-456 99", "PY")).toBe("981123456");
+    expect(isValidPhone("981123456", "PY")).toBe(true);
+    expect(isValidPhone("21123456", "PY")).toBe(false);
+    expect(toE164("981123456", "PY")).toBe("+595981123456");
+  });
+  it("telefone do Brasil: DDD + 9 dígitos", () => {
+    expect(sanitizePhone("(81) 9 8765-4321 000", "BR")).toBe("81987654321");
+    expect(isValidPhone("81987654321", "BR")).toBe(true);
+    expect(isValidPhone("8187654321", "BR")).toBe(false); // sem o 9
+    expect(isValidPhone("01987654321", "BR")).toBe(false); // DDD inválido
+    expect(isValidE164("+5581987654321")).toBe(true);
+    expect(isValidE164("+558198765432")).toBe(false);
+    expect(formatPhone("+5581987654321")).toBe("+55 81 98765-4321");
   });
 });

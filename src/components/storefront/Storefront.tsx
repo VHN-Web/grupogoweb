@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { formatMinor, formatPyg, parseMajorToMinor, pygToMinor, minorToPyg, type Rates } from "@/core/money";
-import { LABELS, type Currency, type OrderType, type PaymentMethod } from "@/core/types";
+import { formatMoney, parseMajorToMinor, fromBase, toBase, type Rates } from "@/core/money";
+import { isValidName, tr, type Locale } from "@/core/region";
+import { getLabels, type Currency, type OrderType, type PaymentMethod } from "@/core/types";
 import type { PublicPaymentConfig } from "@/core/tenant-config";
 import { getTheme, type Theme, type ThemeId } from "@/core/themes";
 import { Illustration } from "@/components/Illustration";
+import { NameInput } from "@/components/forms/NameInput";
+import { PhoneInput } from "@/components/forms/PhoneInput";
 import { AtlasLogo } from "@/components/brand/AtlasLogo";
 
 export type StoreProduct = {
@@ -22,6 +25,9 @@ export type StoreProduct = {
 
 export type StoreData = {
   slug: string;
+  locale: Locale;
+  currency: Currency; // moeda base dos preços
+  country: string; // país (formato do telefone)
   name: string;
   logoUrl: string | null;
   primaryColor: string;
@@ -49,6 +55,11 @@ export type StoreData = {
 };
 
 type Cart = Record<string, number>;
+
+// Idioma e moeda do estabelecimento disponíveis para todos os componentes do site
+type Ctx = { T: (es: string, pt: string) => string; money: (v: number) => string; L: ReturnType<typeof getLabels>; data: StoreData };
+const StoreCtx = createContext<Ctx>(null as unknown as Ctx);
+const useStore = () => useContext(StoreCtx);
 type View = "menu" | "cart" | "checkout";
 
 function useCart(slug: string) {
@@ -116,7 +127,11 @@ export function Storefront({ data }: { data: StoreData }) {
   const tileFor = (i: number) => theme.colors.tiles[i % theme.colors.tiles.length];
   const featured = theme.featured ? all.filter((p) => !p.soldOut).slice(0, 6) : [];
 
+  const ctx: Ctx = { T: tr(data.locale), money: (v: number) => formatMoney(v, data.currency), L: getLabels(data.locale), data };
+  const { T, money } = ctx;
+
   return (
+    <StoreCtx.Provider value={ctx}>
     <div style={vars} className="th min-h-dvh">
       <div className="mx-auto max-w-xl pb-32">
         <Hero data={data} theme={theme} />
@@ -124,14 +139,14 @@ export function Storefront({ data }: { data: StoreData }) {
         {(data.table || data.invalidTable || !data.isOpen) && (
           <div className="mt-4 space-y-2 px-5">
             {data.table && (
-              <div className="th-accent rounded-xl px-4 py-2.5 text-sm font-semibold">Estás en la {data.table.label}. Tu pedido llega a tu mesa.</div>
+              <div className="th-accent rounded-xl px-4 py-2.5 text-sm font-semibold">{T(`Estás en la ${data.table.label}. Tu pedido llega a tu mesa.`, `Você está na ${data.table.label}. Seu pedido chega na sua mesa.`)}</div>
             )}
             {data.invalidTable && (
-              <div className="rounded-xl bg-amber-100 px-4 py-2.5 text-sm text-amber-900">No reconocimos el QR de la mesa. Pedí ayuda al personal.</div>
+              <div className="rounded-xl bg-amber-100 px-4 py-2.5 text-sm text-amber-900">{T("No reconocimos el QR de la mesa. Pedí ayuda al personal.", "Não reconhecemos o QR da mesa. Peça ajuda à equipe.")}</div>
             )}
             {!data.isOpen && (
               <div className="th-surface th-muted rounded-xl border th-line px-4 py-2.5 text-sm">
-                El local está cerrado ahora. Podés ver el menú, pero no hacer pedidos.
+                {T("El local está cerrado ahora. Podés ver el menú, pero no hacer pedidos.", "O estabelecimento está fechado agora. Você pode ver o cardápio, mas não fazer pedidos.")}
               </div>
             )}
           </div>
@@ -139,14 +154,14 @@ export function Storefront({ data }: { data: StoreData }) {
 
         {featured.length > 0 && (
           <section className="mt-6">
-            <h2 className="th-h mb-3 px-5 text-[21px] font-bold">Lo más pedido</h2>
+            <h2 className="th-h mb-3 px-5 text-[21px] font-bold">{T("Lo más pedido", "Mais pedidos")}</h2>
             <div className="no-scrollbar flex gap-3 overflow-x-auto px-5">
               {featured.map((p, i) => (
                 <div key={p.id} className="flex w-36 shrink-0 flex-col gap-1.5">
                   <ProductImage p={p} tile={tileFor(i)} className="h-36 w-36" radius={theme.radius + 4} size={112} />
                   <span className="text-sm font-bold leading-snug">{p.name}</span>
                   <div className="flex items-center justify-between">
-                    <span className="th-muted text-[13px]">{formatPyg(p.pricePyg)}</span>
+                    <span className="th-muted text-[13px]">{money(p.pricePyg)}</span>
                     {data.isOpen && !p.soldOut && <AddButton onClick={() => setQty(p.id, (cart[p.id] ?? 0) + 1)} label={p.name} round small />}
                   </div>
                 </div>
@@ -157,7 +172,7 @@ export function Storefront({ data }: { data: StoreData }) {
 
         {/* Categorias */}
         <nav
-          aria-label="Categorías"
+          aria-label={T("Categorías", "Categorias")}
           className="no-scrollbar th-bg sticky top-0 z-10 mt-4 flex gap-2 overflow-x-auto px-5 py-3"
           style={{ boxShadow: `0 1px 0 ${theme.colors.line}` }}
         >
@@ -176,7 +191,7 @@ export function Storefront({ data }: { data: StoreData }) {
         </nav>
 
         <main className="px-5">
-          {data.groups.length === 0 && <p className="th-muted py-16 text-center">El menú todavía está vacío.</p>}
+          {data.groups.length === 0 && <p className="th-muted py-16 text-center">{T("El menú todavía está vacío.", "O cardápio ainda está vazio.")}</p>}
           {data.groups.map((g, gi) => (
             <section key={g.id} id={`c-${g.id}`} className="scroll-mt-16 pt-6">
               <h2
@@ -202,7 +217,7 @@ export function Storefront({ data }: { data: StoreData }) {
             </section>
           ))}
           <p className="th-muted mt-10 flex items-center justify-center gap-1.5 text-[11px]">
-            Hecho con <AtlasLogo height={10} ink="currentColor" />
+            {T("Hecho con", "Feito com")} <AtlasLogo height={10} ink="currentColor" />
           </p>
         </main>
       </div>
@@ -215,14 +230,14 @@ export function Storefront({ data }: { data: StoreData }) {
             className="th-accent flex w-full items-center justify-between px-5 py-4 text-[15px] font-bold shadow-xl shadow-black/25 transition active:scale-[.99]"
             style={{ borderRadius: theme.radius }}
           >
-            <span>Ver pedido · {count}</span>
-            <span>{formatPyg(subtotal)}</span>
+            <span>{T("Ver pedido", "Ver pedido")} · {count}</span>
+            <span>{money(subtotal)}</span>
           </button>
         </div>
       )}
 
       {view !== "menu" && (
-        <Sheet onClose={() => setView("menu")} title={view === "cart" ? "Tu pedido" : "Finalizar pedido"}>
+        <Sheet onClose={() => setView("menu")} title={view === "cart" ? T("Tu pedido", "Seu pedido") : T("Finalizar pedido", "Finalizar pedido")}>
           {view === "cart" ? (
             <CartView lines={lines} subtotal={subtotal} rates={data.rates} onQty={setQty} canOrder={data.isOpen} onNext={() => setView("checkout")} />
           ) : (
@@ -231,6 +246,7 @@ export function Storefront({ data }: { data: StoreData }) {
         </Sheet>
       )}
     </div>
+    </StoreCtx.Provider>
   );
 }
 
@@ -240,7 +256,7 @@ function Logo({ data, size, ring }: { data: StoreData; size: number; ring?: stri
   const style: CSSProperties = { width: size, height: size, boxShadow: ring ? `0 0 0 3px ${ring}` : undefined };
   if (data.logoUrl) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={data.logoUrl} alt={`Logo de ${data.name}`} style={style} className="shrink-0 rounded-full object-cover" />;
+    return <img src={data.logoUrl} alt={`Logo ${data.name}`} style={style} className="shrink-0 rounded-full object-cover" />;
   }
   return (
     <div style={style} className="th-accent th-h grid shrink-0 place-items-center rounded-full text-[0.9em] font-bold">
@@ -258,16 +274,19 @@ function BannerArt({ data, size, className }: { data: StoreData; size: number; c
 }
 
 function StatusLine({ data, extra }: { data: StoreData; extra?: string | null }) {
+  const { T } = useStore();
   return (
     <span className="flex items-center gap-1.5 text-[12.5px] opacity-80">
       <span className={`inline-block h-2 w-2 rounded-full ${data.isOpen ? "bg-emerald-400" : "bg-zinc-400"}`} />
-      {data.isOpen ? "Abierto" : "Cerrado"}
+      {data.isOpen ? T("Abierto", "Aberto") : T("Cerrado", "Fechado")}
       {extra && <span className="truncate">· {extra}</span>}
     </span>
   );
 }
 
 function Hero({ data, theme }: { data: StoreData; theme: Theme }) {
+  const { T } = useStore();
+  const open = data.isOpen ? T("Abierto", "Aberto") : T("Cerrado", "Fechado");
   const b = data.banner;
   const title = b.title || data.name;
   const hasPhoto = !!b.imageUrl;
@@ -344,7 +363,7 @@ function Hero({ data, theme }: { data: StoreData; theme: Theme }) {
               </h1>
             )}
             <span className="th-surface shrink-0 rounded-full px-3 py-1.5 text-xs">
-              <span className={data.isOpen ? "text-emerald-600" : "text-zinc-400"}>●</span> {data.isOpen ? "Abierto" : "Cerrado"}
+              <span className={data.isOpen ? "text-emerald-600" : "text-zinc-400"}>●</span> {open}
             </span>
           </div>
           {(b.title || b.illustration || b.imageUrl) && (
@@ -371,7 +390,7 @@ function Hero({ data, theme }: { data: StoreData; theme: Theme }) {
         <header className="px-5 pt-12">
           <div className="flex items-center justify-between gap-3">
             {data.logoUrl ? <Logo data={data} size={44} /> : <h1 className="th-h text-[28px] font-extrabold uppercase tracking-[0.08em]">{data.name}</h1>}
-            <span className="th-line shrink-0 rounded-full border px-3 py-1.5 text-xs">{data.tagline || (data.isOpen ? "Abierto" : "Cerrado")}</span>
+            <span className="th-line shrink-0 rounded-full border px-3 py-1.5 text-xs">{data.tagline || open}</span>
           </div>
           {(b.title || b.illustration || b.imageUrl) && (
             <div className="relative mt-4 h-[230px] overflow-hidden rounded-[26px]" style={heroStyle}>
@@ -425,9 +444,100 @@ function Hero({ data, theme }: { data: StoreData; theme: Theme }) {
           </div>
           <div className="flex gap-2 px-5 pt-4 text-xs">
             <span className="th-line rounded-full border px-3 py-1.5">
-              <span className={data.isOpen ? "text-emerald-400" : "text-zinc-400"}>●</span> {data.isOpen ? "Abierto" : "Cerrado"}
+              <span className={data.isOpen ? "text-emerald-400" : "text-zinc-400"}>●</span> {open}
             </span>
             {data.address && <span className="th-line truncate rounded-full border px-3 py-1.5">{data.address}</span>}
+          </div>
+        </header>
+      );
+
+    case "pole":
+      return (
+        <header>
+          <div className="relative h-[300px] overflow-hidden" style={heroStyle}>
+            <div aria-hidden className="absolute -right-6 top-0 h-full w-[92px] rotate-[8deg] opacity-90" style={{ background: `repeating-linear-gradient(-35deg, ${theme.colors.heroAlt} 0 16px, #F4F1EA 16px 32px, #1F3A5F 32px 48px, #F4F1EA 48px 64px)`, animation: "poleSlide 3.5s linear infinite", backgroundSize: "100% 128px" }} />
+            {hasPhoto ? (
+              <BannerArt data={data} size={190} className="absolute inset-y-0 right-[70px] h-full w-[45%]" />
+            ) : (
+              <div className="absolute right-[64px] top-[78px]">
+                <BannerArt data={data} size={170} />
+              </div>
+            )}
+            <div className="relative flex w-[200px] flex-col gap-2 pl-5 pt-12">
+              <span className="th-accent-text text-[11px] font-bold uppercase tracking-[0.35em]">{b.tag || T("Desde", "Desde") + " · Est."}</span>
+              <span className="th-h text-[40px] uppercase leading-[0.95]">{title}</span>
+              {b.subtitle && <span className="text-[13px] opacity-75">{b.subtitle}</span>}
+              {b.highlight && <span className="th-accent self-start rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-wider">{b.highlight}</span>}
+            </div>
+          </div>
+          <div className="th-line flex items-center gap-3 border-b px-5 py-4">
+            <Logo data={data} size={58} ring={data.primaryColor} />
+            <div className="flex min-w-0 flex-col">
+              <h1 className="th-h truncate text-xl uppercase tracking-wide">{data.name}</h1>
+              <StatusLine data={data} extra={data.tagline ?? data.address} />
+            </div>
+          </div>
+        </header>
+      );
+
+    case "grid":
+      return (
+        <header>
+          <div className="relative h-[300px] overflow-hidden" style={heroStyle}>
+            <div aria-hidden className="absolute inset-0 opacity-40" style={{ backgroundImage: `linear-gradient(${theme.colors.line} 1px, transparent 1px), linear-gradient(90deg, ${theme.colors.line} 1px, transparent 1px)`, backgroundSize: "28px 28px" }} />
+            <div aria-hidden className="absolute -right-10 top-10 h-[240px] w-[240px] rounded-full blur-3xl" style={{ background: theme.colors.heroAlt, opacity: 0.28 }} />
+            <div aria-hidden className="absolute -left-16 bottom-0 h-[160px] w-[160px] rounded-full blur-3xl" style={{ background: "#7C3AED", opacity: 0.3 }} />
+            {hasPhoto ? (
+              <BannerArt data={data} size={200} className="absolute inset-y-0 right-0 h-full w-[52%]" />
+            ) : (
+              <div className="absolute -right-4 top-[64px]">
+                <BannerArt data={data} size={200} />
+              </div>
+            )}
+            <div className="relative flex items-center gap-2 px-5 pt-6">
+              {data.logoUrl ? <Logo data={data} size={36} /> : <span className="th-accent grid h-9 w-9 place-items-center rounded-lg text-sm font-black">{initials(data.name)}</span>}
+              <h1 className="th-h truncate text-lg font-bold">{data.name}</h1>
+              <span className="ml-auto rounded-full border px-2.5 py-1 text-[11px]" style={{ borderColor: theme.colors.line }}>
+                <span className={data.isOpen ? "text-emerald-400" : "text-zinc-500"}>●</span> {open}
+              </span>
+            </div>
+            <div className="relative flex w-[190px] flex-col gap-2 pl-5 pt-9">
+              {b.tag && <span className="th-accent-text font-mono text-[11px] uppercase tracking-[0.2em]">{"// "}{b.tag}</span>}
+              <span className="th-h text-[32px] font-bold leading-[1.02]">{title}</span>
+              {b.highlight && <span className="th-accent self-start rounded-lg px-3 py-1.5 text-sm font-bold">{b.highlight}</span>}
+            </div>
+          </div>
+        </header>
+      );
+
+    case "luxe":
+      return (
+        <header>
+          <div className="relative h-[320px] overflow-hidden text-center" style={heroStyle}>
+            <div aria-hidden className="absolute left-1/2 top-[54px] h-[300px] w-[300px] -translate-x-1/2 rounded-full border" style={{ borderColor: theme.colors.heroAlt, opacity: 0.55 }} />
+            <div aria-hidden className="absolute left-1/2 top-[74px] h-[260px] w-[260px] -translate-x-1/2 rounded-full border" style={{ borderColor: theme.colors.heroAlt, opacity: 0.25 }} />
+            <div className="relative flex flex-col items-center gap-1 pt-8">
+              {data.logoUrl ? <Logo data={data} size={52} /> : null}
+              <h1 className="th-h text-[30px] italic leading-none" style={{ color: theme.colors.heroAlt }}>{data.name}</h1>
+              {data.tagline && <span className="text-[10px] uppercase tracking-[0.4em] opacity-75">{data.tagline}</span>}
+            </div>
+            {hasPhoto ? (
+              <BannerArt data={data} size={150} className="absolute bottom-0 left-1/2 h-[170px] w-[60%] -translate-x-1/2 rounded-t-full" />
+            ) : (
+              <div className={`absolute bottom-6 ${b.title || b.highlight ? "left-[62%]" : "left-1/2"} -translate-x-1/2`}>
+                <BannerArt data={data} size={150} />
+              </div>
+            )}
+            {(b.title || b.highlight) && (
+              <div className="absolute bottom-4 left-4 z-10 flex max-w-[160px] flex-col items-start gap-1 text-left">
+                {b.tag && <span className="text-[10px] uppercase tracking-[0.3em]" style={{ color: theme.colors.heroAlt }}>{b.tag}</span>}
+                {b.title && <span className="th-h text-[22px] italic leading-tight">{b.title}</span>}
+                {b.highlight && <span className="th-accent rounded-full px-3 py-1 text-[11px] font-semibold">{b.highlight}</span>}
+              </div>
+            )}
+          </div>
+          <div className="th-line flex justify-center border-b py-3">
+            <StatusLine data={data} extra={data.address} />
           </div>
         </header>
       );
@@ -481,11 +591,12 @@ function ProductImage({ p, tile, className, radius, size }: { p: StoreProduct; t
 }
 
 function AddButton({ onClick, label, round, small }: { onClick: () => void; label: string; round?: boolean; small?: boolean }) {
+  const { T } = useStore();
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`Agregar ${label}`}
+      aria-label={`${T("Agregar", "Adicionar")} ${label}`}
       className={`th-accent grid shrink-0 place-items-center font-bold transition active:scale-95 ${small ? "h-8 w-8 text-lg" : "h-10 w-10 text-xl"} ${
         round ? "rounded-full" : "rounded-xl"
       }`}
@@ -496,13 +607,14 @@ function AddButton({ onClick, label, round, small }: { onClick: () => void; labe
 }
 
 function Stepper({ qty, onQty, max }: { qty: number; onQty: (q: number) => void; max: number }) {
+  const { T } = useStore();
   return (
     <div className="th-line th-bg flex h-10 items-center rounded-full border">
-      <button onClick={() => onQty(qty - 1)} className="h-10 w-9 text-lg font-semibold" aria-label="Quitar uno">
+      <button onClick={() => onQty(qty - 1)} className="h-10 w-9 text-lg font-semibold" aria-label={T("Quitar uno", "Remover um")}>
         −
       </button>
       <span className="w-6 text-center text-sm font-bold tabular-nums">{qty}</span>
-      <button onClick={() => onQty(qty + 1)} disabled={qty >= max} className="h-10 w-9 text-lg font-semibold disabled:opacity-30" aria-label="Agregar uno">
+      <button onClick={() => onQty(qty + 1)} disabled={qty >= max} className="h-10 w-9 text-lg font-semibold disabled:opacity-30" aria-label={T("Agregar uno", "Adicionar um")}>
         +
       </button>
     </div>
@@ -510,20 +622,22 @@ function Stepper({ qty, onQty, max }: { qty: number; onQty: (q: number) => void;
 }
 
 function Qty({ p, qty, onQty, canOrder, round, small }: { p: StoreProduct; qty: number; onQty: (q: number) => void; canOrder: boolean; round?: boolean; small?: boolean }) {
-  if (p.soldOut) return <span className="th-muted text-[11px] font-bold uppercase tracking-wide">Agotado</span>;
+  const { T } = useStore();
+  if (p.soldOut) return <span className="th-muted text-[11px] font-bold uppercase tracking-wide">{T("Agotado", "Esgotado")}</span>;
   if (!canOrder) return null;
   if (qty === 0) return <AddButton onClick={() => onQty(1)} label={p.name} round={round} small={small} />;
   return <Stepper qty={qty} onQty={onQty} max={p.maxQty} />;
 }
 
 function ProductRow({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
+  const { money } = useStore();
   return (
     <li className={`th-surface flex items-center gap-3.5 p-3 ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
       <ProductImage p={p} tile={tile} className="h-[84px] w-[84px]" radius={theme.radius - 4} size={70} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h3 className={`th-h leading-tight ${theme.fonts.headingUpper ? "text-[19px] uppercase tracking-wide" : "text-[15.5px] font-bold"}`}>{p.name}</h3>
         {p.description && <p className="th-muted line-clamp-2 text-[12.5px] leading-snug">{p.description}</p>}
-        <span className={`mt-1 text-[15px] font-bold ${theme.dark ? "th-accent-text" : ""}`}>{formatPyg(p.pricePyg)}</span>
+        <span className={`mt-1 text-[15px] font-bold ${theme.dark ? "th-accent-text" : ""}`}>{money(p.pricePyg)}</span>
       </div>
       <Qty p={p} qty={qty} onQty={onQty} canOrder={canOrder} />
     </li>
@@ -531,6 +645,7 @@ function ProductRow({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct;
 }
 
 function ProductCard({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
+  const { money } = useStore();
   return (
     <div className={`th-surface flex flex-col overflow-hidden border th-line ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
       <ProductImage p={p} tile={tile} className="h-[130px] w-full" radius={0} size={110} />
@@ -538,7 +653,7 @@ function ProductCard({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct
         <h3 className="th-h text-[15.5px] font-bold leading-tight">{p.name}</h3>
         {p.description && <p className="th-muted line-clamp-2 text-[12px] leading-snug">{p.description}</p>}
         <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-          <span className="text-[13.5px] font-bold">{formatPyg(p.pricePyg)}</span>
+          <span className="text-[13.5px] font-bold">{money(p.pricePyg)}</span>
           <Qty p={p} qty={qty} onQty={onQty} canOrder={canOrder} round small />
         </div>
       </div>
@@ -549,6 +664,7 @@ function ProductCard({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct
 // ------------------------------------------------------------------ sheet, carrinho e checkout
 
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const { T } = useStore();
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -560,7 +676,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
       <div className="th-bg flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
         <div className="th-line flex items-center justify-between border-b px-5 py-4">
           <h2 className="th-h text-lg font-bold">{title}</h2>
-          <button onClick={onClose} className="th-surface th-line grid h-9 w-9 place-items-center rounded-full border" aria-label="Cerrar">
+          <button onClick={onClose} className="th-surface th-line grid h-9 w-9 place-items-center rounded-full border" aria-label={T("Cerrar", "Fechar")}>
             ✕
           </button>
         </div>
@@ -577,7 +693,9 @@ const primaryBtn = "th-accent w-full rounded-2xl py-4 text-[15px] font-bold tran
 const ghostBtn = "th-surface th-line rounded-2xl border px-5 py-4 text-sm font-semibold";
 
 function CartView({ lines, subtotal, rates, onQty, onNext, canOrder }: { lines: Line[]; subtotal: number; rates: Rates; onQty: (id: string, q: number) => void; onNext: () => void; canOrder: boolean }) {
-  if (lines.length === 0) return <p className="th-muted py-10 text-center">Tu pedido está vacío.</p>;
+  const { T, money, data } = useStore();
+  const others = (["PYG", "USD", "BRL"] as Currency[]).filter((c) => c !== data.currency && data.payment.options.some((o) => o.currencies.includes(c)));
+  if (lines.length === 0) return <p className="th-muted py-10 text-center">{T("Tu pedido está vacío.", "Seu pedido está vazio.")}</p>;
   return (
     <div className="space-y-4">
       <ul className={`${box} divide-y`} style={{ borderColor: "var(--line)" }}>
@@ -585,7 +703,7 @@ function CartView({ lines, subtotal, rates, onQty, onNext, canOrder }: { lines: 
           <li key={l.product.id} className="th-line flex items-center gap-3 p-3.5">
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold">{l.product.name}</p>
-              <p className="th-muted text-[13px]">{formatPyg(l.product.pricePyg * l.qty)}</p>
+              <p className="th-muted text-[13px]">{money(l.product.pricePyg * l.qty)}</p>
             </div>
             <Stepper qty={l.qty} onQty={(q) => onQty(l.product.id, q)} max={l.product.maxQty} />
           </li>
@@ -594,14 +712,14 @@ function CartView({ lines, subtotal, rates, onQty, onNext, canOrder }: { lines: 
       <div className="flex items-end justify-between px-1">
         <span className="th-muted">Subtotal</span>
         <div className="text-right">
-          <p className="text-xl font-bold">{formatPyg(subtotal)}</p>
-          <p className="th-muted text-xs">
-            ≈ {formatMinor(pygToMinor(subtotal, "USD", rates), "USD")} · {formatMinor(pygToMinor(subtotal, "BRL", rates), "BRL")}
-          </p>
+          <p className="text-xl font-bold">{money(subtotal)}</p>
+          {others.length > 0 && (
+            <p className="th-muted text-xs">≈ {others.map((c) => formatMoney(fromBase(subtotal, data.currency, c, rates), c)).join(" · ")}</p>
+          )}
         </div>
       </div>
       <button onClick={onNext} disabled={!canOrder} className={primaryBtn}>
-        Continuar
+        {T("Continuar", "Continuar")}
       </button>
     </div>
   );
@@ -610,11 +728,13 @@ function CartView({ lines, subtotal, rates, onQty, onNext, canOrder }: { lines: 
 type Quote = { state: "idle" } | { state: "loading" } | { state: "ok"; feePyg: number; distanceKm?: number; free?: boolean } | { state: "error"; message: string };
 
 function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; lines: Line[]; subtotal: number; onBack: () => void; onDone: () => void }) {
+  const { T, money, L } = useStore();
   const router = useRouter();
+  const base = data.currency;
   const typeOptions = (["PICKUP", "DELIVERY"] as const).filter((t) => data.accepts[t]);
   const [type, setType] = useState<OrderType>(data.table ? "DINE_IN" : typeOptions[0] ?? "PICKUP");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState<string | null>(null); // E.164 válido ou null
   const [address, setAddress] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [quote, setQuote] = useState<Quote>({ state: "idle" });
@@ -622,14 +742,14 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
   const options = data.payment.options;
   const [method, setMethod] = useState<PaymentMethod | undefined>(options[0]?.method);
   const option = options.find((o) => o.method === method);
-  const [currency, setCurrency] = useState<Currency>(option?.currencies[0] ?? "PYG");
+  const [currency, setCurrency] = useState<Currency>(option?.currencies.includes(base) ? base : option?.currencies[0] ?? base);
   const [tendered, setTendered] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (option && !option.currencies.includes(currency)) setCurrency(option.currencies[0]);
-  }, [option, currency]);
+    if (option && !option.currencies.includes(currency)) setCurrency(option.currencies.includes(base) ? base : option.currencies[0]);
+  }, [option, currency, base]);
 
   useEffect(() => {
     if (type !== "DELIVERY" || !coords) return;
@@ -645,36 +765,43 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
         if (cancel) return;
         if (q.ok) setQuote({ state: "ok", feePyg: q.feePyg, distanceKm: q.distanceKm, free: q.free });
         else if (q.reason === "NO_STORE_LOCATION") setQuote({ state: "ok", feePyg: q.baseFeePyg ?? 0 });
-        else setQuote({ state: "error", message: q.reason === "OUT_OF_RANGE" ? `Fuera del área de delivery (${q.distanceKm} km)` : "No se pudo calcular" });
+        else
+          setQuote({
+            state: "error",
+            message: q.reason === "OUT_OF_RANGE" ? T(`Fuera del área de delivery (${q.distanceKm} km)`, `Fora da área de entrega (${q.distanceKm} km)`) : T("No se pudo calcular", "Não foi possível calcular"),
+          });
       })
-      .catch(() => !cancel && setQuote({ state: "error", message: "No se pudo calcular" }));
+      .catch(() => !cancel && setQuote({ state: "error", message: T("No se pudo calcular", "Não foi possível calcular") }));
     return () => {
       cancel = true;
     };
-  }, [type, coords, subtotal, data.slug]);
+  }, [type, coords, subtotal, data.slug, T]);
 
   const locate = () => {
-    if (!navigator.geolocation) return setQuote({ state: "error", message: "Tu navegador no comparte ubicación" });
+    if (!navigator.geolocation) return setQuote({ state: "error", message: T("Tu navegador no comparte ubicación", "Seu navegador não compartilha localização") });
     setQuote({ state: "loading" });
     navigator.geolocation.getCurrentPosition(
       (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setQuote({ state: "error", message: "Permití el acceso a la ubicación para calcular el delivery" }),
+      () => setQuote({ state: "error", message: T("Permití el acceso a la ubicación para calcular el delivery", "Permita o acesso à localização para calcular a entrega") }),
       { enableHighAccuracy: true, timeout: 10000 },
     );
   };
 
   const deliveryFee = type === "DELIVERY" && quote.state === "ok" ? quote.feePyg : 0;
   const total = subtotal + deliveryFee;
-  const totalInCurrency = pygToMinor(total, currency, data.rates);
+  const totalInCurrency = fromBase(total, base, currency, data.rates);
   const tenderedMinor = tendered ? parseMajorToMinor(tendered, currency) : null;
-  const tenderedPyg = tenderedMinor == null ? null : minorToPyg(tenderedMinor, currency, data.rates);
-  const change = tenderedPyg != null ? tenderedPyg - total : null;
+  const tenderedBase = tenderedMinor == null ? null : toBase(tenderedMinor, currency, base, data.rates);
+  const change = tenderedBase != null ? tenderedBase - total : null;
+  const nameOk = isValidName(name);
+  const phoneRequired = type === "DELIVERY";
 
   const canSubmit =
-    name.trim().length >= 2 &&
+    nameOk &&
     !!method &&
     !submitting &&
-    (type !== "DELIVERY" || (address.trim() && phone.trim() && quote.state === "ok")) &&
+    (!phoneRequired || !!phone) &&
+    (type !== "DELIVERY" || (address.trim() && quote.state === "ok")) &&
     (method !== "CASH" || !tendered || (change != null && change >= 0));
 
   const submit = async () => {
@@ -686,8 +813,8 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           slug: data.slug,
-          customerName: name,
-          customerPhone: phone || null,
+          customerName: name.trim(),
+          customerPhone: phone,
           type,
           tableCode: data.table?.code ?? null,
           address: type === "DELIVERY" ? address : null,
@@ -701,7 +828,7 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
         }),
       });
       const out = await res.json();
-      if (!res.ok) throw new Error(out.error ?? "No se pudo enviar el pedido");
+      if (!res.ok) throw new Error(out.error ?? T("No se pudo enviar el pedido", "Não foi possível enviar o pedido"));
       onDone();
       if (out.redirectUrl) window.location.href = out.redirectUrl;
       else router.push(`/${data.slug}/pedido/${out.orderId}`);
@@ -711,40 +838,45 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
     }
   };
 
+  const sym = (c: Currency) => (c === "PYG" ? "Gs." : c === "USD" ? "US$" : "R$");
+
   return (
     <div className="space-y-5">
       {data.table ? (
         <div className={`${box} px-4 py-3 text-sm`}>
-          <span className="th-muted">Pedido para </span>
+          <span className="th-muted">{T("Pedido para", "Pedido para")} </span>
           <b>{data.table.label}</b>
         </div>
       ) : (
-        <Segmented value={type} onChange={(v) => setType(v as OrderType)} options={typeOptions.map((t) => ({ value: t, label: LABELS.orderType[t] }))} />
+        <Segmented value={type} onChange={(v) => setType(v as OrderType)} options={typeOptions.map((t) => ({ value: t, label: L.orderType[t] }))} />
       )}
 
       <div className="space-y-3">
         <div>
-          <label className="label" htmlFor="name">Tu nombre</label>
-          <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Ej: Ana" />
+          <label className="label" htmlFor="name">{T("Tu nombre", "Seu nome")}</label>
+          <NameInput id="name" value={name} onChange={setName} placeholder={T("Ej: Ana", "Ex: Ana")} />
+          {name && !nameOk && <p className="mt-1 text-[12px] text-red-500">{T("Escribí al menos 2 letras", "Digite pelo menos 2 letras")}</p>}
         </div>
         {(type === "DELIVERY" || type === "PICKUP") && (
           <div>
-            <label className="label" htmlFor="phone">WhatsApp / teléfono{type === "PICKUP" && " (opcional)"}</label>
-            <input id="phone" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="09xx xxx xxx" />
+            <label className="label" htmlFor="phone">
+              WhatsApp{!phoneRequired && ` (${T("opcional", "opcional")})`}
+            </label>
+            <PhoneInput id="phone" defaultCountry={data.country} locale={data.locale} onChange={(e) => setPhone(e)} />
           </div>
         )}
         {type === "DELIVERY" && (
           <div className="space-y-2">
-            <label className="label" htmlFor="addr">Dirección de entrega</label>
-            <input id="addr" className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Calle, número, referencia" autoComplete="street-address" />
+            <label className="label" htmlFor="addr">{T("Dirección de entrega", "Endereço de entrega")}</label>
+            <input id="addr" className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder={T("Calle, número, referencia", "Rua, número, complemento")} autoComplete="street-address" />
             <button type="button" onClick={locate} className={`${ghostBtn} w-full py-3`}>
-              {coords ? "Ubicación compartida — actualizar" : "Compartir ubicación para calcular el delivery"}
+              {coords ? T("Ubicación compartida — actualizar", "Localização compartilhada — atualizar") : T("Compartir ubicación para calcular el delivery", "Compartilhar localização para calcular a entrega")}
             </button>
-            {quote.state === "loading" && <p className="th-muted text-[13px]">Calculando delivery…</p>}
+            {quote.state === "loading" && <p className="th-muted text-[13px]">{T("Calculando delivery…", "Calculando entrega…")}</p>}
             {quote.state === "error" && <p className="text-[13px] text-red-500">{quote.message}</p>}
             {quote.state === "ok" && (
               <p className="th-muted text-[13px]">
-                Delivery: <b style={{ color: "var(--fg)" }}>{quote.free ? "Gratis" : formatPyg(quote.feePyg)}</b>
+                {T("Delivery", "Entrega")}: <b style={{ color: "var(--fg)" }}>{quote.free ? T("Gratis", "Grátis") : money(quote.feePyg)}</b>
                 {quote.distanceKm != null && ` · ${quote.distanceKm} km`}
               </p>
             )}
@@ -753,8 +885,8 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
       </div>
 
       <div className="space-y-3">
-        <p className="label !mb-0">¿Cómo pagás?</p>
-        {options.length === 0 && <p className="text-sm text-red-500">El local no configuró medios de pago.</p>}
+        <p className="label !mb-0">{T("¿Cómo pagás?", "Como você vai pagar?")}</p>
+        {options.length === 0 && <p className="text-sm text-red-500">{T("El local no configuró medios de pago.", "O estabelecimento não configurou formas de pagamento.")}</p>}
         <div className="grid grid-cols-2 gap-2">
           {options.map((o) => (
             <button
@@ -764,45 +896,52 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
               aria-pressed={method === o.method}
               className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${method === o.method ? "th-accent border-transparent" : "th-surface th-line"}`}
             >
-              {LABELS.paymentMethod[o.method]}
+              {L.paymentMethod[o.method]}
             </button>
           ))}
         </div>
         {option && option.currencies.length > 1 && (
-          <Segmented value={currency} onChange={(v) => setCurrency(v as Currency)} options={option.currencies.map((c) => ({ value: c, label: c === "PYG" ? "Gs." : c === "USD" ? "US$" : "R$" }))} />
+          <Segmented value={currency} onChange={(v) => setCurrency(v as Currency)} options={option.currencies.map((c) => ({ value: c, label: sym(c) }))} />
         )}
         {method === "CASH" && (
           <div>
-            <label className="label" htmlFor="tendered">¿Con cuánto pagás? (para el vuelto, opcional)</label>
-            <input id="tendered" className="input" value={tendered} onChange={(e) => setTendered(e.target.value)} inputMode="decimal" placeholder={currency === "PYG" ? "100.000" : "20"} />
+            <label className="label" htmlFor="tendered">{T("¿Con cuánto pagás? (para el vuelto, opcional)", "Vai pagar com quanto? (para o troco, opcional)")}</label>
+            <input
+              id="tendered"
+              className="input"
+              value={tendered}
+              onChange={(e) => setTendered(e.target.value.replace(/[^\d.,]/g, ""))}
+              inputMode="decimal"
+              placeholder={currency === "PYG" ? "100.000" : "50"}
+            />
             {change != null && (
               <p className={`mt-1.5 text-[13px] ${change < 0 ? "text-red-500" : "th-muted"}`}>
-                {change < 0 ? "El monto es menor al total" : <>Vuelto: <b style={{ color: "var(--fg)" }}>{formatPyg(change)}</b></>}
+                {change < 0 ? T("El monto es menor al total", "O valor é menor que o total") : <>{T("Vuelto", "Troco")}: <b style={{ color: "var(--fg)" }}>{money(change)}</b></>}
               </p>
             )}
           </div>
         )}
         {method === "PIX" && data.payment.pixKey && (
           <p className={`${box} px-4 py-3 text-[13px]`}>
-            Al confirmar te mostramos la clave Pix <b>{data.payment.pixKey}</b>.
+            {T("Al confirmar te mostramos la clave Pix", "Ao confirmar mostramos a chave Pix")} <b>{data.payment.pixKey}</b>.
           </p>
         )}
       </div>
 
       <div>
-        <label className="label" htmlFor="notes">Observaciones (opcional)</label>
-        <textarea id="notes" className="input min-h-20" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Sin cebolla, bien cocido…" />
+        <label className="label" htmlFor="notes">{T("Observaciones (opcional)", "Observações (opcional)")}</label>
+        <textarea id="notes" className="input min-h-20" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={T("Algún detalle sobre tu pedido…", "Algum detalhe sobre o seu pedido…")} />
       </div>
 
       <div className={`${box} space-y-1.5 p-4 text-sm`}>
-        <Row k="Subtotal" v={formatPyg(subtotal)} />
-        {type === "DELIVERY" && <Row k="Delivery" v={quote.state === "ok" ? (quote.free ? "Gratis" : formatPyg(deliveryFee)) : "—"} />}
+        <Row k="Subtotal" v={money(subtotal)} />
+        {type === "DELIVERY" && <Row k={T("Delivery", "Entrega")} v={quote.state === "ok" ? (quote.free ? T("Gratis", "Grátis") : money(deliveryFee)) : "—"} />}
         <div className="th-line my-2 border-t" />
-        <Row k={<b>Total</b>} v={<b className="text-lg">{formatPyg(total)}</b>} />
-        {currency !== "PYG" && <Row k={`En ${LABELS.currency[currency]}`} v={<b>{formatMinor(totalInCurrency, currency)}</b>} />}
-        {currency !== "PYG" && (
+        <Row k={<b>Total</b>} v={<b className="text-lg">{money(total)}</b>} />
+        {currency !== base && <Row k={`${T("En", "Em")} ${L.currency[currency]}`} v={<b>{formatMoney(totalInCurrency, currency)}</b>} />}
+        {currency !== base && (
           <p className="th-muted pt-1 text-xs">
-            Cotización del local: 1 {currency} = {formatPyg(data.rates[currency as "USD" | "BRL"])}
+            {T("Cotización del local", "Cotação do estabelecimento")}: 1 {currency} = {money(Math.round(data.rates[currency] * (base === "PYG" ? 1 : 100)))}
           </p>
         )}
       </div>
@@ -811,10 +950,10 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
 
       <div className="flex gap-2">
         <button onClick={onBack} className={ghostBtn}>
-          Volver
+          {T("Volver", "Voltar")}
         </button>
         <button onClick={submit} disabled={!canSubmit} className={`${primaryBtn} flex-1`}>
-          {submitting ? "Enviando…" : `Confirmar · ${formatMinor(totalInCurrency, currency)}`}
+          {submitting ? T("Enviando…", "Enviando…") : `${T("Confirmar", "Confirmar")} · ${formatMoney(totalInCurrency, currency)}`}
         </button>
       </div>
     </div>

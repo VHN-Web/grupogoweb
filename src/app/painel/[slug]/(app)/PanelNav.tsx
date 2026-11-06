@@ -3,17 +3,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const ITEMS = [
-  { href: "", label: "Pedidos" },
-  { href: "/caixa", label: "Caja" },
-  { href: "/produtos", label: "Productos y stock" },
-  { href: "/notas", label: "Facturas" },
-  { href: "/mesas", label: "Mesas y QR" },
-  { href: "/aparencia", label: "Apariencia" },
-  { href: "/config", label: "Configuración" },
-  { href: "/plano", label: "Mi plan" },
+  { href: "", es: "Pedidos", pt: "Pedidos" },
+  { href: "/caixa", es: "Caja", pt: "Caixa" },
+  { href: "/produtos", es: "Productos y stock", pt: "Produtos e estoque" },
+  { href: "/notas", es: "Facturas", pt: "Notas fiscais" },
+  { href: "/mesas", es: "Mesas y QR", pt: "Mesas e QR" },
+  { href: "/aparencia", es: "Apariencia", pt: "Aparência" },
+  { href: "/config", es: "Configuración", pt: "Configurações" },
+  { href: "/plano", es: "Mi plan", pt: "Meu plano" },
 ];
 
-export function PanelNav({ slug }: { slug: string }) {
+export function PanelNav({ slug, locale }: { slug: string; locale: "es" | "pt" }) {
   const path = usePathname();
   const base = `/painel/${slug}`;
   return (
@@ -27,7 +27,7 @@ export function PanelNav({ slug }: { slug: string }) {
             href={href}
             className={`shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition ${active ? "bg-[#C9A24A] text-[#0E0E10]" : "text-[#B9B3A7] hover:bg-white/10 hover:text-white"}`}
           >
-            {i.label}
+            {locale === "pt" ? i.pt : i.es}
           </Link>
         );
       })}
