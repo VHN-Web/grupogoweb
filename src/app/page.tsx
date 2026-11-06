@@ -17,15 +17,27 @@ const MUTED = "#B9B3A7";
 const H = "'Bricolage Grotesque', Inter, sans-serif";
 
 // Lojas de demonstração criadas pelo seed (npm run db:setup)
-const DEMOS: { slug: string; name: string; theme: ThemeId; art: string; kind: [string, string] }[] = [
-  { kind: ["Hamburguesería", "Hamburgueria"], slug: "brasa-burger", name: "Brasa Burger", theme: "burger", art: "burger" },
-  { kind: ["Barbería", "Barbearia"], slug: "navalha", name: "Navalha", theme: "barber", art: "razor" },
-  { kind: ["Restaurante", "Restaurante"], slug: "nonna-lucia", name: "Nonna Lucía", theme: "restaurant", art: "pizza" },
-  { kind: ["Informática", "Informática"], slug: "tecnoplus", name: "TecnoPlus", theme: "tech", art: "laptop" },
-  { kind: ["Cafetería", "Cafeteria"], slug: "cafe-morena", name: "Café Morena", theme: "cafe", art: "coffee" },
-  { kind: ["Perfumería", "Perfumaria"], slug: "essenza", name: "Essenza", theme: "perfume", art: "perfume" },
-  { kind: ["Tienda de ropa", "Loja de roupas"], slug: "kira", name: "KIRA", theme: "store", art: "dress" },
-  { kind: ["Bar · Cervecería", "Bar · Cervejaria"], slug: "lupulo", name: "Lúpulo", theme: "bar", art: "beer" },
+type Demo = { slug: string; name: string; theme: ThemeId; art: string; kind: string };
+// Cada país vê lojas demo do próprio país (idioma, produtos e moeda locais)
+const DEMOS_PT: Demo[] = [
+  { kind: "Hamburgueria", slug: "burguer-da-praca", name: "Burguer da Praça", theme: "burger", art: "burger" },
+  { kind: "Barbearia", slug: "navalha", name: "Navalha", theme: "barber", art: "razor" },
+  { kind: "Restaurante", slug: "cantina-da-nonna", name: "Cantina da Nonna", theme: "restaurant", art: "pizza" },
+  { kind: "Informática", slug: "byte-store", name: "Byte Store", theme: "tech", art: "laptop" },
+  { kind: "Padaria · Café", slug: "padaria-aurora", name: "Padaria Aurora", theme: "cafe", art: "coffee" },
+  { kind: "Perfumaria", slug: "essenza", name: "Essenza", theme: "perfume", art: "perfume" },
+  { kind: "Loja de roupas", slug: "kira-br", name: "KIRA", theme: "store", art: "dress" },
+  { kind: "Bar · Cervejaria", slug: "boteco-lupulo", name: "Boteco Lúpulo", theme: "bar", art: "beer" },
+];
+const DEMOS_ES: Demo[] = [
+  { kind: "Hamburguesería", slug: "brasa-burger", name: "Brasa Burger", theme: "burger", art: "burger" },
+  { kind: "Barbería", slug: "barberia-filo", name: "Barbería Filo", theme: "barber", art: "razor" },
+  { kind: "Restaurante", slug: "nonna-lucia", name: "Nonna Lucía", theme: "restaurant", art: "pizza" },
+  { kind: "Informática", slug: "tecnoplus", name: "TecnoPlus", theme: "tech", art: "laptop" },
+  { kind: "Cafetería", slug: "cafe-morena", name: "Café Morena", theme: "cafe", art: "coffee" },
+  { kind: "Perfumería", slug: "esencia", name: "Esencia", theme: "perfume", art: "perfume" },
+  { kind: "Tienda de ropa", slug: "kira", name: "KIRA", theme: "store", art: "dress" },
+  { kind: "Bar · Cervecería", slug: "lupulo", name: "Lúpulo", theme: "bar", art: "beer" },
 ];
 
 const FEATURES_ES = [
@@ -125,6 +137,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
   const T = tr(locale);
   const FEATURES = pt ? FEATURES_PT : FEATURES_ES;
   const FAQ = pt ? FAQ_PT : FAQ_ES;
+  const DEMOS = pt ? DEMOS_PT : DEMOS_ES;
   const [settings, plans] = await Promise.all([
     getSettings(),
     db.query.plans.findMany({ where: eq(schema.plans.active, true), orderBy: asc(schema.plans.sortOrder) }),
@@ -196,7 +209,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                 </div>
                 <div className="flex flex-col gap-2 p-3">
                   {[
-                    ["burger", "Doble Brasa", T("Gs. 52.000", "R$ 34,90")],
+                    ["burger", T("Doble Brasa", "Duplo Smash"), T("Gs. 52.000", "R$ 34,90")],
                     ["fries", T("Papas Brasa", "Batata Brasa"), T("Gs. 18.000", "R$ 14,90")],
                     ["soda", T("Gaseosa", "Refrigerante"), T("Gs. 9.000", "R$ 7,00")],
                   ].map(([a, n, p]) => (
@@ -213,7 +226,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
             <div className="absolute left-0 top-16 flex w-[230px] flex-col gap-1.5 rounded-[18px] bg-white p-4 text-[#0E0E10] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
               <span className="text-xs text-[#6A655C]">{T("Nuevo pedido · Mesa 4", "Novo pedido · Mesa 4")}</span>
               <span style={{ fontFamily: H }} className="text-3xl font-extrabold">#4821</span>
-              <span className="text-[13px]">{T("1× Doble Brasa · 1× Papas", "1× Doble Brasa · 1× Batata")}</span>
+              <span className="text-[13px]">{T("1× Doble Brasa · 1× Papas", "1× Duplo Smash · 1× Batata")}</span>
               <div className="mt-1 flex items-center justify-between"><b className="text-sm">{T("US$ 9,60", "R$ 49,80")}</b><span className="rounded-full bg-[#DDEFE7] px-2.5 py-1 text-[11px] font-bold text-[#1F6F55]">{T("Pagado", "Pago · Pix")}</span></div>
             </div>
             <div className="absolute bottom-16 right-0 flex w-[230px] flex-col gap-2.5 rounded-[18px] border border-[#3A3A40] bg-[#2A2B2F] p-4 text-[13px] text-[#F4F1EA] shadow-[0_24px_50px_rgba(0,0,0,0.45)]">
@@ -248,7 +261,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                     </span>
                   </div>
                   <div className="flex items-center justify-between px-4 py-3">
-                    <span className="text-sm font-semibold">{T(d.kind[0], d.kind[1])}</span>
+                    <span className="text-sm font-semibold">{d.kind}</span>
                     <span className="text-sm font-semibold" style={{ color: "#8A6A1F" }}>{T("Ver →", "Ver →")}</span>
                   </div>
                 </Link>

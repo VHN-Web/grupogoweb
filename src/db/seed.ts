@@ -246,6 +246,172 @@ const STORES: Store[] = [
       Skincare: [{ name: "Hidratante facial 50 ml", desc: "Ácido hialurônico e vitamina C", price: 8990, ill: "cream", stock: 15 }],
     },
   },
+  // ---------------- Brasil (português, R$ — preços em centavos)
+  {
+    slug: "burguer-da-praca",
+    name: "Burguer da Praça",
+    theme: "burger",
+    color: "#FFC20E",
+    tagline: "Entrega em 25–35 min",
+    address: "Boa Viagem, Recife",
+    country: "BR", lat: -8.1189, lng: -34.9006, phone: "+5581991234567",
+    payments: PAYMENTS_BR,
+    banner: { tag: "Promo da semana", title: "Combo duplo + batata", highlight: "R$ 39,90", ill: "burger" },
+    menu: {
+      Hambúrgueres: [
+        { name: "Duplo Smash", desc: "2 carnes smash, cheddar e bacon", price: 3490, ill: "burger" },
+        { name: "Clássico", desc: "Carne 150 g, queijo, alface e tomate", price: 2690, ill: "burger" },
+        { name: "Apimentado", desc: "Jalapeño, pepper jack e molho chipotle", price: 3190, ill: "burger" },
+      ],
+      Porções: [{ name: "Batata da Praça", desc: "Com cheddar e cebolinha", price: 1890, ill: "fries" }],
+      Bebidas: [{ name: "Refrigerante lata", desc: "Coca-Cola, Guaraná ou Sprite", price: 700, ill: "soda", stock: 40 }],
+      Sobremesas: [{ name: "Brownie", desc: "Com sorvete de baunilha", price: 1590, ill: "cake" }],
+    },
+  },
+  {
+    slug: "cantina-da-nonna",
+    name: "Cantina da Nonna",
+    theme: "restaurant",
+    color: "#B5482F",
+    tagline: "Cozinha italiana",
+    address: "Casa Forte, Recife",
+    country: "BR", lat: -8.0346, lng: -34.9196, phone: "+5581987654321",
+    payments: PAYMENTS_BR,
+    banner: { title: "Pizza no forno a lenha", subtitle: "Massa de fermentação natural · 48 h", ill: "pizza" },
+    menu: {
+      Pizzas: [
+        { name: "Margherita", desc: "Tomate, muçarela e manjericão", price: 5490, ill: "pizza" },
+        { name: "Calabresa", desc: "Calabresa, cebola roxa e muçarela", price: 5890, ill: "pizza" },
+      ],
+      Massas: [
+        { name: "Talharim à bolonhesa", desc: "Massa fresca com ragu de carne", price: 4890, ill: "pasta" },
+        { name: "Ravióli de ricota", desc: "Molho de tomate e manjericão", price: 4590, ill: "pasta" },
+      ],
+      Vinhos: [{ name: "Taça de vinho tinto", desc: "Malbec da casa", price: 2400, ill: "wine" }],
+      Sobremesas: [{ name: "Tiramisù", price: 2290, ill: "cake" }],
+    },
+  },
+  {
+    slug: "padaria-aurora",
+    name: "Padaria Aurora",
+    theme: "cafe",
+    color: "#4B2E1F",
+    tagline: "Café especial e pães artesanais",
+    address: "Olinda",
+    country: "BR", lat: -8.0089, lng: -34.8553, phone: "+5581999887766",
+    payments: PAYMENTS_BR,
+    banner: { title: "Café da manhã completo", subtitle: "Café + croissant + suco", highlight: "R$ 24,90", ill: "coffee" },
+    menu: {
+      Cafés: [
+        { name: "Espresso", desc: "Grãos especiais do Cerrado Mineiro", price: 690, ill: "coffee" },
+        { name: "Cappuccino", desc: "Com canela e cacau", price: 1190, ill: "coffee" },
+      ],
+      Padaria: [
+        { name: "Croissant de manteiga", price: 990, ill: "croissant" },
+        { name: "Pão de queijo (6 un.)", price: 1290, ill: "croissant" },
+      ],
+      Doces: [{ name: "Bolo de rolo (fatia)", desc: "Receita pernambucana", price: 1190, ill: "cake" }],
+      Sucos: [{ name: "Suco de laranja", desc: "Natural, 400 ml", price: 990, ill: "juice" }],
+    },
+  },
+  {
+    slug: "kira-br",
+    name: "KIRA",
+    theme: "store",
+    color: "#0E0E10",
+    tagline: "Frete grátis acima de R$ 299",
+    address: "Recife",
+    country: "BR", lat: -8.0476, lng: -34.877, phone: "+5581988776655",
+    payments: PAYMENTS_BR,
+    banner: { tag: "Primavera", title: "Nova coleção", highlight: "Ver tudo →", ill: "dress" },
+    menu: {
+      Feminino: [
+        { name: "Vestido Lia", desc: "Linho, tamanhos P a G", price: 18990, ill: "dress", stock: 6 },
+        { name: "Bolsa de couro", desc: "Couro legítimo", price: 25990, ill: "bag", stock: 3 },
+      ],
+      Masculino: [{ name: "Camiseta Basic", desc: "Algodão penteado", price: 7990, ill: "tshirt", stock: 20 }],
+      Calçados: [{ name: "Tênis Urban", desc: "Numeração 34 a 44", price: 34990, ill: "sneaker", stock: 8 }],
+    },
+  },
+  {
+    slug: "boteco-lupulo",
+    name: "Boteco Lúpulo",
+    theme: "bar",
+    color: "#F2A900",
+    tagline: "Cervejaria · Petiscos",
+    address: "Recife Antigo",
+    country: "BR", lat: -8.0631, lng: -34.8711, phone: "+5581977665544",
+    payments: PAYMENTS_BR,
+    banner: { title: "Happy hour", highlight: "Chopp em dobro · 18h às 21h", ill: "beer" },
+    menu: {
+      Chopp: [
+        { name: "Chopp IPA 500 ml", desc: "Amargo e cítrico · 6,2%", price: 2290, ill: "beer" },
+        { name: "Chopp Pilsen 500 ml", desc: "Leve e refrescante", price: 1690, ill: "beer" },
+      ],
+      Drinks: [{ name: "Caipirinha", desc: "Cachaça, limão e açúcar", price: 2490, ill: "cocktail" }],
+      Petiscos: [{ name: "Nachos do Boteco", desc: "Cheddar, guacamole e jalapeño", price: 3490, ill: "nachos" }],
+    },
+  },
+  {
+    slug: "byte-store",
+    name: "Byte Store",
+    theme: "tech",
+    color: "#22D3EE",
+    tagline: "Informática · Celulares · Games",
+    address: "Shopping Recife",
+    country: "BR", lat: -8.1185, lng: -34.9049, phone: "+5581966554433",
+    payments: PAYMENTS_BR,
+    banner: { tag: "Black Friday", title: "Notebooks com 15% off", highlight: "A partir de R$ 2.999", ill: "laptop" },
+    menu: {
+      Notebooks: [
+        { name: "Notebook Pro 14\"", desc: "Ryzen 7, 16 GB RAM, SSD 512 GB", price: 459900, ill: "laptop", stock: 5 },
+        { name: "Notebook Air 13\"", desc: "Core i5, 8 GB, SSD 256 GB", price: 299900, ill: "laptop", stock: 7 },
+      ],
+      Celulares: [
+        { name: "Smartphone X12 128 GB", desc: "Tela AMOLED 6,5\"", price: 189900, ill: "phone", stock: 12 },
+        { name: "Smartphone Lite 64 GB", desc: "Bateria 5000 mAh", price: 99900, ill: "phone", stock: 3 },
+      ],
+      Acessórios: [
+        { name: "Fone Bluetooth ANC", desc: "Cancelamento de ruído · 30 h", price: 39900, ill: "headphones", stock: 18 },
+        { name: "Mouse gamer RGB", desc: "16.000 DPI, 7 botões", price: 14990, ill: "mouse", stock: 25 },
+      ],
+    },
+  },
+  // ---------------- Paraguai: versões dos novos modelos
+  {
+    slug: "barberia-filo",
+    name: "Barbería Filo",
+    theme: "barber",
+    color: "#D4A657",
+    tagline: "Cortes clásicos · Barba · Toalla caliente",
+    address: "Villa Morra, Asunción",
+    banner: { tag: "Desde 2015", title: "Corte + Barba", subtitle: "Con toalla caliente y cerveza fría", highlight: "Gs. 90.000", ill: "razor" },
+    menu: {
+      Cortes: [
+        { name: "Corte clásico", desc: "Tijera y máquina, lavado incluido", price: 60000, ill: "scissors" },
+        { name: "Degradé a navaja", desc: "Fade con terminación a navaja", price: 70000, ill: "razor" },
+      ],
+      Barba: [{ name: "Barba completa", desc: "Toalla caliente, navaja y bálsamo", price: 45000, ill: "razor" }],
+      Productos: [{ name: "Pomada modeladora 120 g", desc: "Efecto mate", price: 55000, ill: "pomade", stock: 14 }],
+    },
+  },
+  {
+    slug: "esencia",
+    name: "Esencia",
+    theme: "perfume",
+    color: "#8C3B5A",
+    tagline: "Perfumería · Cosméticos",
+    address: "Ciudad del Este",
+    banner: { tag: "Día de la Madre", title: "Kits de regalo", highlight: "hasta 30% off", ill: "perfume" },
+    menu: {
+      Perfumes: [
+        { name: "Eau de Parfum Rosé 100 ml", desc: "Floral · rosa, peonía y almizcle", price: 520000, ill: "perfume", stock: 8 },
+        { name: "Eau de Toilette Cedro 100 ml", desc: "Amaderado · cedro y bergamota", price: 410000, ill: "perfume", stock: 6 },
+      ],
+      Maquillaje: [{ name: "Labial mate Vino", desc: "Larga duración", price: 85000, ill: "lipstick", stock: 30 }],
+      Skincare: [{ name: "Crema facial 50 ml", desc: "Ácido hialurónico y vitamina C", price: 130000, ill: "cream", stock: 15 }],
+    },
+  },
 ];
 
 async function seedStore(db: DB, s: Store) {
