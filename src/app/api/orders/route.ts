@@ -1,8 +1,11 @@
+import { tooMany } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { createOrder, OrderError } from "@/services/orders";
 
 export async function POST(req: Request) {
+  const limited = await tooMany(req, "orders", 20, 600);
+  if (limited) return limited;
   try {
     const result = await createOrder(await req.json());
     return NextResponse.json(result, { status: 201 });

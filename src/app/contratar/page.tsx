@@ -1,3 +1,4 @@
+import { clientIp, rateLimit } from "@/lib/security";
 // Contratação self-service: o visitante escolhe o plano na página de vendas,
 // preenche os dados e cai direto na fatura da implantação (paga em R$, Gs. ou US$).
 import { redirect } from "next/navigation";
@@ -26,6 +27,7 @@ async function contratar(f: FormData) {
   const back = (msg: string) => redirect(`/contratar?plano=${encodeURIComponent(planId)}&lang=${lang}&err=${encodeURIComponent(msg)}`);
 
   if (str(f, "website")) back("…"); // honeypot anti-robô
+  if (!(await rateLimit(`contratar:${await clientIp()}`, 5, 60 * 60))) back(T("Demasiados intentos. Esperá una hora o escribinos por WhatsApp.", "Muitas tentativas. Aguarde uma hora ou fale conosco pelo WhatsApp."));
   const country = lang === "pt" ? "BR" : getRegion(str(f, "country")).country;
   const contactName = str(f, "contactName");
   const whatsapp = str(f, "whatsapp");

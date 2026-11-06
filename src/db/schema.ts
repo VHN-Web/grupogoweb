@@ -105,8 +105,12 @@ export const tenants = pgTable("tenants", {
   reportChannel: text("report_channel").$type<"none" | "email" | "whatsapp">().notNull().default("none"),
   reportTo: text("report_to"), // e-mail ou WhatsApp E.164
 
-  // Agenda (GoInteligence) — JSON validado em src/core/booking.ts
+  // Agenda (GoInteligence) — JSON validado em src/core/intelligence.ts
   bookingConfig: text("booking_config").notNull().default("{}"),
+
+  // Segurança
+  demo: boolean("demo").notNull().default(false), // loja de demonstração (único caso em que o pagamento simulado é aceito)
+  sessionVersion: integer("session_version").notNull().default(1), // trocar a senha derruba as outras sessões
   createdAt: createdAt(),
 });
 
@@ -498,10 +502,34 @@ export const staff = pgTable(
     passwordHash: text("password_hash").notNull(),
     permissions: text("permissions").notNull().default("[]"), // JSON PanelArea[]
     active: boolean("active").notNull().default(true),
+    sessionVersion: integer("session_version").notNull().default(1),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("staff_tenant_user_uq").on(t.tenantId, t.username)],
 );
+
+// =============================================================================
+// Segurança: registro de atividades e limites de tentativas
+// =============================================================================
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: id(),
+    tenantId: text("tenant_id").references(() => tenants.id, { onDelete: "cascade" }), // null = plataforma
+    actor: text("actor").notNull(), // "dono", "admin", "equipe:ana", "cliente", "sistema"
+    action: text("action").notNull(), // ex: login.fail, order.paid, cash.close
+    detail: text("detail"),
+    ip: text("ip"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("audit_tenant_idx").on(t.tenantId, t.createdAt)],
+);
+
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+});
 
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   categories: many(categories),
@@ -560,3 +588,4 @@ export type Coupon = typeof coupons.$inferSelect;
 export type Cart = typeof carts.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
 export type Staff = typeof staff.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;

@@ -1,3 +1,4 @@
+import { tooMany } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
@@ -7,6 +8,8 @@ import { quoteDeliveryForTenant } from "@/services/orders";
 const body = z.object({ slug: z.string(), lat: z.number(), lng: z.number(), subtotalPyg: z.number().int().min(0) });
 
 export async function POST(req: Request) {
+  const limited = await tooMany(req, "dq", 60, 600);
+  if (limited) return limited;
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, reason: "BAD_REQUEST" }, { status: 400 });
   const { slug, lat, lng, subtotalPyg } = parsed.data;

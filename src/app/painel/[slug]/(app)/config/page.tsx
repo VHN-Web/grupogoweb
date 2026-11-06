@@ -1,4 +1,5 @@
 import { requireTenantAdmin } from "@/lib/auth";
+import { openCredentials } from "@/lib/security";
 import { PAYMENT_METHODS, type Currency } from "@/core/types";
 import { panelI18n } from "@/lib/panel-i18n";
 import { CURRENCY_SYMBOL, minorToInput } from "@/core/money";
@@ -27,7 +28,7 @@ export default async function ConfigPage({ params, searchParams }: { params: Pro
   const pt = region.locale === "pt";
   const labelOf = (p: { label: string; labelPt?: string }) => (pt ? (p.labelPt ?? p.label) : p.label);
   const regionProviders = providers.filter((p) => p.currencies.includes(base));
-  const mpCreds = pay.credentials.mercadopago ?? {};
+  const mpCreds = openCredentials(pay.credentials.mercadopago);
   const integrations = regionProviders.filter((p) => p.online && p.id !== "mock_online");
   const rateField: Record<Currency, "rateUsd" | "rateBrl" | "ratePyg"> = { USD: "rateUsd", BRL: "rateBrl", PYG: "ratePyg" };
 
@@ -277,10 +278,16 @@ export default async function ConfigPage({ params, searchParams }: { params: Pro
         )}
       </Section>
 
-      <Section title={T("Seguridad", "Segurança")}>
-        <form action={changePassword.bind(null, slug)} className="flex flex-wrap gap-2">
-          <input name="password" type="password" minLength={8} className="input max-w-xs" placeholder={T("Nueva contraseña (mín. 8)", "Nova senha (mín. 8)")} required />
-          <button className="btn-primary">{T("Cambiar contraseña", "Alterar senha")}</button>
+      <div id="seguranca" />
+      <Section title={T("Seguridad", "Segurança")} desc={T("Al cambiar la contraseña, todos los otros dispositivos se desconectan.", "Ao alterar a senha, todos os outros aparelhos são desconectados.")}>
+        <form action={changePassword.bind(null, slug)} className="grid gap-2 sm:grid-cols-3">
+          <input name="current" type="password" autoComplete="current-password" className="input" placeholder={T("Contraseña actual", "Senha atual")} />
+          <input name="password" type="password" autoComplete="new-password" minLength={8} className="input" placeholder={T("Nueva (8+, letras y números)", "Nova (8+, letras e números)")} required />
+          <input name="confirm" type="password" autoComplete="new-password" minLength={8} className="input" placeholder={T("Repetir nueva", "Repetir nova")} required />
+          <div className="sm:col-span-3 flex flex-wrap items-center gap-3">
+            <button className="btn-primary">{T("Cambiar contraseña", "Alterar senha")}</button>
+            <a href={`/painel/${slug}/atividade`} className="text-sm underline">{T("Ver registro de actividad", "Ver registro de atividades")}</a>
+          </div>
         </form>
       </Section>
     </div>

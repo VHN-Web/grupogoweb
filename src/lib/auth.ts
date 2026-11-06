@@ -43,14 +43,26 @@ export function readToken(token: string | undefined): string | null {
   return subject;
 }
 
-export async function setSession(subject: string) {
-  (await cookies()).set(COOKIE, makeToken(subject), {
+/** Admin da plataforma: sessão curta (12 h). Dono/equipe: 14 dias. */
+export const ADMIN_MAX_AGE = 60 * 60 * 12;
+
+export async function setSession(subject: string, maxAge = subject === "platform" ? ADMIN_MAX_AGE : MAX_AGE) {
+  (await cookies()).set(COOKIE, makeToken(subject, maxAge), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: MAX_AGE,
+    maxAge,
   });
+}
+
+/** Sujeito da sessão com versão: trocar a senha incrementa a versão e derruba os outros aparelhos. */
+export const ownerSubject = (t: { id: string; sessionVersion: number }) => `tenant:${t.id}@${t.sessionVersion}`;
+export const staffSubject = (s: { id: string; sessionVersion: number }) => `staff:${s.id}@${s.sessionVersion}`;
+
+function splitVer(rest: string): [string, number] {
+  const [id, v] = rest.split("@");
+  return [id, Number(v ?? NaN)];
 }
 
 export async function clearSession() {
@@ -67,7 +79,16 @@ export type PanelAccess = {
   staffId?: string;
   staffName?: string;
   areas: Set<PanelArea>;
+  isPlatform?: boolean;
 };
+
+/** Nome de quem está agindo, para o registro de atividades. */
+export async function actorName(slug: string): Promise<string> {
+  const acc = await getPanelAccess(slug);
+  if (!acc) return "desconhecido";
+  if (acc.isPlatform) return "admin GoWeb";
+  return acc.role === "owner" ? "dono" : `equipe: ${acc.staffName}`;
+}
 
 /** Quem está logado no painel do tenant `slug` (dono, admin da plataforma ou funcionário). */
 export async function getPanelAccess(slug: string): Promise<PanelAccess | null> {
@@ -75,12 +96,15 @@ export async function getPanelAccess(slug: string): Promise<PanelAccess | null> 
   if (!tenant) return null;
   const subject = await sessionSubject();
   // O admin da plataforma (você) acessa o painel de qualquer cliente — necessário na implantação
-  if (subject === `tenant:${tenant.id}` || subject === "platform") {
-    return { tenant, role: "owner", areas: new Set(PANEL_AREAS) };
+  if (subject === "platform") return { tenant, role: "owner", areas: new Set(PANEL_AREAS), isPlatform: true };
+  if (subject?.startsWith("tenant:")) {
+    const [id, v] = splitVer(subject.slice(7));
+    if (id === tenant.id && v === tenant.sessionVersion) return { tenant, role: "owner", areas: new Set(PANEL_AREAS) };
   }
   if (subject?.startsWith("staff:")) {
-    const s = await db.query.staff.findFirst({ where: eq(schema.staff.id, subject.slice(6)) });
-    if (s && s.active && s.tenantId === tenant.id && tenant.tier === "pro") {
+    const [sid, v] = splitVer(subject.slice(6));
+    const s = await db.query.staff.findFirst({ where: eq(schema.staff.id, sid) });
+    if (s && s.active && s.sessionVersion === v && s.tenantId === tenant.id && tenant.tier === "pro") {
       let perms: PanelArea[] = [];
       try {
         perms = (JSON.parse(s.permissions) as string[]).filter((p): p is PanelArea => (PANEL_AREAS as readonly string[]).includes(p));

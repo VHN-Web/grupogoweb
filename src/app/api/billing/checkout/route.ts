@@ -1,3 +1,4 @@
+import { tooMany } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { CURRENCIES } from "@/core/types";
@@ -6,6 +7,8 @@ import { BillingError, startCheckout } from "@/services/billing";
 const body = z.object({ invoiceId: z.string(), currency: z.enum(CURRENCIES) });
 
 export async function POST(req: Request) {
+  const limited = await tooMany(req, "checkout", 20, 600);
+  if (limited) return limited;
   const p = body.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
   try {

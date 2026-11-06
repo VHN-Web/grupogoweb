@@ -17,7 +17,8 @@ export const mockBillingProvider: BillingProvider = {
   id: "mock",
   label: "Simulado (testes)",
   currencies: ["PYG", "USD", "BRL"],
-  isConfigured: () => process.env.NODE_ENV !== "production" || process.env.ENABLE_MOCK_GATEWAY === "true",
+  // NUNCA em produção: confirmaria faturas sem dinheiro real.
+  isConfigured: () => process.env.NODE_ENV !== "production",
   async createCheckout(input) {
     const u = new URL("/pay/billing-mock", input.returnUrl);
     u.searchParams.set("invoice", input.invoiceId);

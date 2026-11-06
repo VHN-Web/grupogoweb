@@ -1,9 +1,12 @@
+import { tooMany } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { slotsFor } from "@/services/intelligence";
 
 export async function GET(req: Request) {
+  const limited = await tooMany(req, "slots", 120, 600);
+  if (limited) return limited;
   const url = new URL(req.url);
   const slug = url.searchParams.get("slug") ?? "";
   const productId = url.searchParams.get("productId") ?? "";

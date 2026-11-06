@@ -2,9 +2,10 @@
 // Server Actions do GoInteligence (recursos pro). Toda action verifica acesso + plano pro.
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { hashPassword, requireTenantAdmin } from "@/lib/auth";
+import { actorName, hashPassword, requireTenantAdmin } from "@/lib/auth";
+import { audit } from "@/lib/security";
 import { normalizeCode, parseBookingConfig, waLink } from "@/core/intelligence";
 import { parseMajorToMinor, formatMoney } from "@/core/money";
 import { getRegion, tr } from "@/core/region";
@@ -76,6 +77,7 @@ export async function saveCoupon(slug: string, f: FormData) {
     maxUses,
     expiresAt: days ? new Date(Date.now() + days * 864e5) : null,
   });
+  await audit(t.id, await actorName(slug), "coupon.create", `${code} ${kind === "PERCENT" ? `${value}%` : formatMoney(value, t.currency as Currency)}`);
   back(`${base(slug)}/marketing`, "ok", T(`Cupón ${code} creado`, `Cupom ${code} criado`));
 }
 
@@ -88,7 +90,8 @@ export async function toggleCoupon(slug: string, id: string) {
 
 export async function deleteCoupon(slug: string, id: string) {
   const t = await proTenant(slug, "marketing");
-  await db.delete(schema.coupons).where(and(eq(schema.coupons.id, id), eq(schema.coupons.tenantId, t.id)));
+  const [c] = await db.delete(schema.coupons).where(and(eq(schema.coupons.id, id), eq(schema.coupons.tenantId, t.id))).returning({ code: schema.coupons.code });
+  if (c) await audit(t.id, await actorName(slug), "coupon.delete", c.code);
   revalidatePath(`${base(slug)}/marketing`);
 }
 
@@ -160,6 +163,7 @@ export async function createStaff(slug: string, f: FormData) {
   const exists = await db.query.staff.findFirst({ where: and(eq(schema.staff.tenantId, t.id), eq(schema.staff.username, username)) });
   if (exists) back(`${base(slug)}/equipe`, "err", T("Ese usuario ya existe", "Esse usuário já existe"));
   await db.insert(schema.staff).values({ tenantId: t.id, name, username, passwordHash: hashPassword(password), permissions: JSON.stringify(permsFrom(f)) });
+  await audit(t.id, await actorName(slug), "staff.create", `${name} (${username})`);
   back(`${base(slug)}/equipe`, "ok", T(`Usuario ${username} creado`, `Usuário ${username} criado`));
 }
 
@@ -172,13 +176,21 @@ export async function updateStaff(slug: string, id: string, f: FormData) {
   if (password && password.length < 6) back(`${base(slug)}/equipe`, "err", T("Contraseña de al menos 6 caracteres", "Senha de pelo menos 6 caracteres"));
   await db
     .update(schema.staff)
-    .set({ permissions: JSON.stringify(permsFrom(f)), active: bool(f, "active"), ...(password ? { passwordHash: hashPassword(password) } : {}) })
+    .set({
+      permissions: JSON.stringify(permsFrom(f)),
+      active: bool(f, "active"),
+      // senha nova ou acesso desativado: derruba as sessões abertas desse funcionário
+      ...(password ? { passwordHash: hashPassword(password) } : {}),
+      ...(password || !bool(f, "active") ? { sessionVersion: sql`${schema.staff.sessionVersion} + 1` } : {}),
+    })
     .where(eq(schema.staff.id, s.id));
+  await audit(t.id, await actorName(slug), "staff.update", `${s.name}${password ? " (senha trocada)" : ""}${bool(f, "active") ? "" : " (desativado)"}`);
   back(`${base(slug)}/equipe`, "ok", T("Permisos actualizados", "Permissões atualizadas"));
 }
 
 export async function deleteStaff(slug: string, id: string) {
   const t = await proTenant(slug, "team");
-  await db.delete(schema.staff).where(and(eq(schema.staff.id, id), eq(schema.staff.tenantId, t.id)));
+  const [s] = await db.delete(schema.staff).where(and(eq(schema.staff.id, id), eq(schema.staff.tenantId, t.id))).returning({ name: schema.staff.name });
+  if (s) await audit(t.id, await actorName(slug), "staff.delete", s.name);
   revalidatePath(`${base(slug)}/equipe`);
 }

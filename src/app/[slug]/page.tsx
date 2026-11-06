@@ -70,6 +70,7 @@ export default async function StorePage({
   // só mostra opções cujo adapter está disponível
   payCfg.options = payCfg.options.filter((o) => {
     try {
+      if (o.provider === "mock_online" && !tenant.demo) return false; // simulado só em loja demo
       return getPaymentProvider(o.provider).available;
     } catch {
       return false;

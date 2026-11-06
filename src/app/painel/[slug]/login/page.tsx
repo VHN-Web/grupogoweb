@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { setSession, verifyPassword } from "@/lib/auth";
+import { ownerSubject, setSession, staffSubject, verifyPassword } from "@/lib/auth";
+import { audit, clearLimit, clientIp, isLimited, rateLimit } from "@/lib/security";
 import { AuthShell } from "@/components/brand/AuthShell";
 import { getRegion, tr } from "@/core/region";
 
@@ -24,12 +25,22 @@ export default async function Login({
     if (!t) redirect(`/painel/${slug}/login?e=1`);
     const password = String(formData.get("password") ?? "");
     const username = String(formData.get("username") ?? "").trim().toLowerCase();
-    // TODO(segurança): rate limit por IP/slug antes de produção
+    // Bloqueio contra força bruta: 5 erros em 15 min por IP + loja
+    const ip = await clientIp();
+    const lk = `login:${t.id}:${ip}`;
+    if (await isLimited(lk, 5)) redirect(`/painel/${slug}/login?e=bloq`);
+    const fail = async (who: string) => {
+      await rateLimit(lk, 5, 15 * 60);
+      await audit(t.id, who, "login.fail");
+      redirect(`/painel/${slug}/login?e=1`);
+    };
     if (username) {
       // Funcionário (GoInteligence)
       const s = await db.query.staff.findFirst({ where: and(eq(schema.staff.tenantId, t.id), eq(schema.staff.username, username)) });
-      if (!s || !s.active || t.tier !== "pro" || !verifyPassword(password, s.passwordHash)) redirect(`/painel/${slug}/login?e=1`);
-      await setSession(`staff:${s.id}`);
+      if (!s || !s.active || t.tier !== "pro" || !verifyPassword(password, s.passwordHash)) return fail(`equipe: ${username.slice(0, 30)}`);
+      await clearLimit(lk);
+      await setSession(staffSubject(s));
+      await audit(t.id, `equipe: ${s.name}`, "login.ok");
       let first = "";
       try {
         const perms = JSON.parse(s.permissions) as string[];
@@ -40,8 +51,10 @@ export default async function Login({
       }
       redirect(`/painel/${slug}${first}`);
     }
-    if (!verifyPassword(password, t.adminPasswordHash)) redirect(`/painel/${slug}/login?e=1`);
-    await setSession(`tenant:${t.id}`);
+    if (!verifyPassword(password, t.adminPasswordHash)) return fail("dono");
+    await clearLimit(lk);
+    await setSession(ownerSubject(t));
+    await audit(t.id, "dono", "login.ok");
     redirect(`/painel/${slug}`);
   }
 
@@ -56,7 +69,11 @@ export default async function Login({
         )}
         <label className="label" htmlFor="password">{T("Contraseña", "Senha")}</label>
         <input id="password" name="password" type="password" className="input" autoFocus required />
-        {e && <p className="text-sm text-red-400">{T("Usuario o contraseña incorrectos", "Usuário ou senha incorretos")}</p>}
+        {e === "bloq" ? (
+          <p className="text-sm text-red-400">{T("Demasiados intentos. Esperá 15 minutos e intentá de nuevo.", "Muitas tentativas. Aguarde 15 minutos e tente de novo.")}</p>
+        ) : e ? (
+          <p className="text-sm text-red-400">{T("Usuario o contraseña incorrectos", "Usuário ou senha incorretos")}</p>
+        ) : null}
         <button className="btn-primary w-full py-3">Entrar</button>
       </form>
     </AuthShell>

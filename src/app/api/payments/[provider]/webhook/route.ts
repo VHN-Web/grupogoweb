@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { getPaymentProvider } from "@/adapters/payments/registry";
 import { parsePaymentConfig } from "@/core/tenant-config";
 import { setPaymentStatus } from "@/services/orders";
+import { audit, openCredentials } from "@/lib/security";
 
 // Webhook genérico: /api/payments/{providerId}/webhook?t={tenantSlug}
 // Cada adapter valida a assinatura e traduz o payload do gateway para WebhookResult.
@@ -22,9 +23,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
     return NextResponse.json({ error: "provider" }, { status: 404 });
   }
   if (!provider.handleWebhook) return NextResponse.json({ error: "sem webhook" }, { status: 400 });
+  // Pagamento simulado só vale em lojas de demonstração (nunca numa loja real)
+  if (provider.id === "mock_online" && !tenant.demo) return NextResponse.json({ error: "provider" }, { status: 403 });
 
   try {
-    const creds = parsePaymentConfig(tenant.paymentConfig).credentials[provider.id] ?? {};
+    const creds = openCredentials(parsePaymentConfig(tenant.paymentConfig).credentials[provider.id]);
     const result = await provider.handleWebhook(req, creds);
     if (!result) return NextResponse.json({ ok: true });
     const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, result.orderId) });
@@ -34,11 +37,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
     // confere o valor pago (quando o gateway informa)
     if (result.status === "PAID" && result.amountMinor != null && result.amountMinor < order.payAmountMinor) {
       console.error(`[webhook ${providerId}] valor pago menor que o pedido`, order.id);
+      await audit(tenant.id, `gateway:${providerId}`, "order.amount_mismatch", `#${order.number} pago ${result.amountMinor} < ${order.payAmountMinor}`);
       return NextResponse.json({ error: "valor" }, { status: 400 });
     }
     // idempotente: não volta um pedido pago para pendente
     if (order.paymentStatus !== "PAID" || result.status === "REFUNDED") {
       await setPaymentStatus(tenant.id, order.id, result.status, result.providerRef);
+      await audit(tenant.id, `gateway:${providerId}`, `order.${result.status.toLowerCase()}`, `#${order.number}`);
     }
     return NextResponse.json(result.responseBody ?? { ok: true });
   } catch (e) {

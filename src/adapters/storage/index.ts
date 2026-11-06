@@ -1,4 +1,5 @@
 // =============================================================================
+import { sniffImage } from "@/lib/security";
 // PONTO DE EXTENSÃO: armazenamento de imagens (logo, banner, fotos de produtos)
 // =============================================================================
 // BLOB_READ_WRITE_TOKEN definido -> Vercel Blob (produção na Vercel)
@@ -20,17 +21,23 @@ export class UploadError extends Error {}
 export async function saveImage(file: File, folder: string): Promise<string> {
   if (!file || file.size === 0) throw new UploadError("Arquivo vazio");
   if (file.size > MAX_BYTES) throw new UploadError("Imagem maior que 4 MB");
-  const ext = TYPES[file.type];
-  if (!ext) throw new UploadError("Use JPG, PNG, WEBP ou GIF");
+  const declared = TYPES[file.type];
+  if (!declared) throw new UploadError("Use JPG, PNG, WEBP ou GIF");
+  // confere o conteúdo real do arquivo (não confia na extensão / tipo enviado)
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const real = sniffImage(bytes);
+  if (!real) throw new UploadError("Arquivo não é uma imagem válida");
+  const ext = real;
+  const contentType = { jpg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" }[real];
   const name = `${folder.replace(/[^a-zA-Z0-9/_-]/g, "")}/${randomUUID()}.${ext}`;
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const { put } = await import("@vercel/blob");
-    const blob = await put(name, file, { access: "public", contentType: file.type });
+    const blob = await put(name, bytes, { access: "public", contentType });
     return blob.url;
   }
   const dir = path.join(LOCAL_DIR, path.dirname(name));
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(LOCAL_DIR, name), Buffer.from(await file.arrayBuffer()));
+  await writeFile(path.join(LOCAL_DIR, name), bytes);
   return `/uploads/${name}`;
 }

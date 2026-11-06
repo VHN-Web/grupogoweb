@@ -5,10 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { parseMajorToMinor } from "@/core/money";
+import { formatMoney, parseMajorToMinor } from "@/core/money";
 import { COUNTRIES, getRegion, isValidE164, tr } from "@/core/region";
 import { checkMercadoPagoToken } from "@/adapters/payments/mercadopago";
-import { clearSession, hashPassword, requireTenantAdmin } from "@/lib/auth";
+import { actorName, clearSession, hashPassword, ownerSubject, requireTenantAdmin, setSession, verifyPassword } from "@/lib/auth";
+import { audit, openCredentials, sealCredentials } from "@/lib/security";
 import { randomTableCode } from "@/core/codes";
 import { CURRENCIES, ORDER_STATUSES, PAYMENT_METHODS, type Currency, type OrderStatus, type PaymentMethod } from "@/core/types";
 import { fiscalConfigSchema, parseFiscalConfig, parsePaymentConfig } from "@/core/tenant-config";
@@ -59,16 +60,22 @@ export async function logout(slug: string) {
 }
 
 // ---------------- Pedidos ----------------
+async function orderRef(tenantId: string, orderId: string) {
+  const o = await db.query.orders.findFirst({ where: and(eq(schema.orders.id, orderId), eq(schema.orders.tenantId, tenantId)), columns: { number: true, totalPyg: true } });
+  return o ? `#${o.number}` : orderId;
+}
 export async function updateOrderStatus(slug: string, orderId: string, status: OrderStatus) {
   const t = await requireTenantAdmin(slug, "orders");
   if (!ORDER_STATUSES.includes(status)) throw new Error("status inválido");
   await setOrderStatus(t.id, orderId, status);
+  if (status === "CANCELLED") await audit(t.id, await actorName(slug), "order.cancel", await orderRef(t.id, orderId));
   revalidatePath(base(slug), "layout");
 }
 
 export async function markOrderPaid(slug: string, orderId: string) {
   const t = await requireTenantAdmin(slug, "orders");
   await setPaymentStatus(t.id, orderId, "PAID");
+  await audit(t.id, await actorName(slug), "order.mark_paid", await orderRef(t.id, orderId));
   revalidatePath(base(slug), "layout");
 }
 
@@ -126,7 +133,8 @@ export async function saveProduct(slug: string, f: FormData) {
 
 export async function deleteProduct(slug: string, productId: string) {
   const t = await requireTenantAdmin(slug, "products");
-  await db.delete(schema.products).where(and(eq(schema.products.id, productId), eq(schema.products.tenantId, t.id)));
+  const [p] = await db.delete(schema.products).where(and(eq(schema.products.id, productId), eq(schema.products.tenantId, t.id))).returning({ name: schema.products.name });
+  if (p) await audit(t.id, await actorName(slug), "product.delete", p.name);
   revalidatePath(`${base(slug)}/produtos`);
 }
 
@@ -144,6 +152,7 @@ export async function adjustStock(slug: string, productId: string, f: FormData) 
     if (!r.length) return;
     await tx.insert(schema.stockMovements).values({ tenantId: t.id, productId, delta, reason, note: optStr(f, "note") });
   });
+  await audit(t.id, await actorName(slug), "stock.adjust", `${delta > 0 ? "+" : ""}${delta} (${reason})`);
   revalidatePath(`${base(slug)}/produtos`);
 }
 
@@ -167,13 +176,17 @@ export async function deleteCategory(slug: string, id: string) {
 // ---------------- Caixa ----------------
 export async function openCash(slug: string, f: FormData) {
   const t = await requireTenantAdmin(slug, "cash");
-  await openSession(t.id, money(f, "openingAmountPyg", t.currency));
+  const opening = money(f, "openingAmountPyg", t.currency);
+  await openSession(t.id, opening);
+  await audit(t.id, await actorName(slug), "cash.open", formatMoney(opening, t.currency as Currency));
   revalidatePath(`${base(slug)}/caixa`);
 }
 
 export async function closeCash(slug: string, sessionId: string, f: FormData) {
   const t = await requireTenantAdmin(slug, "cash");
-  await closeSession(t.id, sessionId, money(f, "countedAmountPyg", t.currency), optStr(f, "notes") ?? undefined);
+  const counted = money(f, "countedAmountPyg", t.currency);
+  await closeSession(t.id, sessionId, counted, optStr(f, "notes") ?? undefined);
+  await audit(t.id, await actorName(slug), "cash.close", `${formatMoney(counted, t.currency as Currency)} contado`);
   revalidatePath(`${base(slug)}/caixa`);
   // GoInteligence: relatório de fechamento enviado no canal preferido do lojista
   if (t.tier === "pro") {
@@ -187,7 +200,9 @@ export async function addCashMovement(slug: string, f: FormData) {
   const type = str(f, "type") === "IN" ? "IN" : "OUT";
   const amount = money(f, "amountPyg", t.currency);
   if (amount <= 0) return;
-  await addMovement(t.id, type, amount, str(f, "description") || (type === "IN" ? "Suprimento" : "Retiro"));
+  const desc = str(f, "description") || (type === "IN" ? "Suprimento" : "Retiro");
+  await addMovement(t.id, type, amount, desc);
+  await audit(t.id, await actorName(slug), type === "IN" ? "cash.in" : "cash.out", `${formatMoney(amount, t.currency as Currency)} — ${desc}`);
   revalidatePath(`${base(slug)}/caixa`);
 }
 
@@ -399,7 +414,7 @@ export async function saveIntegration(slug: string, providerId: string, f: FormD
   const back = (k: "ok" | "err", msg: string) => redirect(`${base(slug)}/config?${k}=${encodeURIComponent(msg)}#${providerId}`);
   if (providerId !== "mercadopago") back("err", T("Integración no disponible.", "Integração indisponível."));
 
-  const current = cfg.credentials.mercadopago ?? {};
+  const current = openCredentials(cfg.credentials.mercadopago);
   const accessToken = str(f, "accessToken").replace(/\s+/g, "") || current.accessToken || "";
   const webhookSecret = str(f, "webhookSecret").replace(/\s+/g, "") || current.webhookSecret || "";
   if (!accessToken) back("err", T("Pegá el Access Token.", "Cole o Access Token."));
@@ -416,10 +431,12 @@ export async function saveIntegration(slug: string, providerId: string, f: FormD
     options,
     credentials: {
       ...cfg.credentials,
-      mercadopago: { accessToken, ...(webhookSecret ? { webhookSecret } : {}), account: check.ok ? check.account : "" },
+      // tokens guardados criptografados (AES-256-GCM)
+      mercadopago: sealCredentials({ accessToken, ...(webhookSecret ? { webhookSecret } : {}), account: check.ok ? check.account : "" }),
     },
   };
   await db.update(schema.tenants).set({ paymentConfig: JSON.stringify(next) }).where(eq(schema.tenants.id, t.id));
+  await audit(t.id, await actorName(slug), "integration.connect", "Mercado Pago");
   revalidatePath(`/${t.slug}`);
   back("ok", T("¡Mercado Pago conectado! El Pix de tu sitio ahora es automático.", "Mercado Pago conectado! O Pix do seu site agora é automático."));
 }
@@ -434,6 +451,7 @@ export async function removeIntegration(slug: string, providerId: string) {
   const fallback: Record<string, string> = { PIX: "pix_manual", CARD: "pos", CASH: "cash", TRANSFER: "transfer_manual" };
   const options = cfg.options.map((o) => (o.provider === providerId ? { ...o, provider: fallback[o.method] } : o));
   await db.update(schema.tenants).set({ paymentConfig: JSON.stringify({ ...cfg, options, credentials: rest }) }).where(eq(schema.tenants.id, t.id));
+  await audit(t.id, await actorName(slug), "integration.remove", providerId);
   revalidatePath(`/${t.slug}`);
   redirect(`${base(slug)}/config?ok=${encodeURIComponent(T("Integración desconectada.", "Integração desconectada."))}`);
 }
@@ -455,10 +473,27 @@ export async function saveFiscal(slug: string, f: FormData) {
 
 export async function changePassword(slug: string, f: FormData) {
   const t = await requireTenantAdmin(slug, "team");
+  const T = tr(getRegion(t.country).locale);
+  const back = (k: "ok" | "err", m: string) => redirect(`${base(slug)}/config?${k}=${encodeURIComponent(m)}#seguranca`);
+  const actor = await actorName(slug);
+  const current = str(f, "current");
   const p = str(f, "password");
-  if (p.length < 8) throw new Error("Mínimo 8 caracteres");
-  await db.update(schema.tenants).set({ adminPasswordHash: hashPassword(p) }).where(eq(schema.tenants.id, t.id));
-  revalidatePath(`${base(slug)}/config`);
+  // exige a senha atual (o admin da plataforma pode redefinir sem ela)
+  if (actor !== "admin GoWeb" && !verifyPassword(current, t.adminPasswordHash)) {
+    await audit(t.id, actor, "password.fail");
+    back("err", T("La contraseña actual no es correcta.", "A senha atual não confere."));
+  }
+  if (p.length < 8 || !/[A-Za-z]/.test(p) || !/\d/.test(p)) back("err", T("Mínimo 8 caracteres, con letras y números.", "Mínimo de 8 caracteres, com letras e números."));
+  if (p !== str(f, "confirm")) back("err", T("Las contraseñas no coinciden.", "As senhas não conferem."));
+  // nova versão de sessão: todos os outros aparelhos são desconectados
+  const [u] = await db
+    .update(schema.tenants)
+    .set({ adminPasswordHash: hashPassword(p), sessionVersion: sql`${schema.tenants.sessionVersion} + 1` })
+    .where(eq(schema.tenants.id, t.id))
+    .returning();
+  await audit(t.id, actor, "password.change");
+  if (actor !== "admin GoWeb") await setSession(ownerSubject(u));
+  back("ok", T("Contraseña cambiada. Los demás dispositivos fueron desconectados.", "Senha alterada. Os outros aparelhos foram desconectados."));
 }
 
 export async function savePrinter(slug: string, f: FormData) {

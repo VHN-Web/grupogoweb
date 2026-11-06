@@ -2,6 +2,7 @@
 // Uso: npm run db:setup  (ou npm run db:seed)
 // Senha de todos os painéis demo: demo1234
 import "dotenv/config";
+import { sealCredentials } from "../lib/secrets";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { hashPassword } from "@/lib/password";
 import { createDb, type DB } from "./client";
@@ -486,11 +487,32 @@ async function ensureGoInteligencePlan(db: DB) {
 
 const BARBER_SLUGS = ["navalha", "barberia-filo"];
 
+/** Segurança: criptografa tokens de gateway que ainda estejam em texto puro. */
+async function sealStoredCredentials(db: DB) {
+  const all = await db.query.tenants.findMany({ columns: { id: true, paymentConfig: true } });
+  for (const t of all) {
+    try {
+      const cfg = JSON.parse(t.paymentConfig || "{}") as { credentials?: Record<string, Record<string, string>> };
+      if (!cfg.credentials) continue;
+      let changed = false;
+      for (const [k, v] of Object.entries(cfg.credentials)) {
+        const sealed = sealCredentials(v ?? {});
+        if (JSON.stringify(sealed) !== JSON.stringify(v)) {
+          cfg.credentials[k] = sealed;
+          changed = true;
+        }
+      }
+      if (changed) await db.update(schema.tenants).set({ paymentConfig: JSON.stringify(cfg) }).where(eq(schema.tenants.id, t.id));
+    } catch {}
+  }
+}
+
 async function demoExtras(db: DB) {
+  await sealStoredCredentials(db);
   const demos = await db.query.tenants.findMany({ where: inArray(schema.tenants.slug, STORES.map((s) => s.slug)) });
   for (const t of demos) {
     const pt = t.country === "BR";
-    await db.update(schema.tenants).set({ tier: "pro", whatsapp: t.whatsapp ?? t.phone, instagram: t.instagram ?? t.slug.replace(/-/g, "") }).where(eq(schema.tenants.id, t.id));
+    await db.update(schema.tenants).set({ demo: true, tier: "pro", whatsapp: t.whatsapp ?? t.phone, instagram: t.instagram ?? t.slug.replace(/-/g, "") }).where(eq(schema.tenants.id, t.id));
     // cupom de boas-vindas
     const code = pt ? "BEMVINDO10" : "BIENVENIDO10";
     const c = await db.query.coupons.findFirst({ where: and(eq(schema.coupons.tenantId, t.id), eq(schema.coupons.code, code)) });

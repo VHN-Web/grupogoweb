@@ -14,6 +14,7 @@ import { getPaymentProvider } from "@/adapters/payments/registry";
 import { getDistanceProvider } from "@/adapters/distance";
 import { getExchangeRateProvider } from "@/adapters/exchange-rates";
 import { maybeAutoIssueFiscal } from "./fiscal";
+import { openCredentials } from "@/lib/security";
 
 export class OrderError extends Error {
   constructor(public code: string, message: string) {
@@ -170,7 +171,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   if (!option) throw new OrderError("PAYMENT", T("Medio de pago no disponible", "Forma de pagamento indisponível"));
   if (!option.currencies.includes(input.payCurrency)) throw new OrderError("PAYMENT", T("Moneda no aceptada para este medio", "Moeda não aceita para esta forma de pagamento"));
   const provider = getPaymentProvider(option.provider);
-  if (!provider.available) throw new OrderError("PAYMENT", T("Medio de pago no disponible", "Forma de pagamento indisponível"));
+  if (!provider.available || (provider.id === "mock_online" && !tenant.demo)) throw new OrderError("PAYMENT", T("Medio de pago no disponible", "Forma de pagamento indisponível"));
 
   const rates: Rates = await getExchangeRateProvider().getRates(tenant);
   const exchangeRate = input.payCurrency === base ? 1 : rates[input.payCurrency];
@@ -250,7 +251,13 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
     );
 
     if (couponId) {
-      await tx.update(schema.coupons).set({ uses: sql`${schema.coupons.uses} + 1` }).where(eq(schema.coupons.id, couponId));
+      // Atômico: só incrementa se ainda houver usos (evita estourar o limite com pedidos simultâneos)
+      const used = await tx
+        .update(schema.coupons)
+        .set({ uses: sql`${schema.coupons.uses} + 1` })
+        .where(and(eq(schema.coupons.id, couponId), sql`(${schema.coupons.maxUses} IS NULL OR ${schema.coupons.maxUses} = 0 OR ${schema.coupons.uses} < ${schema.coupons.maxUses})`))
+        .returning({ id: schema.coupons.id });
+      if (!used.length) throw new OrderError("COUPON", T("Este cupón ya alcanzó el límite de usos", "Este cupom já atingiu o limite de usos"));
     }
 
     for (const [pid, qty] of qtyByProduct) {
@@ -286,7 +293,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
     returnUrl,
     webhookUrl: `${appUrl()}/api/payments/${provider.id}/webhook?t=${tenant.slug}`,
     credentials: {
-      ...(payCfg.credentials[provider.id] ?? {}),
+      ...openCredentials(payCfg.credentials[provider.id]),
       ...(payCfg.pixKey ? { pixKey: payCfg.pixKey } : {}),
       ...(payCfg.bankInfo ? { bankInfo: payCfg.bankInfo } : {}),
     },

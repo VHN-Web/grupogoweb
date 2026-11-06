@@ -1,3 +1,4 @@
+import { tooMany } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -15,6 +16,8 @@ const Body = z.object({
 
 /** Guarda o carrinho de quem já informou o WhatsApp (para recuperação de carrinho abandonado). */
 export async function POST(req: Request) {
+  const limited = await tooMany(req, "carts", 30, 600);
+  if (limited) return limited;
   const p = Body.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ ok: false }, { status: 400 });
   const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, p.data.slug) });
@@ -25,6 +28,8 @@ export async function POST(req: Request) {
 
 /** Restaura um carrinho pelo link enviado ao cliente (?carrinho=ID). */
 export async function GET(req: Request) {
+  const limited = await tooMany(req, "carts-get", 60, 600);
+  if (limited) return limited;
   const url = new URL(req.url);
   const slug = url.searchParams.get("slug") ?? "";
   const id = url.searchParams.get("id") ?? "";

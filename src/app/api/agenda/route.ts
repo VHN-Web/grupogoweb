@@ -1,3 +1,4 @@
+import { tooMany } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -18,6 +19,8 @@ const Body = z.object({
 
 /** Cliente pede um horário (fica PENDENTE até o estabelecimento confirmar no painel). */
 export async function POST(req: Request) {
+  const limited = await tooMany(req, "agenda", 8, 600);
+  if (limited) return limited;
   const p = Body.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ error: "Dados inválidos · Datos inválidos" }, { status: 400 });
   const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, p.data.slug) });
