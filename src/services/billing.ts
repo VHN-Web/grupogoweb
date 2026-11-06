@@ -134,13 +134,18 @@ export async function createCustomer(input: NewCustomerInput) {
     .returning();
 
   const amounts = setupAmounts(plan, input.wantsDomain, settings);
-  const domainNote = input.wantsDomain ? (chargesDomain(plan, true) ? " + dominio (1er año)" : " · dominio incluido gratis") : "";
+  const TT = Tc(customer);
+  const domainNote = input.wantsDomain
+    ? chargesDomain(plan, true)
+      ? TT(" + dominio (1er año)", " + domínio (1º ano)")
+      : TT(" · dominio incluido gratis", " · domínio incluso grátis")
+    : "";
   const [inv] = await db
     .insert(schema.invoices)
     .values({
       customerId: customer.id,
       kind: "SETUP",
-      description: `Implementación — plan ${plan.name}${domainNote}`,
+      description: `${TT("Implementación — plan", "Implantação — plano")} ${plan.name}${domainNote}`,
       amountPyg: amounts.PYG,
       amountUsdMinor: amounts.USD,
       amountBrlMinor: amounts.BRL,
@@ -363,14 +368,14 @@ async function createSubscriptionInvoice(c: Customer, plan: Plan, periodStart: D
   if (chargesDomain(plan, c.wantsDomain) && domainPaidUntil && domainPaidUntil.getTime() <= periodEnd.getTime()) {
     amounts = add(amounts, domainPrice(settings));
     domainPaidUntil = addInterval(domainPaidUntil, "YEARLY");
-    domainLine = " + renovación de dominio";
+    domainLine = Tc(c)(" + renovación de dominio", " + renovação do domínio");
   }
   const [inv] = await db
     .insert(schema.invoices)
     .values({
       customerId: c.id,
       kind: "SUBSCRIPTION",
-      description: `Plan ${plan.name} — ${fmtDate(periodStart)} a ${fmtDate(periodEnd)}${domainLine}`,
+      description: `${Tc(c)("Plan", "Plano")} ${plan.name} — ${fmtDate(periodStart)} ${Tc(c)("a", "a")} ${fmtDate(periodEnd)}${domainLine}`,
       amountPyg: amounts.PYG,
       amountUsdMinor: amounts.USD,
       amountBrlMinor: amounts.BRL,

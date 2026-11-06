@@ -23,7 +23,7 @@ export type ProvisionInput = {
   country?: string;
 };
 
-export const RESERVED_SLUGS = new Set(["painel", "admin", "api", "pay", "_next", "static", "login", "registro"]);
+export const RESERVED_SLUGS = new Set(["painel", "admin", "api", "pay", "_next", "static", "login", "registro", "contratar", "fatura", "uploads"]);
 
 export async function provisionTenant(db: DB, input: ProvisionInput) {
   const slug = slugify(input.slug || input.name);

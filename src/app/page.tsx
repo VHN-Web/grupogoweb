@@ -332,7 +332,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                     ))}
                     {p.includesDomain && <li className="flex items-start gap-2.5"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ATLAS_GOLD} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>{T("Dominio propio incluido", "Domínio próprio incluso")}</li>}
                   </ul>
-                  <a href={wa} className="mt-auto rounded-2xl py-4 text-center font-bold" style={{ background: hi ? ATLAS_GOLD : INK, color: hi ? INK : IVORY }}>{T("Quiero este plan", "Quero este plano")}</a>
+                  <Link href={`/contratar?plano=${p.id}&lang=${locale}`} className="mt-auto rounded-2xl py-4 text-center font-bold" style={{ background: hi ? ATLAS_GOLD : INK, color: hi ? INK : IVORY }}>{T("Quiero este plan", "Quero este plano")}</Link>
                 </div>
               );
             })}
