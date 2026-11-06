@@ -12,9 +12,11 @@ const cache = new Map<string, { slug: string | null; at: number }>();
 const TTL = 60_000;
 
 function mainHosts() {
-  const hosts = new Set(["localhost", "127.0.0.1"]);
+  const hosts = new Set(["localhost", "127.0.0.1", "goweboficial.com", "www.goweboficial.com"]);
   try {
-    hosts.add(new URL(process.env.APP_URL ?? "http://localhost").hostname);
+    const h = new URL(process.env.APP_URL ?? "http://localhost").hostname;
+    hosts.add(h);
+    hosts.add(`www.${h}`);
   } catch {}
   return hosts;
 }
@@ -22,7 +24,7 @@ function mainHosts() {
 export async function middleware(req: NextRequest) {
   const host = (req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "").toLowerCase().replace(/:\d+$/, "");
   const { pathname } = req.nextUrl;
-  if (!host || mainHosts().has(host) || PASS.test(pathname)) return NextResponse.next();
+  if (!host || mainHosts().has(host) || host.endsWith(".vercel.app") || PASS.test(pathname)) return NextResponse.next();
 
   let entry = cache.get(host);
   if (!entry || Date.now() - entry.at > TTL) {
