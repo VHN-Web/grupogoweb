@@ -527,7 +527,18 @@ async function demoExtras(db: DB) {
     const fakePhone = pt ? `+55819000000${idx}` : `+5959000000${idx}`;
     await db
       .update(schema.tenants)
-      .set({ demo: true, tier: "pro", phone: fakePhone, whatsapp: fakePhone, instagram: pt ? "sualoja" : "tutienda", reportTo: null, reportChannel: "none" })
+      .set({
+        demo: true, tier: "pro", phone: fakePhone, whatsapp: fakePhone, instagram: pt ? "sualoja" : "tutienda", reportTo: null, reportChannel: "none",
+        // chave Pix de exemplo (nada de chave/nome de pessoa real nem a marca antiga)
+        paymentConfig: (() => {
+          try {
+            const cfg = JSON.parse(t.paymentConfig || "{}");
+            return JSON.stringify({ ...cfg, pixKey: "pix@exemplo.com.br", pixHolder: pt ? "Loja de exemplo" : "Tienda de ejemplo" });
+          } catch {
+            return t.paymentConfig;
+          }
+        })(),
+      })
       .where(eq(schema.tenants.id, t.id));
     // cupom de boas-vindas
     const code = pt ? "BEMVINDO10" : "BIENVENIDO10";
