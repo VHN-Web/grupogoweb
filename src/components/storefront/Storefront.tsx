@@ -1022,7 +1022,6 @@ function Checkout({
               inputMode="numeric"
               autoComplete="off"
               value={cpf}
-              maxLength={14}
               placeholder="000.000.000-00"
               onChange={(e) => setCpf(formatCpf(e.target.value))}
             />

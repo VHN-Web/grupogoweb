@@ -24,6 +24,13 @@ function mainHosts() {
 export async function middleware(req: NextRequest) {
   const host = (req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "").toLowerCase().replace(/:\d+$/, "");
   const { pathname } = req.nextUrl;
+  // ?lang=pt|es escolhido na página vale também para o <html lang> e o título (layout raiz)
+  const lang = req.nextUrl.searchParams.get("lang");
+  if (lang === "pt" || lang === "es") {
+    const h = new Headers(req.headers);
+    h.set("x-gw-lang", lang);
+    if (!host || mainHosts().has(host) || host.endsWith(".vercel.app") || PASS.test(pathname)) return NextResponse.next({ request: { headers: h } });
+  }
   if (!host || mainHosts().has(host) || host.endsWith(".vercel.app") || PASS.test(pathname)) return NextResponse.next();
 
   let entry = cache.get(host);

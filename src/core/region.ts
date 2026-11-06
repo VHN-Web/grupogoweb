@@ -132,6 +132,8 @@ export function tr(locale: Locale) {
 
 /** Idioma do visitante pela região (header da Vercel) ou pelo navegador. */
 export function detectLocale(headers: { get(name: string): string | null }): Locale {
+  const forced = headers.get("x-gw-lang");
+  if (forced === "pt" || forced === "es") return forced;
   const country = headers.get("x-vercel-ip-country")?.toUpperCase();
   if (country === "BR" || country === "PT") return "pt";
   if (country) return "es";

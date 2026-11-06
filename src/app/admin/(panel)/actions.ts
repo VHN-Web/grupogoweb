@@ -6,6 +6,8 @@ import { db, schema } from "@/db";
 import { clearSession, requirePlatformAdmin } from "@/lib/auth";
 import { isValidE164, isValidName } from "@/core/region";
 import { CURRENCIES, type Currency } from "@/core/types";
+import { customerCurrency } from "@/services/documents";
+import { amountIn } from "@/core/billing";
 import { parseMajorToMinor } from "@/core/money";
 import {
   BillingError,
@@ -74,8 +76,15 @@ export async function deliver(customerId: string) {
 
 export async function confirmInvoicePaid(customerId: string, invoiceId: string, f: FormData) {
   await requirePlatformAdmin();
-  const currency = (CURRENCIES.find((c) => c === str(f, "currency")) ?? undefined) as Currency | undefined;
-  await markInvoicePaid(invoiceId, { provider: "manual", currency });
+  // Moeda do país do cliente: cliente do Brasil sempre em R$ (nunca cai em guaranis por padrão)
+  const c = await db.query.customers.findFirst({ where: eq(schema.customers.id, customerId) });
+  if (!c) return;
+  const allowed: Currency[] = c.country === "BR" ? ["BRL"] : ["PYG", "USD"];
+  const asked = CURRENCIES.find((x) => x === str(f, "currency")) as Currency | undefined;
+  const currency = asked && allowed.includes(asked) ? asked : customerCurrency(c);
+  const inv = await db.query.invoices.findFirst({ where: eq(schema.invoices.id, invoiceId) });
+  if (!inv || inv.customerId !== c.id) return;
+  await markInvoicePaid(invoiceId, { provider: "manual", currency, amountMinor: amountIn(inv, currency) });
   revalidatePath(`/admin/clientes/${customerId}`);
 }
 

@@ -65,7 +65,8 @@ export function PhoneInput({
             emit(c, n);
           }}
         >
-          {PHONE_COUNTRIES.map((c) => (
+          {/* o país da loja/do visitante aparece primeiro */}
+          {[defaultCountry, ...PHONE_COUNTRIES.filter((c) => c !== defaultCountry)].filter((c): c is string => !!c && !!PHONE_RULES[c]).map((c) => (
             <option key={c} value={c}>
               {c} +{PHONE_RULES[c].dial}
             </option>

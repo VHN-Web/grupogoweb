@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatMinor } from "@/core/money";
-import { CURRENCIES, PLATFORM_LABELS } from "@/core/types";
+import { PLATFORM_LABELS } from "@/core/types";
 import { fmtDate } from "@/core/billing";
 import { tenantPublicUrl } from "@/lib/urls";
 import { invoiceUrl, getSettings } from "@/services/billing";
@@ -135,9 +135,14 @@ export default async function CustomerPage({ params, searchParams }: { params: P
                     <div className="flex flex-col items-end gap-2">
                       <a href={invoiceUrl(i.id)} target="_blank" className="text-xs underline">Link de pagamento ↗</a>
                       <form action={confirmInvoicePaid.bind(null, c.id, i.id)} className="flex gap-1">
-                        <select name="currency" className="input w-auto py-1 text-xs">
-                          {CURRENCIES.map((cur) => <option key={cur}>{cur}</option>)}
-                        </select>
+                        {c.country === "BR" ? (
+                          <input type="hidden" name="currency" value="BRL" />
+                        ) : (
+                          <select name="currency" className="input w-auto py-1 text-xs" defaultValue={c.preferredCurrency === "USD" ? "USD" : "PYG"}>
+                            <option value="PYG">Gs.</option>
+                            <option value="USD">US$</option>
+                          </select>
+                        )}
                         <button className="btn-ghost px-2.5 py-1 text-xs">Marcar paga</button>
                       </form>
                       <form action={cancelInvoice.bind(null, c.id, i.id)}><button className="text-xs text-red-600 hover:underline">Cancelar fatura</button></form>

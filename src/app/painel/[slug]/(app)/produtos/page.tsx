@@ -103,7 +103,7 @@ export default async function ProductsPage({ params, searchParams }: { params: P
                   <button className="btn-ghost px-3">✓</button>
                 </form>
                 <form action={deleteCategory.bind(null, slug, c.id)}>
-                  <button className="px-1 text-muted hover:text-red-600" aria-label="Eliminar">✕</button>
+                  <button className="px-1 text-muted hover:text-red-600" aria-label={T("Eliminar categoría", "Excluir categoria")}>✕</button>
                 </form>
               </li>
             ))}
