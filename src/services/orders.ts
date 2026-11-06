@@ -244,8 +244,12 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
 
   // ---- Inicia pagamento no adapter (fora da transação: pode chamar API externa)
   const returnUrl = `${appUrl()}/${tenant.slug}/pedido/${order.id}`;
-  const result = await provider.createPayment({
+  let result;
+  try {
+    result = await provider.createPayment({
     tenantId: tenant.id,
+    method: input.paymentMethod,
+    locale: getRegion(tenant.country).locale,
     tenantSlug: tenant.slug,
     orderId: order.id,
     orderNumber: order.number,
@@ -261,6 +265,15 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
       ...(payCfg.bankInfo ? { bankInfo: payCfg.bankInfo } : {}),
     },
   });
+  } catch (e) {
+    // gateway fora/mal configurado: cancela o pedido (devolve o estoque) e avisa o cliente
+    console.error("[createPayment]", provider.id, e);
+    await setOrderStatus(tenant.id, order.id, "CANCELLED").catch(() => {});
+    throw new OrderError(
+      "PAYMENT",
+      T("No pudimos iniciar el pago online. Elegí otro medio de pago.", "Não conseguimos iniciar o pagamento online. Escolha outra forma de pagamento."),
+    );
+  }
   if (result.providerRef || result.status !== "PENDING") {
     await db
       .update(schema.orders)

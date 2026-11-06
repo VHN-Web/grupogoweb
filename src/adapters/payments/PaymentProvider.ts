@@ -15,6 +15,10 @@ export type PaymentContext = {
   tenantSlug: string;
   orderId: string;
   orderNumber: string;
+  /** Forma de pagamento escolhida (ex: PIX ou CARD) */
+  method: PaymentMethod;
+  /** Idioma do cliente final (instruções exibidas a ele) */
+  locale: "es" | "pt";
   amountMinor: number; // na moeda abaixo
   currency: Currency;
   customerName: string;
@@ -42,6 +46,8 @@ export type WebhookResult = {
   orderId: string;
   status: PaymentStatus;
   providerRef?: string;
+  /** Valor efetivamente pago (unidade menor), para conferência */
+  amountMinor?: number;
   /** Resposta que o gateway espera receber */
   responseBody?: unknown;
 };
@@ -50,6 +56,8 @@ export interface PaymentProvider {
   /** id estável, salvo no pedido e na config do tenant */
   readonly id: string;
   readonly label: string;
+  /** Rótulo em português (painel de estabelecimentos do Brasil) */
+  readonly labelPt?: string;
   readonly methods: readonly PaymentMethod[];
   readonly currencies: readonly Currency[];
   /** true = pagamento processado online pelo gateway; false = confirmado manualmente no painel */
@@ -58,7 +66,8 @@ export interface PaymentProvider {
   readonly available: boolean;
 
   createPayment(ctx: PaymentContext): Promise<CreatePaymentResult>;
-  handleWebhook?(req: Request, credentials: Record<string, string>): Promise<WebhookResult>;
+  /** null = aviso que não é de pagamento (responder 200 e ignorar) */
+  handleWebhook?(req: Request, credentials: Record<string, string>): Promise<WebhookResult | null>;
   refund?(ref: string, amountMinor: number, credentials: Record<string, string>): Promise<void>;
 }
 

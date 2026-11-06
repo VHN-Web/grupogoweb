@@ -6,6 +6,7 @@ import type { PaymentProvider } from "./PaymentProvider";
 export const mockOnlineProvider: PaymentProvider = {
   id: "mock_online",
   label: "Tarjeta online (SIMULADO)",
+  labelPt: "Cartão online (SIMULADO — demonstração)",
   methods: ["CARD"],
   currencies: ["PYG", "USD", "BRL"],
   online: true,

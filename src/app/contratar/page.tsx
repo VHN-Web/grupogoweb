@@ -8,7 +8,7 @@ import { db, schema } from "@/db";
 import { AuthShell } from "@/components/brand/AuthShell";
 import { NameInput } from "@/components/forms/NameInput";
 import { PhoneInput } from "@/components/forms/PhoneInput";
-import { COUNTRIES, REGIONS, detectLocale, getRegion, isValidE164, isValidName, tr, type Locale } from "@/core/region";
+import { detectLocale, getRegion, isValidE164, isValidName, tr, type Locale } from "@/core/region";
 import { THEMES, THEME_IDS } from "@/core/themes";
 import { formatMinor } from "@/core/money";
 import { BillingError, createCustomer } from "@/services/billing";
@@ -25,7 +25,7 @@ async function contratar(f: FormData) {
   const back = (msg: string) => redirect(`/contratar?plano=${encodeURIComponent(planId)}&lang=${lang}&err=${encodeURIComponent(msg)}`);
 
   if (str(f, "website")) back("…"); // honeypot anti-robô
-  const country = getRegion(str(f, "country")).country;
+  const country = lang === "pt" ? "BR" : getRegion(str(f, "country")).country;
   const contactName = str(f, "contactName");
   const whatsapp = str(f, "whatsapp");
   if (!str(f, "businessName")) back(T("Completá el nombre del negocio.", "Preencha o nome do negócio."));
@@ -93,12 +93,8 @@ export default async function Contratar({ searchParams }: { searchParams: Promis
         <input type="hidden" name="lang" value={locale} />
         <input name="website" className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true" />
 
-        <label className="label" htmlFor="country">{T("País del negocio", "País do negócio")}</label>
-        <select id="country" name="country" className="input" defaultValue={country}>
-          {COUNTRIES.map((c) => (
-            <option key={c} value={c}>{T(REGIONS[c].name.es, REGIONS[c].name.pt)}</option>
-          ))}
-        </select>
+        {/* País definido pela região do visitante: Brasil (pt) ou Paraguai (es) */}
+        <input type="hidden" name="country" value={country} />
 
         <label className="label" htmlFor="businessName">{T("Nombre del negocio", "Nome do negócio")}</label>
         <input id="businessName" name="businessName" className="input" required maxLength={80} placeholder={T("Ej: Barbería Navaja", "Ex: Barbearia Navalha")} />

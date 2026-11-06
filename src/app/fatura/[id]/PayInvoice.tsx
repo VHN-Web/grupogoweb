@@ -34,7 +34,7 @@ export function PayInvoice({ invoiceId, options, defaultCurrency, locale = "es" 
 
   return (
     <div className="mt-6 space-y-3">
-      <p className="label !mb-0">{T("¿En qué moneda querés pagar?", "Em qual moeda você quer pagar?")}</p>
+      {options.length > 1 && <p className="label !mb-0">{T("¿En qué moneda querés pagar?", "Em qual moeda você quer pagar?")}</p>}
       {options.map((o) => (
         <button
           key={o.currency}

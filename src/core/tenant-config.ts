@@ -69,7 +69,8 @@ export function parseFiscalConfig(raw: string | null | undefined): FiscalConfig 
 /** Versão segura para enviar ao navegador (sem credenciais). */
 export function publicPaymentConfig(cfg: PaymentConfig) {
   return {
-    options: cfg.options.filter((o) => o.enabled),
+    // Gateway online sem credencial não aparece para o cliente (evita pedido que não consegue pagar)
+    options: cfg.options.filter((o) => o.enabled && (o.provider !== "mercadopago" || !!cfg.credentials.mercadopago?.accessToken)),
     pixKey: cfg.pixKey,
     pixHolder: cfg.pixHolder,
     bankInfo: cfg.bankInfo,

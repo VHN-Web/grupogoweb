@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { CURRENCIES, type Currency } from "@/core/types";
+import type { Currency } from "@/core/types";
 import { amountIn, fmtDate } from "@/core/billing";
 import { formatMinor } from "@/core/money";
 import { getBillingProvider } from "@/adapters/billing/registry";
@@ -22,8 +22,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const settings = await getSettings();
   const locale = getRegion(inv.customer.country).locale;
   const T = tr(locale);
-  // Brasil: reais primeiro
-  const order: Currency[] = locale === "pt" ? ["BRL", "USD", "PYG"] : [...CURRENCIES];
+  // Cada país vê só as suas moedas: Brasil = R$; Paraguai = Gs. e US$
+  const order: Currency[] = locale === "pt" ? ["BRL"] : ["PYG", "USD"];
   const gw = gatewayMap(settings.gatewayByCurrency);
   const options = order.map((c) => {
     const p = getBillingProvider(gw[c]);

@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { parseMajorToMinor } from "@/core/money";
-import { COUNTRIES, getRegion, isValidE164 } from "@/core/region";
+import { COUNTRIES, getRegion, isValidE164, tr } from "@/core/region";
+import { checkMercadoPagoToken } from "@/adapters/payments/mercadopago";
 import { clearSession, hashPassword, requireTenantAdmin } from "@/lib/auth";
 import { randomTableCode } from "@/core/codes";
 import { CURRENCIES, ORDER_STATUSES, PAYMENT_METHODS, type Currency, type OrderStatus, type PaymentMethod } from "@/core/types";
@@ -362,15 +363,69 @@ export async function saveDelivery(slug: string, f: FormData) {
 export async function savePayments(slug: string, f: FormData) {
   const t = await requireTenantAdmin(slug);
   const cfg = parsePaymentConfig(t.paymentConfig);
+  const region = getRegion(t.country);
+  const allowed: Currency[] = [region.currency, ...region.extraCurrencies];
   const options = PAYMENT_METHODS.map((m: PaymentMethod) => ({
     method: m,
     provider: str(f, `${m}_provider`) || cfg.options.find((o) => o.method === m)?.provider || "cash",
     enabled: bool(f, `${m}_enabled`),
-    currencies: CURRENCIES.filter((c: Currency) => bool(f, `${m}_${c}`)),
-  })).map((o) => ({ ...o, currencies: o.currencies.length ? o.currencies : (["PYG"] as Currency[]) }));
+    currencies: allowed.filter((c: Currency) => bool(f, `${m}_${c}`)),
+  })).map((o) => ({ ...o, currencies: o.currencies.length ? o.currencies : [region.currency] }));
+  const T = tr(region.locale);
+  if (options.some((o) => o.enabled && o.provider === "mercadopago") && !cfg.credentials.mercadopago?.accessToken) {
+    redirect(`${base(slug)}/config?err=${encodeURIComponent(T("Conectá Mercado Pago antes de elegirlo.", "Conecte o Mercado Pago antes de escolhê-lo."))}#mercadopago`);
+  }
   const next = { ...cfg, options, pixKey: optStr(f, "pixKey") ?? undefined, pixHolder: optStr(f, "pixHolder") ?? undefined, bankInfo: optStr(f, "bankInfo") ?? undefined };
   await db.update(schema.tenants).set({ paymentConfig: JSON.stringify(next) }).where(eq(schema.tenants.id, t.id));
   revalidatePath(`${base(slug)}/config`);
+  revalidatePath(`/${t.slug}`);
+}
+
+/** Conecta um gateway online do próprio estabelecimento (hoje: Mercado Pago). Token é testado antes de salvar. */
+export async function saveIntegration(slug: string, providerId: string, f: FormData) {
+  const t = await requireTenantAdmin(slug);
+  const T = tr(getRegion(t.country).locale);
+  const cfg = parsePaymentConfig(t.paymentConfig);
+  const back = (k: "ok" | "err", msg: string) => redirect(`${base(slug)}/config?${k}=${encodeURIComponent(msg)}#${providerId}`);
+  if (providerId !== "mercadopago") back("err", T("Integración no disponible.", "Integração indisponível."));
+
+  const current = cfg.credentials.mercadopago ?? {};
+  const accessToken = str(f, "accessToken").replace(/\s+/g, "") || current.accessToken || "";
+  const webhookSecret = str(f, "webhookSecret").replace(/\s+/g, "") || current.webhookSecret || "";
+  if (!accessToken) back("err", T("Pegá el Access Token.", "Cole o Access Token."));
+  if (accessToken.startsWith("TEST-") === false && !accessToken.startsWith("APP_USR-")) {
+    back("err", T("El Access Token empieza con APP_USR- (no uses la Public Key).", "O Access Token começa com APP_USR- (não use a Public Key)."));
+  }
+  const check = await checkMercadoPagoToken(accessToken);
+  if (!check.ok) back("err", `${T("No se pudo conectar", "Não foi possível conectar")}: ${check.error}`);
+
+  // Ao conectar, o Pix do site passa a ser automático pelo Mercado Pago
+  const options = cfg.options.map((o) => (o.method === "PIX" ? { ...o, provider: "mercadopago", enabled: true, currencies: ["BRL" as Currency] } : o));
+  const next = {
+    ...cfg,
+    options,
+    credentials: {
+      ...cfg.credentials,
+      mercadopago: { accessToken, ...(webhookSecret ? { webhookSecret } : {}), account: check.ok ? check.account : "" },
+    },
+  };
+  await db.update(schema.tenants).set({ paymentConfig: JSON.stringify(next) }).where(eq(schema.tenants.id, t.id));
+  revalidatePath(`/${t.slug}`);
+  back("ok", T("¡Mercado Pago conectado! El Pix de tu sitio ahora es automático.", "Mercado Pago conectado! O Pix do seu site agora é automático."));
+}
+
+export async function removeIntegration(slug: string, providerId: string) {
+  const t = await requireTenantAdmin(slug);
+  const T = tr(getRegion(t.country).locale);
+  const cfg = parsePaymentConfig(t.paymentConfig);
+  const { [providerId]: _removed, ...rest } = cfg.credentials;
+  void _removed;
+  // métodos que usavam esse gateway voltam para o modo manual
+  const fallback: Record<string, string> = { PIX: "pix_manual", CARD: "pos", CASH: "cash", TRANSFER: "transfer_manual" };
+  const options = cfg.options.map((o) => (o.provider === providerId ? { ...o, provider: fallback[o.method] } : o));
+  await db.update(schema.tenants).set({ paymentConfig: JSON.stringify({ ...cfg, options, credentials: rest }) }).where(eq(schema.tenants.id, t.id));
+  revalidatePath(`/${t.slug}`);
+  redirect(`${base(slug)}/config?ok=${encodeURIComponent(T("Integración desconectada.", "Integração desconectada."))}`);
 }
 
 export async function saveFiscal(slug: string, f: FormData) {

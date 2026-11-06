@@ -17,7 +17,12 @@ async function load(slug: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const t = await load((await params).slug);
-  return { title: t ? `${t.name} — ${getRegion(t.country).locale === "pt" ? "Cardápio" : "Menú"}` : "Menú" };
+  if (!t) return { title: "Atlas" };
+  const pt = getRegion(t.country).locale === "pt";
+  return {
+    title: t.tagline ? `${t.name} — ${t.tagline}` : t.name,
+    description: pt ? `Peça online na ${t.name}.` : `Pedí online en ${t.name}.`,
+  };
 }
 
 export default async function StorePage({

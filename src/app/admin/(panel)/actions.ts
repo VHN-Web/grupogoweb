@@ -47,7 +47,8 @@ export async function newCustomer(f: FormData) {
       ruc: str(f, "ruc") || null,
       desiredSlug: str(f, "slug") || null,
       planId: str(f, "planId"),
-      preferredCurrency: (CURRENCIES.find((c) => c === str(f, "currency")) ?? "PYG") as Currency,
+      // Brasil cobra só em R$
+      preferredCurrency: str(f, "country") === "BR" ? "BRL" : ((CURRENCIES.find((c) => c === str(f, "currency")) ?? "PYG") as Currency),
       wantsDomain: bool(f, "wantsDomain"),
       domainName: str(f, "domainName") || null,
       notes: str(f, "notes") || null,

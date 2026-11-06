@@ -26,9 +26,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
   try {
     const creds = parsePaymentConfig(tenant.paymentConfig).credentials[provider.id] ?? {};
     const result = await provider.handleWebhook(req, creds);
+    if (!result) return NextResponse.json({ ok: true });
     const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, result.orderId) });
     if (!order || order.tenantId !== tenant.id || order.paymentProvider !== provider.id) {
       return NextResponse.json({ error: "pedido" }, { status: 404 });
+    }
+    // confere o valor pago (quando o gateway informa)
+    if (result.status === "PAID" && result.amountMinor != null && result.amountMinor < order.payAmountMinor) {
+      console.error(`[webhook ${providerId}] valor pago menor que o pedido`, order.id);
+      return NextResponse.json({ error: "valor" }, { status: 400 });
     }
     // idempotente: não volta um pedido pago para pendente
     if (order.paymentStatus !== "PAID" || result.status === "REFUNDED") {

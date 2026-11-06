@@ -1,18 +1,18 @@
 import { requireTenantAdmin } from "@/lib/auth";
-import { CURRENCIES, PAYMENT_METHODS, type Currency } from "@/core/types";
+import { PAYMENT_METHODS, type Currency } from "@/core/types";
 import { panelI18n } from "@/lib/panel-i18n";
-import { COUNTRIES, REGIONS } from "@/core/region";
 import { CURRENCY_SYMBOL, minorToInput } from "@/core/money";
 import { PhoneInput } from "@/components/forms/PhoneInput";
 import { parseFiscalConfig, parsePaymentConfig } from "@/core/tenant-config";
 import { listPaymentProviders } from "@/adapters/payments/registry";
 import { listFiscalProviders } from "@/adapters/fiscal/providers";
-import { changePassword, saveDelivery, saveFiscal, saveGeneral, savePayments, saveRates, saveRegion } from "../actions";
+import { changePassword, saveDelivery, saveFiscal, saveGeneral, savePayments, saveRates, saveIntegration, removeIntegration } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function ConfigPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ConfigPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { slug } = await params;
+  const sp = await searchParams;
   const t = await requireTenantAdmin(slug);
   const pay = parsePaymentConfig(t.paymentConfig);
   const fiscal = parseFiscalConfig(t.fiscalConfig);
@@ -20,7 +20,14 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
   const { T, L, region, base } = panelI18n(t);
   const sym = CURRENCY_SYMBOL[base];
   const mi = (v: number | null | undefined) => minorToInput(v, base);
-  const others = CURRENCIES.filter((c) => c !== base);
+  // Moedas do país do estabelecimento: Brasil = só R$; Paraguai = Gs. + US$ + R$
+  const regionCurrencies: Currency[] = [base, ...region.extraCurrencies];
+  const others = region.extraCurrencies;
+  const pt = region.locale === "pt";
+  const labelOf = (p: { label: string; labelPt?: string }) => (pt ? (p.labelPt ?? p.label) : p.label);
+  const regionProviders = providers.filter((p) => p.currencies.includes(base));
+  const mpCreds = pay.credentials.mercadopago ?? {};
+  const integrations = regionProviders.filter((p) => p.online && p.id !== "mock_online");
   const rateField: Record<Currency, "rateUsd" | "rateBrl" | "ratePyg"> = { USD: "rateUsd", BRL: "rateBrl", PYG: "ratePyg" };
 
   return (
@@ -42,20 +49,7 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
         </form>
       </Section>
 
-      <Section title={T("País y moneda", "País e moeda")} desc={T("Define idioma del menú, moneda base, formato del teléfono y documento fiscal.", "Define idioma do cardápio, moeda base, formato do telefone e documento fiscal.")}>
-        <form action={saveRegion.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
-          <Field label={T("País", "País")}>
-            <select name="country" defaultValue={t.country} className="input">
-              {COUNTRIES.map((c) => (
-                <option key={c} value={c}>{T(REGIONS[c].name.es, REGIONS[c].name.pt)} — {REGIONS[c].currency}</option>
-              ))}
-            </select>
-          </Field>
-          <p className="self-end text-xs text-muted">{T("Atención: cambiar la moneda no convierte los precios ya cargados.", "Atenção: trocar a moeda não converte os preços já cadastrados.")}</p>
-          <Save label={T("Guardar", "Salvar")} />
-        </form>
-      </Section>
-
+      {others.length > 0 && (
       <Section title={T("Cotización del día", "Cotação do dia")} desc={T(`Cuánto vale cada moneda en ${sym}. Se usa para cobrar y calcular el vuelto.`, `Quanto vale cada moeda em ${sym}. Usado para cobrar e calcular o troco.`)}>
         <form action={saveRates.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
           {others.map((c) => (
@@ -66,12 +60,79 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
           <Save label={T("Guardar", "Salvar")} />
         </form>
       </Section>
+      )}
+
+      {sp.ok && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{sp.ok}</p>}
+      {sp.err && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{sp.err}</p>}
+
+      <Section
+        title={T("Integraciones de pago", "Integrações de pagamento")}
+        desc={T(
+          "Conectá tu cuenta para cobrar online. El dinero va directo a tu cuenta y el pedido se confirma solo.",
+          "Conecte sua conta para receber online. O dinheiro vai direto para a sua conta e o pedido é confirmado sozinho.",
+        )}
+      >
+        <div className="space-y-4">
+          {integrations.map((p) =>
+            p.id === "mercadopago" ? (
+              <div key={p.id} id="mercadopago" className="rounded-xl border border-line p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <b>Mercado Pago</b>
+                  {mpCreds.accessToken ? (
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                      ✓ {T("Conectado", "Conectado")}{mpCreds.account ? ` · ${mpCreds.account}` : ""}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-paper px-2.5 py-0.5 text-xs font-semibold text-muted">{T("No conectado", "Não conectado")}</span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-muted">
+                  {T(
+                    "Pix y tarjeta online con confirmación automática.",
+                    "Pix e cartão online com confirmação automática. Pegue o Access Token em mercadopago.com.br/developers → Suas integrações → Credenciais de produção.",
+                  )}
+                </p>
+                <form action={saveIntegration.bind(null, slug, "mercadopago")} className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Field label="Access Token" wide>
+                    <input
+                      name="accessToken"
+                      type="password"
+                      autoComplete="off"
+                      className="input font-mono"
+                      placeholder={mpCreds.accessToken ? `APP_USR-••••${mpCreds.accessToken.slice(-4)} (${T("guardado", "salvo")})` : "APP_USR-..."}
+                      required={!mpCreds.accessToken}
+                    />
+                  </Field>
+                  <Field label={T("Clave secreta del webhook (opcional)", "Assinatura secreta do webhook (opcional)")} wide>
+                    <input name="webhookSecret" type="password" autoComplete="off" className="input font-mono" placeholder={mpCreds.webhookSecret ? "••••••••" : ""} />
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+                    <button className="btn-brand">{mpCreds.accessToken ? T("Actualizar", "Atualizar") : T("Conectar", "Conectar")}</button>
+                    <span className="text-xs text-muted">{T("Probamos el token antes de guardar.", "Testamos o token antes de salvar. Ao conectar, o Pix do seu site passa a ser automático.")}</span>
+                  </div>
+                </form>
+                {mpCreds.accessToken && (
+                  <form action={removeIntegration.bind(null, slug, "mercadopago")} className="mt-2">
+                    <button className="text-xs text-red-600 hover:underline">{T("Desconectar", "Desconectar")}</button>
+                  </form>
+                )}
+              </div>
+            ) : (
+              <div key={p.id} className="rounded-xl border border-line p-4 opacity-70">
+                <b>{labelOf(p)}</b>
+                <p className="mt-1 text-sm text-muted">{T("Próximamente: la integración está en desarrollo.", "Em breve: integração em desenvolvimento.")}</p>
+              </div>
+            ),
+          )}
+        </div>
+      </Section>
 
       <Section title={T("Medios de pago", "Formas de pagamento")} desc={T("Elegí qué medios aceptás, en qué monedas y qué integración procesa cada uno.", "Escolha quais formas aceita, em quais moedas e qual integração processa cada uma.")}>
         <form action={savePayments.bind(null, slug)} className="space-y-3">
           {PAYMENT_METHODS.map((m) => {
             const o = pay.options.find((x) => x.method === m);
-            const compatible = providers.filter((p) => p.methods.includes(m));
+            const compatible = regionProviders.filter((p) => p.methods.includes(m));
+            if (compatible.length === 0) return null;
             return (
               <div key={m} className="rounded-xl border border-line p-3">
                 <div className="flex flex-wrap items-center gap-3">
@@ -81,17 +142,22 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
                   <select name={`${m}_provider`} defaultValue={o?.provider} className="input w-auto flex-1 py-2 text-sm">
                     {compatible.map((p) => (
                       <option key={p.id} value={p.id} disabled={!p.available}>
-                        {p.label}{!p.available ? T(" — próximamente", " — em breve") : ""}
+                        {labelOf(p)}
+                        {!p.available ? T(" — próximamente", " — em breve") : p.id === "mercadopago" && !mpCreds.accessToken ? T(" — conectá arriba", " — conecte acima") : ""}
                       </option>
                     ))}
                   </select>
-                  <div className="flex gap-3 text-sm">
-                    {CURRENCIES.map((c) => (
-                      <label key={c} className="flex items-center gap-1">
-                        <input type="checkbox" name={`${m}_${c}`} defaultChecked={o?.currencies.includes(c)} /> {c}
-                      </label>
-                    ))}
-                  </div>
+                  {regionCurrencies.length > 1 ? (
+                    <div className="flex gap-3 text-sm">
+                      {regionCurrencies.map((c) => (
+                        <label key={c} className="flex items-center gap-1">
+                          <input type="checkbox" name={`${m}_${c}`} defaultChecked={o?.currencies.includes(c)} /> {c}
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <input type="hidden" name={`${m}_${base}`} value="on" />
+                  )}
                 </div>
               </div>
             );
@@ -103,7 +169,6 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
               <textarea name="bankInfo" className="input" defaultValue={pay.bankInfo ?? ""} placeholder={T("Banco, cuenta, titular, CI/RUC", "Banco, agência, conta, titular, CPF/CNPJ")} />
             </Field>
           </div>
-          <p className="text-xs text-muted">{T("Las credenciales de gateways (Bancard, Pagopar) se cargarán aquí cuando la integración esté activa.", "As credenciais de gateways serão configuradas aqui quando a integração estiver ativa.")}</p>
           <Save label={T("Guardar", "Salvar")} />
         </form>
       </Section>
@@ -123,16 +188,26 @@ export default async function ConfigPage({ params }: { params: Promise<{ slug: s
 
       <Section title={T("Facturación", "Notas fiscais")} desc={T("Manual (talonario) hoy. SIFEN (factura electrónica) queda listo para activar.", "Registro manual hoje. Emissão eletrônica (NF-e/NFC-e) virá como integração.")}>
         <form action={saveFiscal.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
-          <Field label={T("Modo", "Modo")}>
-            <select name="provider" defaultValue={fiscal.provider} className="input">
-              {listFiscalProviders().map((p) => (
-                <option key={p.id} value={p.id} disabled={!p.available}>{p.label}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Timbrado"><input name="timbrado" className="input" defaultValue={fiscal.timbrado ?? ""} /></Field>
-          <Field label={T("Establecimiento", "Estabelecimento")}><input name="establishment" className="input" defaultValue={fiscal.establishment} /></Field>
-          <Field label={T("Punto de expedición", "Série")}><input name="expeditionPoint" className="input" defaultValue={fiscal.expeditionPoint} /></Field>
+          {pt ? (
+            <>
+              <input type="hidden" name="provider" value="manual" />
+              <input type="hidden" name="establishment" value={fiscal.establishment} />
+              <input type="hidden" name="expeditionPoint" value={fiscal.expeditionPoint} />
+            </>
+          ) : (
+            <>
+              <Field label="Modo">
+                <select name="provider" defaultValue={fiscal.provider} className="input">
+                  {listFiscalProviders().map((p) => (
+                    <option key={p.id} value={p.id} disabled={!p.available}>{p.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Timbrado"><input name="timbrado" className="input" defaultValue={fiscal.timbrado ?? ""} /></Field>
+              <Field label="Establecimiento"><input name="establishment" className="input" defaultValue={fiscal.establishment} /></Field>
+              <Field label="Punto de expedición"><input name="expeditionPoint" className="input" defaultValue={fiscal.expeditionPoint} /></Field>
+            </>
+          )}
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" name="autoIssue" defaultChecked={fiscal.autoIssue} /> {T("Registrar factura automáticamente al cobrar un pedido", "Registrar nota automaticamente ao receber um pedido")}
           </label>
