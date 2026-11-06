@@ -8,6 +8,8 @@ export default async function PanelEntry() {
   async function go(formData: FormData) {
     "use server";
     const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+    // Quem digitar "admin" aqui quer o admin da plataforma
+    if (slug === "admin" || slug === "/admin") redirect("/admin/login");
     if (slug) redirect(`/painel/${slug}`);
   }
   return (
