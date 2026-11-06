@@ -382,7 +382,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
             <GoWebLogo height={26} />
             <span className="text-xs font-semibold" style={{ color: "#7FB8EE" }}>{T("Clic, Conectá, Vendé.", "Clique, Conecte, Venda.")}</span>
           </span>
-          <span>© {new Date().getFullYear()} GoWeb · {T("Sistema para gastronomía y comercios", "Sistema para gastronomia, serviços e comércio")}</span>
+          <span>© {new Date().getFullYear()} GoWeb · {T("Tu negocio online: vitrina, pedidos, pagos y gestión en un solo lugar", "Seu negócio online: vitrine, pedidos, pagamentos e gestão em um só lugar")}</span>
         </div>
       </footer>
     </div>

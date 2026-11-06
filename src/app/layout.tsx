@@ -8,11 +8,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return pt
     ? {
         title: "GoWeb — Cardápio digital, pedidos e caixa",
-        description: "Cardápio e vitrine com QR, pedidos em tempo real, Pix, caixa e estoque para restaurantes, barbearias, perfumarias e lojas.",
+        description: "Seu negócio online: vitrine digital, pedidos, pagamentos por Pix e cartão, caixa e estoque em um só lugar.",
       }
     : {
         title: "GoWeb — Menú digital, pedidos y caja",
-        description: "Menú con QR, pedidos en tiempo real, caja multi-moneda y stock para restaurantes, bares, cafeterías y tiendas en Paraguay.",
+        description: "Tu negocio online: vitrina digital, pedidos, pagos, caja y stock en un solo lugar.",
       };
 }
 
