@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTenantAdmin } from "@/lib/auth";
+import { requirePanelAccess } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
 import { PanelNav } from "./PanelNav";
 import { GoWebLogo } from "@/components/brand/GoWebLogo";
@@ -7,7 +7,8 @@ import { toggleOpen, logout } from "./actions";
 
 export default async function PanelLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const tenant = await requireTenantAdmin(slug);
+  const access = await requirePanelAccess(slug);
+  const tenant = access.tenant;
   const { T, locale } = panelI18n(tenant);
   return (
     <div style={{ ["--brand" as string]: "#3CC46B" }} className="min-h-dvh">
@@ -20,7 +21,10 @@ export default async function PanelLayout({ children, params }: { children: Reac
             <img src={tenant.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
           ) : null}
           <div className="min-w-0 flex-1">
-            <p className="truncate font-bold leading-tight">{tenant.name}</p>
+            <p className="truncate font-bold leading-tight">
+              {tenant.name}
+              {access.role === "staff" && <span className="ml-2 text-xs font-normal text-[#B9B3A7]">· {access.staffName}</span>}
+            </p>
             <Link href={`/${slug}`} target="_blank" className="text-xs text-[#B9B3A7] hover:underline">{T("Ver mi sitio", "Ver meu site")} ↗</Link>
           </div>
           <form action={toggleOpen.bind(null, slug)}>
@@ -36,7 +40,7 @@ export default async function PanelLayout({ children, params }: { children: Reac
             <button className="text-xs text-[#B9B3A7] hover:underline">{T("Salir", "Sair")}</button>
           </form>
         </div>
-        <PanelNav slug={slug} locale={locale} />
+        <PanelNav slug={slug} locale={locale} areas={[...access.areas]} pro={tenant.tier === "pro"} />
       </header>
       {tenant.suspended && (
         <div className="no-print bg-red-600 px-4 py-2.5 text-center text-sm font-semibold text-white">

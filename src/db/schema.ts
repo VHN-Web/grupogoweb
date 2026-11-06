@@ -89,6 +89,24 @@ export const tenants = pgTable("tenants", {
   customDomain: text("custom_domain").unique(),
   // Suspenso por inadimplência (cardápio fora do ar; painel continua acessível para pagar)
   suspended: boolean("suspended").notNull().default(false),
+
+  // Redes sociais exibidas no site (ícones clicáveis)
+  whatsapp: text("whatsapp"), // E.164
+  instagram: text("instagram"), // @usuario (sem @)
+
+  // Plano de recursos: "basic" | "pro" (GoInteligence)
+  tier: text("tier").$type<"basic" | "pro">().notNull().default("basic"),
+
+  // Impressora térmica
+  printerWidth: integer("printer_width").notNull().default(80), // 58 | 80 mm
+  autoPrint: boolean("auto_print").notNull().default(false),
+
+  // Relatório de fechamento de caixa (GoInteligence)
+  reportChannel: text("report_channel").$type<"none" | "email" | "whatsapp">().notNull().default("none"),
+  reportTo: text("report_to"), // e-mail ou WhatsApp E.164
+
+  // Agenda (GoInteligence) — JSON validado em src/core/booking.ts
+  bookingConfig: text("booking_config").notNull().default("{}"),
   createdAt: createdAt(),
 });
 
@@ -122,6 +140,11 @@ export const products = pgTable(
     trackStock: boolean("track_stock").notNull().default(false),
     stock: integer("stock").notNull().default(0),
     sortOrder: integer("sort_order").notNull().default(0),
+    // Oferta relâmpago (GoInteligence): preço promocional até promoEndsAt
+    promoPricePyg: integer("promo_price_pyg"),
+    promoEndsAt: timestamp("promo_ends_at", { withTimezone: true }),
+    // Serviço agendável (ex: corte de cabelo): duração em minutos
+    durationMin: integer("duration_min"),
     createdAt: createdAt(),
   },
   (t) => [index("products_tenant_idx").on(t.tenantId)],
@@ -203,6 +226,8 @@ export const orders = pgTable(
     notes: text("notes"),
 
     subtotalPyg: integer("subtotal_pyg").notNull(),
+    discountPyg: integer("discount_pyg").notNull().default(0),
+    couponCode: text("coupon_code"),
     deliveryFeePyg: integer("delivery_fee_pyg").notNull().default(0),
     totalPyg: integer("total_pyg").notNull(),
 
@@ -305,6 +330,7 @@ export const plans = pgTable("plans", {
   setupUsdMinor: integer("setup_usd_minor").notNull().default(0),
   setupBrlMinor: integer("setup_brl_minor").notNull().default(0),
   includesDomain: boolean("includes_domain").notNull().default(false), // anual: domínio grátis
+  intelligence: boolean("intelligence").notNull().default(false), // inclui GoInteligence (recursos pro)
   features: text("features"), // texto livre, 1 por linha (exibido ao cliente)
   active: boolean("active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -395,6 +421,88 @@ export const notifications = pgTable("notifications", {
 });
 
 // ---------- Relations ----------
+// =============================================================================
+// GoInteligence: cupons, carrinhos abandonados, agenda e equipe
+// =============================================================================
+export const coupons = pgTable(
+  "coupons",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    code: text("code").notNull(), // MAIUSCULO
+    kind: text("kind").$type<"PERCENT" | "FIXED">().notNull(),
+    value: integer("value").notNull(), // % (1-90) ou valor em unidade menor da base
+    minSubtotal: integer("min_subtotal").notNull().default(0),
+    maxUses: integer("max_uses"),
+    uses: integer("uses").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("coupons_tenant_code_uq").on(t.tenantId, t.code)],
+);
+
+export const carts = pgTable(
+  "carts",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    customerName: text("customer_name"),
+    customerPhone: text("customer_phone").notNull(), // E.164
+    items: text("items").notNull(), // JSON [{productId,name,quantity,unitPricePyg}]
+    subtotalPyg: integer("subtotal_pyg").notNull(),
+    status: text("status").$type<"OPEN" | "CONTACTED" | "RECOVERED">().notNull().default("OPEN"),
+    ownerNotifiedAt: timestamp("owner_notified_at", { withTimezone: true }),
+    contactedAt: timestamp("contacted_at", { withTimezone: true }),
+    recoveredOrderId: text("recovered_order_id"),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("carts_tenant_idx").on(t.tenantId, t.updatedAt)],
+);
+
+export const appointments = pgTable(
+  "appointments",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+    serviceName: text("service_name").notNull(),
+    pricePyg: integer("price_pyg").notNull().default(0),
+    customerName: text("customer_name").notNull(),
+    customerPhone: text("customer_phone").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    durationMin: integer("duration_min").notNull(),
+    status: text("status").$type<"PENDING" | "CONFIRMED" | "CANCELLED" | "DONE">().notNull().default("PENDING"),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("appointments_tenant_idx").on(t.tenantId, t.startsAt)],
+);
+
+export const staff = pgTable(
+  "staff",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    username: text("username").notNull(), // login (minúsculo)
+    passwordHash: text("password_hash").notNull(),
+    permissions: text("permissions").notNull().default("[]"), // JSON PanelArea[]
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("staff_tenant_user_uq").on(t.tenantId, t.username)],
+);
+
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   categories: many(categories),
   products: many(products),
@@ -448,3 +556,7 @@ export type Order = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type DiningTable = typeof diningTables.$inferSelect;
 export type FiscalDocument = typeof fiscalDocuments.$inferSelect;
+export type Coupon = typeof coupons.$inferSelect;
+export type Cart = typeof carts.$inferSelect;
+export type Appointment = typeof appointments.$inferSelect;
+export type Staff = typeof staff.$inferSelect;

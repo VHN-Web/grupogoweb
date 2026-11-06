@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TablesPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "tables");
   const { T } = panelI18n(t);
   const tables = (await db.query.diningTables.findMany({ where: eq(schema.diningTables.tenantId, t.id), orderBy: asc(schema.diningTables.label) })).sort((a, b) =>
     a.label.localeCompare(b.label, "es", { numeric: true }),

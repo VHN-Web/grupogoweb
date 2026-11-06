@@ -9,7 +9,7 @@ import { tenantPublicUrl } from "@/lib/urls";
 import { invoiceUrl, getSettings } from "@/services/billing";
 import { Flash } from "@/components/Flash";
 import { StatusPill } from "@/components/StatusPill";
-import { cancelCustomerAction, cancelInvoice, confirmInvoicePaid, deliver, saveDomain, suspendCustomer, toggleTask } from "../../actions";
+import { cancelCustomerAction, cancelInvoice, confirmInvoicePaid, deliver, saveDomain, setTier, suspendCustomer, toggleTask } from "../../actions";
 
 export default async function CustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { id } = await params;
@@ -55,7 +55,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="card space-y-1 p-4 text-sm">
           <h2 className="mb-2 font-semibold">Contrato</h2>
-          <Row k="Plano" v={`${c.plan.name} (${PLATFORM_LABELS.interval[c.plan.interval]})`} />
+          <Row k="Plano" v={`${c.plan.name} (${PLATFORM_LABELS.interval[c.plan.interval]})${c.tenant?.tier === "pro" ? " · GoInteligence ativo" : ""}`} />
           <Row k="Valor" v={`${formatMinor(c.plan.pricePyg, "PYG")} · ${formatMinor(c.plan.priceUsdMinor, "USD")} · ${formatMinor(c.plan.priceBrlMinor, "BRL")}`} />
           <Row k="Moeda preferida" v={c.preferredCurrency} />
           <Row k="Próximo vencimento" v={c.nextBillingAt ? fmtDate(c.nextBillingAt) : "—"} />
@@ -176,6 +176,11 @@ export default async function CustomerPage({ params, searchParams }: { params: P
             <form action={suspendCustomer.bind(null, c.id, false)}><button className="btn-ghost">Reativar manualmente</button></form>
           ) : (
             <form action={suspendCustomer.bind(null, c.id, true)}><button className="btn-ghost">Suspender</button></form>
+          )}
+          {c.tenant.tier === "pro" ? (
+            <form action={setTier.bind(null, c.id, "basic")}><button className="btn-ghost">Desativar GoInteligence</button></form>
+          ) : (
+            <form action={setTier.bind(null, c.id, "pro")}><button className="btn-ghost">Ativar GoInteligence</button></form>
           )}
           <form action={cancelCustomerAction.bind(null, c.id)}><button className="btn-ghost text-red-600">Cancelar contrato</button></form>
         </section>

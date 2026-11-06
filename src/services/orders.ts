@@ -4,7 +4,9 @@ import { z } from "zod";
 import { db, schema } from "@/db";
 import { randomOrderNumber } from "@/core/codes";
 import { quoteDelivery } from "@/core/delivery";
-import { changeDue, fromBase, type Rates } from "@/core/money";
+import { changeDue, formatMoney, fromBase, type Rates } from "@/core/money";
+import { checkCoupon, effectivePrice } from "@/core/intelligence";
+import { couponError, findCoupon, markCartRecovered } from "./intelligence";
 import { getRegion, isValidE164, isValidName, tr } from "@/core/region";
 import { parsePaymentConfig } from "@/core/tenant-config";
 import { CURRENCIES, ORDER_TYPES, PAYMENT_METHODS, type Currency, type OrderStatus, type PaymentStatus } from "@/core/types";
@@ -44,6 +46,8 @@ export const createOrderSchema = z.object({
   paymentMethod: z.enum(PAYMENT_METHODS),
   payCurrency: z.enum(CURRENCIES),
   cashTenderedMinor: z.number().int().min(0).optional().nullable(),
+  couponCode: z.string().trim().max(30).optional().nullable(),
+  cartId: z.string().max(60).optional().nullable(),
 });
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 
@@ -117,13 +121,29 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
     const p = byId.get(i.productId);
     if (!p) throw new OrderError("PRODUCT", T("Un producto ya no está disponible", "Um produto não está mais disponível"));
     qtyByProduct.set(p.id, (qtyByProduct.get(p.id) ?? 0) + i.quantity);
-    return { product: p, quantity: i.quantity, notes: i.notes ?? null };
+    if (p.durationMin) throw new OrderError("PRODUCT", T(`${p.name} se agenda, no se pide`, `${p.name} é agendado, não pedido`));
+    // preço efetivo: oferta relâmpago ativa (GoInteligence) ou preço normal
+    const unit = tenant.tier === "pro" ? effectivePrice(p) : p.pricePyg;
+    return { product: p, unit, quantity: i.quantity, notes: i.notes ?? null };
   });
   for (const [pid, qty] of qtyByProduct) {
     const p = byId.get(pid)!;
     if (p.trackStock && p.stock < qty) throw new OrderError("STOCK", T(`Sin stock suficiente: ${p.name}`, `Sem estoque suficiente: ${p.name}`));
   }
-  const subtotalPyg = lines.reduce((s, l) => s + l.product.pricePyg * l.quantity, 0);
+  const subtotalPyg = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
+
+  // ---- Cupom (GoInteligence) — validado e calculado no servidor
+  let discountPyg = 0;
+  let couponId: string | null = null;
+  let couponCode: string | null = null;
+  if (input.couponCode && tenant.tier === "pro") {
+    const c = await findCoupon(tenant.id, input.couponCode);
+    const chk = c ? checkCoupon(c, subtotalPyg) : ({ ok: false, reason: "INACTIVE" } as const);
+    if (!chk.ok || !c) throw new OrderError("COUPON", couponError(chk.ok ? "INACTIVE" : chk.reason, getRegion(tenant.country).locale, c ? formatMoney(c.minSubtotal, tenant.currency as Currency) : undefined));
+    discountPyg = chk.discount;
+    couponId = c.id;
+    couponCode = c.code;
+  }
 
   // ---- Delivery (recalculado no servidor)
   let deliveryFeePyg = 0;
@@ -142,7 +162,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
       distanceKm = q.distanceKm;
     }
   }
-  const totalPyg = subtotalPyg + deliveryFeePyg;
+  const totalPyg = subtotalPyg - discountPyg + deliveryFeePyg;
 
   // ---- Pagamento
   const payCfg = parsePaymentConfig(tenant.paymentConfig);
@@ -203,6 +223,8 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
         distanceKm,
         notes: input.notes ?? null,
         subtotalPyg,
+        discountPyg,
+        couponCode,
         deliveryFeePyg,
         totalPyg,
         paymentMethod: input.paymentMethod,
@@ -221,11 +243,15 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
         orderId: o.id,
         productId: l.product.id,
         name: l.product.name,
-        unitPricePyg: l.product.pricePyg,
+        unitPricePyg: l.unit,
         quantity: l.quantity,
         notes: l.notes,
       })),
     );
+
+    if (couponId) {
+      await tx.update(schema.coupons).set({ uses: sql`${schema.coupons.uses} + 1` }).where(eq(schema.coupons.id, couponId));
+    }
 
     for (const [pid, qty] of qtyByProduct) {
       const p = byId.get(pid)!;
@@ -280,6 +306,8 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
       .set({ paymentRef: result.providerRef ?? null, paymentStatus: result.status })
       .where(eq(schema.orders.id, order.id));
   }
+
+  if (input.cartId) await markCartRecovered(tenant.id, input.cartId, order.id).catch(() => {});
 
   return { orderId: order.id, number: order.number, redirectUrl: result.redirectUrl, instructions: result.instructions };
 }

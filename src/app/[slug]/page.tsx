@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { effectivePrice, parseBookingConfig, promoActive } from "@/core/intelligence";
+import { tenantSuggestions } from "@/services/intelligence";
 import type { Metadata } from "next";
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -81,6 +83,14 @@ export default async function StorePage({
 
   const theme = getTheme(tenant.theme);
   const region = getRegion(tenant.country);
+  const pro = tenant.tier === "pro";
+  const booking = parseBookingConfig(tenant.bookingConfig);
+  const suggestions = pro
+    ? await tenantSuggestions(
+        tenant.id,
+        prods.map((p) => ({ id: p.id, categoryId: p.categoryId, available: !(p.trackStock && p.stock <= 0), service: !!p.durationMin })),
+      )
+    : {};
   const data: StoreData = {
     slug: tenant.slug,
     locale: region.locale,
@@ -102,6 +112,10 @@ export default async function StorePage({
     },
     address: tenant.address,
     phone: tenant.phone,
+    social: { whatsapp: tenant.whatsapp, instagram: tenant.instagram },
+    pro,
+    suggestions,
+    booking: pro && booking.enabled ? { daysAhead: booking.daysAhead } : null,
     isOpen: tenant.isOpen,
     accepts: { DINE_IN: tenant.acceptsDineIn, PICKUP: tenant.acceptsPickup, DELIVERY: tenant.acceptsDelivery },
     rates: tenantRates(tenant),
@@ -118,7 +132,10 @@ export default async function StorePage({
         description: p.description,
         imageUrl: p.imageUrl,
         illustration: p.illustration,
-        pricePyg: p.pricePyg,
+        pricePyg: pro ? effectivePrice(p) : p.pricePyg,
+        regularPricePyg: pro && promoActive(p) ? p.pricePyg : null,
+        promoEndsAt: pro && promoActive(p) ? p.promoEndsAt!.toISOString() : null,
+        durationMin: pro && booking.enabled ? p.durationMin : null,
         soldOut: p.trackStock && p.stock <= 0,
         maxQty: p.trackStock ? p.stock : 99,
       })),

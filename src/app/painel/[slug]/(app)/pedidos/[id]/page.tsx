@@ -7,6 +7,7 @@ import { panelI18n } from "@/lib/panel-i18n";
 import { formatPhone } from "@/core/region";
 import { Receipt } from "@/components/Receipt";
 import { PrintButton } from "@/components/PrintButton";
+import { ThermalPrintButton } from "@/components/ThermalPrint";
 import { PayBadge } from "@/components/PayBadge";
 import { getOrderWithItems } from "@/services/orders";
 import { issueInvoiceForOrder, markOrderPaid, updateOrderStatus } from "../../actions";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OrderDetail({ params }: { params: Promise<{ slug: string; id: string }> }) {
   const { slug, id } = await params;
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "orders");
   const { T, L, region } = panelI18n(t);
   const o = await getOrderWithItems(t.id, id);
   if (!o) notFound();
@@ -61,7 +62,8 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
               <button className="btn-ghost text-red-600">{T("Cancelar (devuelve stock)", "Cancelar (devolve estoque)")}</button>
             </form>
           )}
-          <PrintButton label={T("Imprimir ticket", "Imprimir comprovante")} />
+          <ThermalPrintButton url={`/painel/${slug}/imprimir/${o.id}`} label={T("Imprimir en la térmica", "Imprimir na térmica")} />
+          <PrintButton label={T("Imprimir (A4)", "Imprimir (A4)")} />
         </div>
 
         <div className="card p-4">

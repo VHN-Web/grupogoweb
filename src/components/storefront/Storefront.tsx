@@ -18,7 +18,10 @@ export type StoreProduct = {
   description: string | null;
   imageUrl: string | null;
   illustration: string | null;
-  pricePyg: number;
+  pricePyg: number; // preço efetivo (com oferta relâmpago, se ativa)
+  regularPricePyg: number | null; // preço "de" quando há oferta
+  promoEndsAt: string | null; // ISO
+  durationMin: number | null; // serviço agendável
   soldOut: boolean;
   maxQty: number;
 };
@@ -44,6 +47,10 @@ export type StoreData = {
   };
   address: string | null;
   phone: string | null;
+  social: { whatsapp: string | null; instagram: string | null };
+  pro: boolean;
+  suggestions: Record<string, string[]>;
+  booking: { daysAhead: number } | null;
   isOpen: boolean;
   accepts: Record<OrderType, boolean>;
   rates: Rates;
@@ -57,7 +64,7 @@ export type StoreData = {
 type Cart = Record<string, number>;
 
 // Idioma e moeda do estabelecimento disponíveis para todos os componentes do site
-type Ctx = { T: (es: string, pt: string) => string; money: (v: number) => string; L: ReturnType<typeof getLabels>; data: StoreData };
+type Ctx = { T: (es: string, pt: string) => string; money: (v: number) => string; L: ReturnType<typeof getLabels>; data: StoreData; book: (p: StoreProduct) => void };
 const StoreCtx = createContext<Ctx>(null as unknown as Ctx);
 const useStore = () => useContext(StoreCtx);
 type View = "menu" | "cart" | "checkout";
@@ -102,7 +109,39 @@ export function Storefront({ data }: { data: StoreData }) {
   const count = lines.reduce((s, l) => s + l.qty, 0);
   const subtotal = lines.reduce((s, l) => s + l.qty * l.product.pricePyg, 0);
 
-  const setQty = (id: string, qty: number) =>
+  const [suggestFor, setSuggestFor] = useState<string | null>(null);
+  const [booking, setBooking] = useState<StoreProduct | null>(null);
+  const [cartId, setCartId] = useState<string | null>(null);
+  const [initialCoupon, setInitialCoupon] = useState<string>("");
+
+  // Link de recuperação de carrinho (?carrinho=ID&cupom=CODE) e cupom vindo de campanha (?cupom=CODE)
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const cupom = sp.get("cupom");
+    if (cupom) setInitialCoupon(cupom);
+    const cid = sp.get("carrinho");
+    try {
+      const saved = localStorage.getItem(`gw_cartid_${data.slug}`);
+      if (saved) setCartId(saved);
+    } catch {}
+    if (!cid) return;
+    fetch(`/api/carts?slug=${encodeURIComponent(data.slug)}&id=${encodeURIComponent(cid)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { cartId: string; items: { productId: string; quantity: number }[] } | null) => {
+        if (!j) return;
+        setCart(Object.fromEntries(j.items.filter((i) => products.has(i.productId)).map((i) => [i.productId, i.quantity])));
+        setCartId(j.cartId);
+        try {
+          localStorage.setItem(`gw_cartid_${data.slug}`, j.cartId);
+        } catch {}
+        setView("cart");
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setQty = (id: string, qty: number) => {
+    if (data.pro && qty > 0 && !cart[id] && (data.suggestions[id]?.length ?? 0) > 0) setSuggestFor(id);
     setCart((c) => {
       const p = products.get(id);
       const n = { ...c };
@@ -111,6 +150,7 @@ export function Storefront({ data }: { data: StoreData }) {
       else n[id] = q;
       return n;
     });
+  };
 
   const vars = {
     "--bg": theme.colors.bg,
@@ -127,7 +167,7 @@ export function Storefront({ data }: { data: StoreData }) {
   const tileFor = (i: number) => theme.colors.tiles[i % theme.colors.tiles.length];
   const featured = theme.featured ? all.filter((p) => !p.soldOut).slice(0, 6) : [];
 
-  const ctx: Ctx = { T: tr(data.locale), money: (v: number) => formatMoney(v, data.currency), L: getLabels(data.locale), data };
+  const ctx: Ctx = { T: tr(data.locale), money: (v: number) => formatMoney(v, data.currency), L: getLabels(data.locale), data, book: (p) => setBooking(p) };
   const { T, money } = ctx;
 
   return (
@@ -135,6 +175,8 @@ export function Storefront({ data }: { data: StoreData }) {
     <div style={vars} className="th min-h-dvh">
       <div className="mx-auto max-w-xl pb-32">
         <Hero data={data} theme={theme} />
+        <SocialBar />
+        <FlashOffers products={all} theme={theme} cart={cart} setQty={setQty} tileFor={tileFor} />
 
         {(data.table || data.invalidTable || !data.isOpen) && (
           <div className="mt-4 space-y-2 px-5">
@@ -161,8 +203,8 @@ export function Storefront({ data }: { data: StoreData }) {
                   <ProductImage p={p} tile={tileFor(i)} className="h-36 w-36" radius={theme.radius + 4} size={112} />
                   <span className="text-sm font-bold leading-snug">{p.name}</span>
                   <div className="flex items-center justify-between">
-                    <span className="th-muted text-[13px]">{money(p.pricePyg)}</span>
-                    {data.isOpen && !p.soldOut && <AddButton onClick={() => setQty(p.id, (cart[p.id] ?? 0) + 1)} label={p.name} round small />}
+                    <Price p={p} className="th-muted text-[13px]" />
+                    {data.isOpen && <Qty p={p} qty={0} onQty={() => setQty(p.id, (cart[p.id] ?? 0) + 1)} canOrder round small />}
                   </div>
                 </div>
               ))}
@@ -222,6 +264,23 @@ export function Storefront({ data }: { data: StoreData }) {
         </main>
       </div>
 
+      {suggestFor && view === "menu" && (
+        <Suggestions
+          forProduct={products.get(suggestFor)!}
+          items={(data.suggestions[suggestFor] ?? []).map((id) => products.get(id)).filter((x): x is StoreProduct => !!x && !x.soldOut)}
+          onAdd={(id) => {
+            setQty(id, (cart[id] ?? 0) + 1);
+            setSuggestFor(null);
+          }}
+          onClose={() => setSuggestFor(null)}
+          theme={theme}
+          tileFor={tileFor}
+          lifted={count > 0}
+        />
+      )}
+
+      {booking && <BookingSheet product={booking} onClose={() => setBooking(null)} />}
+
       {/* Barra do carrinho */}
       {count > 0 && view === "menu" && (
         <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -241,7 +300,27 @@ export function Storefront({ data }: { data: StoreData }) {
           {view === "cart" ? (
             <CartView lines={lines} subtotal={subtotal} rates={data.rates} onQty={setQty} canOrder={data.isOpen} onNext={() => setView("checkout")} />
           ) : (
-            <Checkout data={data} lines={lines} subtotal={subtotal} onBack={() => setView("cart")} onDone={() => setCart({})} />
+            <Checkout
+              data={data}
+              lines={lines}
+              subtotal={subtotal}
+              cartId={cartId}
+              onCartId={(id) => {
+                setCartId(id);
+                try {
+                  localStorage.setItem(`gw_cartid_${data.slug}`, id);
+                } catch {}
+              }}
+              initialCoupon={initialCoupon}
+              onBack={() => setView("cart")}
+              onDone={() => {
+                setCart({});
+                setCartId(null);
+                try {
+                  localStorage.removeItem(`gw_cartid_${data.slug}`);
+                } catch {}
+              }}
+            />
           )}
         </Sheet>
       )}
@@ -622,7 +701,13 @@ function Stepper({ qty, onQty, max }: { qty: number; onQty: (q: number) => void;
 }
 
 function Qty({ p, qty, onQty, canOrder, round, small }: { p: StoreProduct; qty: number; onQty: (q: number) => void; canOrder: boolean; round?: boolean; small?: boolean }) {
-  const { T } = useStore();
+  const { T, book } = useStore();
+  if (p.durationMin)
+    return (
+      <button type="button" onClick={() => book(p)} className="th-accent shrink-0 rounded-full px-3.5 py-2 text-[12.5px] font-bold transition active:scale-95">
+        {T("Reservar", "Agendar")}
+      </button>
+    );
   if (p.soldOut) return <span className="th-muted text-[11px] font-bold uppercase tracking-wide">{T("Agotado", "Esgotado")}</span>;
   if (!canOrder) return null;
   if (qty === 0) return <AddButton onClick={() => onQty(1)} label={p.name} round={round} small={small} />;
@@ -630,14 +715,13 @@ function Qty({ p, qty, onQty, canOrder, round, small }: { p: StoreProduct; qty: 
 }
 
 function ProductRow({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
-  const { money } = useStore();
   return (
     <li className={`th-surface flex items-center gap-3.5 p-3 ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
       <ProductImage p={p} tile={tile} className="h-[84px] w-[84px]" radius={theme.radius - 4} size={70} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h3 className={`th-h leading-tight ${theme.fonts.headingUpper ? "text-[19px] uppercase tracking-wide" : "text-[15.5px] font-bold"}`}>{p.name}</h3>
         {p.description && <p className="th-muted line-clamp-2 text-[12.5px] leading-snug">{p.description}</p>}
-        <span className={`mt-1 text-[15px] font-bold ${theme.dark ? "th-accent-text" : ""}`}>{money(p.pricePyg)}</span>
+        <Price p={p} className={`mt-1 text-[15px] font-bold ${theme.dark ? "th-accent-text" : ""}`} />
       </div>
       <Qty p={p} qty={qty} onQty={onQty} canOrder={canOrder} />
     </li>
@@ -645,7 +729,6 @@ function ProductRow({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct;
 }
 
 function ProductCard({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
-  const { money } = useStore();
   return (
     <div className={`th-surface flex flex-col overflow-hidden border th-line ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
       <ProductImage p={p} tile={tile} className="h-[130px] w-full" radius={0} size={110} />
@@ -653,7 +736,7 @@ function ProductCard({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct
         <h3 className="th-h text-[15.5px] font-bold leading-tight">{p.name}</h3>
         {p.description && <p className="th-muted line-clamp-2 text-[12px] leading-snug">{p.description}</p>}
         <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-          <span className="text-[13.5px] font-bold">{money(p.pricePyg)}</span>
+          <Price p={p} className="text-[13.5px] font-bold" />
           <Qty p={p} qty={qty} onQty={onQty} canOrder={canOrder} round small />
         </div>
       </div>
@@ -727,8 +810,29 @@ function CartView({ lines, subtotal, rates, onQty, onNext, canOrder }: { lines: 
 
 type Quote = { state: "idle" } | { state: "loading" } | { state: "ok"; feePyg: number; distanceKm?: number; free?: boolean } | { state: "error"; message: string };
 
-function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; lines: Line[]; subtotal: number; onBack: () => void; onDone: () => void }) {
+function Checkout({
+  data,
+  lines,
+  subtotal,
+  cartId,
+  onCartId,
+  initialCoupon,
+  onBack,
+  onDone,
+}: {
+  data: StoreData;
+  lines: Line[];
+  subtotal: number;
+  cartId: string | null;
+  onCartId: (id: string) => void;
+  initialCoupon: string;
+  onBack: () => void;
+  onDone: () => void;
+}) {
   const { T, money, L } = useStore();
+  const [couponInput, setCouponInput] = useState(initialCoupon);
+  const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [couponMsg, setCouponMsg] = useState<string | null>(null);
   const router = useRouter();
   const base = data.currency;
   const typeOptions = (["PICKUP", "DELIVERY"] as const).filter((t) => data.accepts[t]);
@@ -787,8 +891,54 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
     );
   };
 
+  // Cupom (GoInteligence)
+  const applyCoupon = async (code = couponInput) => {
+    if (!code.trim()) return;
+    setCouponMsg(null);
+    const r = await fetch("/api/coupons", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug: data.slug, code, subtotalPyg: subtotal }),
+    })
+      .then((x) => x.json())
+      .catch(() => ({ ok: false, error: T("No se pudo validar", "Não foi possível validar") }));
+    if (r.ok) setCoupon({ code: r.code, discount: r.discountPyg });
+    else {
+      setCoupon(null);
+      setCouponMsg(r.error ?? T("Cupón inválido", "Cupom inválido"));
+    }
+  };
+  useEffect(() => {
+    if (data.pro && initialCoupon) applyCoupon(initialCoupon);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // recalcula o desconto se o carrinho mudar
+  useEffect(() => {
+    if (coupon) applyCoupon(coupon.code);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal]);
+
+  // Carrinho abandonado (GoInteligence): guarda o carrinho de quem já deixou o WhatsApp
+  const itemsKey = lines.map((l) => `${l.product.id}:${l.qty}`).join(",");
+  useEffect(() => {
+    if (!data.pro || !phone || lines.length === 0) return;
+    const h = setTimeout(() => {
+      fetch("/api/carts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug: data.slug, cartId, name: name || null, phone, items: lines.map((l) => ({ productId: l.product.id, quantity: l.qty })) }),
+      })
+        .then((r) => r.json())
+        .then((j) => j.cartId && j.cartId !== cartId && onCartId(j.cartId))
+        .catch(() => {});
+    }, 1200);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone, name, itemsKey]);
+
+  const discount = coupon?.discount ?? 0;
   const deliveryFee = type === "DELIVERY" && quote.state === "ok" ? quote.feePyg : 0;
-  const total = subtotal + deliveryFee;
+  const total = subtotal - discount + deliveryFee;
   const totalInCurrency = fromBase(total, base, currency, data.rates);
   const tenderedMinor = tendered ? parseMajorToMinor(tendered, currency) : null;
   const tenderedBase = tenderedMinor == null ? null : toBase(tenderedMinor, currency, base, data.rates);
@@ -825,6 +975,8 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
           paymentMethod: method,
           payCurrency: currency,
           cashTenderedMinor: method === "CASH" ? tenderedMinor : null,
+          couponCode: coupon?.code ?? null,
+          cartId,
         }),
       });
       const out = await res.json();
@@ -928,6 +1080,27 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
         )}
       </div>
 
+      {data.pro && (
+        <div>
+          <label className="label" htmlFor="coupon">{T("Cupón de descuento", "Cupom de desconto")}</label>
+          <div className="flex gap-2">
+            <input
+              id="coupon"
+              className="input uppercase"
+              value={couponInput}
+              onChange={(e) => setCouponInput(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""))}
+              placeholder={T("Ej: BIENVENIDO10", "Ex: BEMVINDO10")}
+              maxLength={24}
+            />
+            <button type="button" onClick={() => applyCoupon()} className={`${ghostBtn} shrink-0 px-4 py-2`}>
+              {T("Aplicar", "Aplicar")}
+            </button>
+          </div>
+          {coupon && <p className="mt-1 text-[12.5px] text-emerald-600">✓ {T("Cupón aplicado", "Cupom aplicado")}: -{money(coupon.discount)}</p>}
+          {couponMsg && <p className="mt-1 text-[12.5px] text-red-500">{couponMsg}</p>}
+        </div>
+      )}
+
       <div>
         <label className="label" htmlFor="notes">{T("Observaciones (opcional)", "Observações (opcional)")}</label>
         <textarea id="notes" className="input min-h-20" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={T("Algún detalle sobre tu pedido…", "Algum detalhe sobre o seu pedido…")} />
@@ -935,6 +1108,7 @@ function Checkout({ data, lines, subtotal, onBack, onDone }: { data: StoreData; 
 
       <div className={`${box} space-y-1.5 p-4 text-sm`}>
         <Row k="Subtotal" v={money(subtotal)} />
+        {discount > 0 && <Row k={`${T("Descuento", "Desconto")} (${coupon!.code})`} v={<span className="text-emerald-600">-{money(discount)}</span>} />}
         {type === "DELIVERY" && <Row k={T("Delivery", "Entrega")} v={quote.state === "ok" ? (quote.free ? T("Gratis", "Grátis") : money(deliveryFee)) : "—"} />}
         <div className="th-line my-2 border-t" />
         <Row k={<b>Total</b>} v={<b className="text-lg">{money(total)}</b>} />
@@ -985,5 +1159,300 @@ function Segmented({ value, onChange, options }: { value: string; onChange: (v: 
         </button>
       ))}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ preço, redes sociais e GoInteligence
+
+function Price({ p, className }: { p: StoreProduct; className?: string }) {
+  const { money } = useStore();
+  if (!p.regularPricePyg) return <span className={className}>{money(p.pricePyg)}</span>;
+  return (
+    <span className={`flex flex-wrap items-baseline gap-x-1.5 ${className ?? ""}`}>
+      <span className="text-[0.8em] font-normal line-through opacity-50">{money(p.regularPricePyg)}</span>
+      <span className="text-emerald-500">{money(p.pricePyg)}</span>
+    </span>
+  );
+}
+
+const WA_ICON = (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
+    <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.5 0-3-.4-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z" />
+  </svg>
+);
+const IG_ICON = (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="3" width="18" height="18" rx="5" />
+    <circle cx="12" cy="12" r="4" />
+    <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+/** WhatsApp e Instagram do estabelecimento (ícones clicáveis). */
+function SocialBar() {
+  const { data, T } = useStore();
+  const wa = data.social.whatsapp;
+  const ig = data.social.instagram?.replace(/^@/, "");
+  if (!wa && !ig) return null;
+  return (
+    <div className="mt-4 flex flex-wrap gap-2 px-5">
+      {wa && (
+        <a
+          href={`https://wa.me/${wa.replace(/\D/g, "")}?text=${encodeURIComponent(T(`¡Hola ${data.name}!`, `Olá, ${data.name}!`))}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-semibold text-white"
+          style={{ background: "#25D366" }}
+          aria-label="WhatsApp"
+        >
+          {WA_ICON} WhatsApp
+        </a>
+      )}
+      {ig && (
+        <a
+          href={`https://instagram.com/${encodeURIComponent(ig)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-semibold text-white"
+          style={{ background: "linear-gradient(45deg,#F58529,#DD2A7B 50%,#8134AF 80%,#515BD4)" }}
+          aria-label="Instagram"
+        >
+          {IG_ICON} @{ig}
+        </a>
+      )}
+    </div>
+  );
+}
+
+function useCountdown(iso: string | null) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!iso) return;
+    const h = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(h);
+  }, [iso]);
+  if (!iso) return null;
+  const ms = Math.max(0, new Date(iso).getTime() - now);
+  const h = Math.floor(ms / 3600e3);
+  const m = Math.floor((ms % 3600e3) / 60e3);
+  const sec = Math.floor((ms % 60e3) / 1000);
+  if (h >= 24) return { done: false, text: `${Math.floor(h / 24)}d ${h % 24}h ${String(m).padStart(2, "0")}m` };
+  return { done: ms === 0, text: `${h > 0 ? `${h}h ` : ""}${String(m).padStart(2, "0")}m ${String(sec).padStart(2, "0")}s` };
+}
+
+/** Faixa de ofertas relâmpago com contagem regressiva. */
+function FlashOffers({
+  products,
+  theme,
+  cart,
+  setQty,
+  tileFor,
+}: {
+  products: StoreProduct[];
+  theme: Theme;
+  cart: Record<string, number>;
+  setQty: (id: string, q: number) => void;
+  tileFor: (i: number) => string;
+}) {
+  const { T, data } = useStore();
+  const offers = products.filter((p) => p.promoEndsAt && p.regularPricePyg);
+  const firstEnd = offers.map((p) => p.promoEndsAt!).sort()[0] ?? null;
+  const cd = useCountdown(firstEnd);
+  if (!offers.length || cd?.done) return null;
+  return (
+    <section className="mt-6">
+      <div className="mb-3 flex items-center justify-between gap-2 px-5">
+        <h2 className="th-h whitespace-nowrap text-[19px] font-bold">⚡ {T("Oferta relámpago", "Oferta relâmpago")}</h2>
+        {cd && (
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-red-600 px-3 py-1 text-[12px] font-bold tabular-nums text-white">
+            {T("Termina en", "Acaba em")} {cd.text}
+          </span>
+        )}
+      </div>
+      <div className="no-scrollbar flex gap-3 overflow-x-auto px-5">
+        {offers.map((p, i) => {
+          const pct = Math.round((1 - p.pricePyg / p.regularPricePyg!) * 100);
+          return (
+            <div key={p.id} className="relative flex w-40 shrink-0 flex-col gap-1.5">
+              <span className="absolute left-2 top-2 z-10 rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-black text-white">-{pct}%</span>
+              <ProductImage p={p} tile={tileFor(i + 1)} className="h-36 w-40" radius={theme.radius + 4} size={112} />
+              <span className="text-sm font-bold leading-snug">{p.name}</span>
+              <div className="flex items-center justify-between gap-1">
+                <Price p={p} className="text-[13px] font-bold" />
+                {data.isOpen && !p.soldOut && !p.durationMin && <AddButton onClick={() => setQty(p.id, (cart[p.id] ?? 0) + 1)} label={p.name} round small />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Sugestão inteligente: aparece ao adicionar um item ("Combina com..."). */
+function Suggestions({
+  forProduct,
+  items,
+  onAdd,
+  onClose,
+  theme,
+  tileFor,
+  lifted,
+}: {
+  forProduct: StoreProduct;
+  items: StoreProduct[];
+  onAdd: (id: string) => void;
+  onClose: () => void;
+  theme: Theme;
+  tileFor: (i: number) => string;
+  lifted: boolean;
+}) {
+  const { T } = useStore();
+  if (!items.length) return null;
+  return (
+    <div className={`fixed inset-x-0 z-20 mx-auto max-w-xl px-4 ${lifted ? "bottom-[88px]" : "bottom-4"}`}>
+      <div className="th-surface th-line rounded-2xl border p-3 shadow-2xl shadow-black/30" style={{ borderRadius: theme.radius + 2 }}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-[13px] font-bold">
+            ✨ {T("Combina con", "Combina com")} <span className="th-muted font-semibold">{forProduct.name}</span>
+          </p>
+          <button onClick={onClose} className="th-muted px-1 text-sm" aria-label={T("Cerrar", "Fechar")}>
+            ✕
+          </button>
+        </div>
+        <div className="no-scrollbar flex gap-2 overflow-x-auto">
+          {items.map((p, i) => (
+            <button
+              key={p.id}
+              onClick={() => onAdd(p.id)}
+              className="th-bg th-line flex w-[178px] shrink-0 items-center gap-2 rounded-xl border p-2 text-left transition active:scale-[.98]"
+            >
+              <ProductImage p={p} tile={tileFor(i)} className="h-11 w-11" radius={10} size={38} />
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-2 block text-[12.5px] font-bold leading-tight">{p.name}</span>
+                <Price p={p} className="text-[12px]" />
+              </span>
+              <span className="th-accent grid h-6 w-6 shrink-0 place-items-center rounded-full text-sm font-bold">+</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Agendamento de serviço (barbearia etc.): escolhe dia e horário, informa nome e WhatsApp. */
+function BookingSheet({ product, onClose }: { product: StoreProduct; onClose: () => void }) {
+  const { T, data, money } = useStore();
+  const days = useMemo(() => {
+    const out: { iso: string; label: string }[] = [];
+    const fmt = new Intl.DateTimeFormat(data.locale === "pt" ? "pt-BR" : "es-PY", { weekday: "short", day: "2-digit", month: "2-digit" });
+    for (let i = 0; i < (data.booking?.daysAhead ?? 14); i++) {
+      const d = new Date(Date.now() + i * 864e5);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      out.push({ iso, label: i === 0 ? T("Hoy", "Hoje") : i === 1 ? T("Mañana", "Amanhã") : fmt.format(d) });
+    }
+    return out;
+  }, [data.booking, data.locale, T]);
+  const [day, setDay] = useState(days[0]?.iso);
+  const [slots, setSlots] = useState<{ label: string; startsAt: string }[] | null>(null);
+  const [slot, setSlot] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!day) return;
+    setSlots(null);
+    setSlot(null);
+    fetch(`/api/agenda/slots?slug=${encodeURIComponent(data.slug)}&productId=${product.id}&date=${day}`)
+      .then((r) => r.json())
+      .then((j) => setSlots(j.slots ?? []))
+      .catch(() => setSlots([]));
+  }, [day, data.slug, product.id]);
+
+  const send = async () => {
+    setSending(true);
+    setError(null);
+    const r = await fetch("/api/agenda", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug: data.slug, productId: product.id, startsAt: slot, customerName: name.trim(), customerPhone: phone }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setSending(false);
+    if (!r.ok) return setError(j.error ?? T("No se pudo reservar", "Não foi possível agendar"));
+    setDone(true);
+  };
+
+  return (
+    <Sheet onClose={onClose} title={`${T("Reservar", "Agendar")}: ${product.name}`}>
+      {done ? (
+        <div className="space-y-3 py-6 text-center">
+          <p className="text-4xl">📅</p>
+          <p className="text-lg font-bold">{T("¡Pedido de turno enviado!", "Pedido de horário enviado!")}</p>
+          <p className="th-muted text-sm">
+            {T("Te confirmamos por WhatsApp en breve.", "Você vai receber a confirmação no WhatsApp em breve.")}
+          </p>
+          <button onClick={onClose} className={`${primaryBtn} mt-2`}>
+            OK
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="th-muted text-sm">
+            {money(product.pricePyg)} · {product.durationMin} min
+          </p>
+          <div className="no-scrollbar flex gap-2 overflow-x-auto">
+            {days.map((d) => (
+              <button
+                key={d.iso}
+                onClick={() => setDay(d.iso)}
+                className={`shrink-0 rounded-xl border px-3 py-2 text-[13px] font-semibold capitalize ${day === d.iso ? "th-accent border-transparent" : "th-surface th-line"}`}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+          <div>
+            {slots === null ? (
+              <p className="th-muted text-sm">{T("Buscando horarios…", "Buscando horários…")}</p>
+            ) : slots.length === 0 ? (
+              <p className="th-muted text-sm">{T("Sin horarios libres este día.", "Sem horários livres neste dia.")}</p>
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
+                {slots.map((s) => (
+                  <button
+                    key={s.startsAt}
+                    onClick={() => setSlot(s.startsAt)}
+                    className={`rounded-lg border py-2 text-[13px] font-semibold tabular-nums ${slot === s.startsAt ? "th-accent border-transparent" : "th-surface th-line"}`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {slot && (
+            <div className="space-y-3">
+              <div>
+                <label className="label" htmlFor="bname">{T("Tu nombre", "Seu nome")}</label>
+                <NameInput id="bname" value={name} onChange={setName} />
+              </div>
+              <div>
+                <label className="label" htmlFor="bphone">WhatsApp</label>
+                <PhoneInput id="bphone" defaultCountry={data.country} locale={data.locale} onChange={(e) => setPhone(e)} />
+              </div>
+            </div>
+          )}
+          {error && <p className="rounded-xl bg-red-100 px-4 py-3 text-sm text-red-800">{error}</p>}
+          <button onClick={send} disabled={!slot || !isValidName(name) || !phone || sending} className={primaryBtn}>
+            {sending ? T("Enviando…", "Enviando…") : T("Pedir turno", "Pedir horário")}
+          </button>
+        </div>
+      )}
+    </Sheet>
   );
 }

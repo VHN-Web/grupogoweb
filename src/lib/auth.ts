@@ -5,9 +5,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { PANEL_AREAS, type PanelArea } from "@/core/types";
 
-// Autenticação simples por estabelecimento (1 senha de admin por tenant).
-// TODO(evolução): usuários múltiplos com papéis (dono, caixa, cozinha) — ver docs/ROADMAP.md
+// Autenticação do painel: dono (senha do estabelecimento), funcionários (usuário + senha,
+// com áreas liberadas pelo dono — GoInteligence) e admin da plataforma.
 
 const COOKIE = "mp_session";
 const MAX_AGE = 60 * 60 * 24 * 14; // 14 dias
@@ -60,14 +61,57 @@ async function sessionSubject() {
   return readToken((await cookies()).get(COOKIE)?.value);
 }
 
-/** Garante que o usuário logado é admin do tenant `slug`. Retorna o tenant. */
-export async function requireTenantAdmin(slug: string) {
+export type PanelAccess = {
+  tenant: typeof schema.tenants.$inferSelect;
+  role: "owner" | "staff";
+  staffId?: string;
+  staffName?: string;
+  areas: Set<PanelArea>;
+};
+
+/** Quem está logado no painel do tenant `slug` (dono, admin da plataforma ou funcionário). */
+export async function getPanelAccess(slug: string): Promise<PanelAccess | null> {
   const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug) });
-  if (!tenant) redirect("/painel");
+  if (!tenant) return null;
   const subject = await sessionSubject();
   // O admin da plataforma (você) acessa o painel de qualquer cliente — necessário na implantação
-  if (subject !== `tenant:${tenant.id}` && subject !== "platform") redirect(`/painel/${slug}/login`);
-  return tenant;
+  if (subject === `tenant:${tenant.id}` || subject === "platform") {
+    return { tenant, role: "owner", areas: new Set(PANEL_AREAS) };
+  }
+  if (subject?.startsWith("staff:")) {
+    const s = await db.query.staff.findFirst({ where: eq(schema.staff.id, subject.slice(6)) });
+    if (s && s.active && s.tenantId === tenant.id && tenant.tier === "pro") {
+      let perms: PanelArea[] = [];
+      try {
+        perms = (JSON.parse(s.permissions) as string[]).filter((p): p is PanelArea => (PANEL_AREAS as readonly string[]).includes(p));
+      } catch {}
+      perms = perms.filter((p) => p !== "team"); // equipe é sempre exclusiva do dono
+      return { tenant, role: "staff", staffId: s.id, staffName: s.name, areas: new Set(perms) };
+    }
+  }
+  return null;
+}
+
+/**
+ * Garante acesso ao painel do tenant `slug`. Retorna o tenant.
+ * `area` = área exigida (funcionários só entram nas áreas liberadas pelo dono).
+ */
+export async function requireTenantAdmin(slug: string, area?: PanelArea) {
+  const acc = await getPanelAccess(slug);
+  if (!acc) {
+    const exists = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { id: true } });
+    redirect(exists ? `/painel/${slug}/login` : "/painel");
+  }
+  if (area && !acc.areas.has(area)) redirect(`/painel/${slug}/sem-acesso`);
+  return acc.tenant;
+}
+
+/** Igual a requireTenantAdmin, mas devolve também o tipo de acesso (para menus). */
+export async function requirePanelAccess(slug: string, area?: PanelArea) {
+  const acc = await getPanelAccess(slug);
+  if (!acc) redirect(`/painel/${slug}/login`);
+  if (area && !acc.areas.has(area)) redirect(`/painel/${slug}/sem-acesso`);
+  return acc;
 }
 
 export async function isPlatformAdmin() {

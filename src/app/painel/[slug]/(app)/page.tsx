@@ -6,6 +6,8 @@ import { panelI18n } from "@/lib/panel-i18n";
 import { formatMinor, formatPyg } from "@/core/money";
 import { type OrderStatus } from "@/core/types";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { AutoPrinter } from "@/components/ThermalPrint";
+import { listAbandonedCarts, notifyOwnerAbandoned } from "@/services/intelligence";
 import { PayBadge } from "@/components/PayBadge";
 import { markOrderPaid, updateOrderStatus } from "./actions";
 import { nextLabel, nextStatus } from "./order-flow";
@@ -20,7 +22,7 @@ const COLUMNS: { es: string; pt: string; statuses: OrderStatus[] }[] = [
 
 export default async function OrdersBoard({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "orders");
   const { T, L, fm, fmtDate, region } = panelI18n(t);
   const since = new Date(Date.now() - 1000 * 60 * 60 * 24);
   const orders = await db.query.orders.findMany({
@@ -30,10 +32,34 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
   });
   const finished = orders.filter((o) => o.status === "COMPLETED" || o.status === "CANCELLED");
   const today = orders.filter((o) => o.status !== "CANCELLED");
+  const pro = t.tier === "pro";
+  // GoInteligence: avisa o lojista de carrinhos abandonados e mostra pendências
+  if (pro) await notifyOwnerAbandoned(t).catch(() => 0);
+  const [abandoned, pendingAppts] = pro
+    ? await Promise.all([
+        listAbandonedCarts(t.id).then((c) => c.filter((x) => x.status === "OPEN").length),
+        db.$count(schema.appointments, and(eq(schema.appointments.tenantId, t.id), eq(schema.appointments.status, "PENDING"), gte(schema.appointments.startsAt, new Date()))),
+      ])
+    : [0, 0];
 
   return (
     <div className="space-y-6">
       <AutoRefresh ms={5000} />
+      <AutoPrinter slug={slug} enabled={t.autoPrint} orderIds={orders.filter((o) => o.status !== "CANCELLED").map((o) => o.id)} />
+      {(abandoned > 0 || pendingAppts > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {pendingAppts > 0 && (
+            <Link href={`/painel/${slug}/agenda`} className="rounded-xl bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-900 ring-1 ring-blue-200">
+              📅 {pendingAppts} {T("turno(s) para confirmar", "horário(s) para confirmar")} →
+            </Link>
+          )}
+          {abandoned > 0 && (
+            <Link href={`/painel/${slug}/marketing`} className="rounded-xl bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 ring-1 ring-amber-200">
+              🛒 {abandoned} {T("carrito(s) abandonado(s) — enviá un cupón", "carrinho(s) abandonado(s) — envie um cupom")} →
+            </Link>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat k={T("Pedidos (24h)", "Pedidos (24h)")} v={String(today.length)} />
         <Stat k={T("Vendido (24h)", "Vendido (24h)")} v={fm(today.reduce((s, o) => s + o.totalPyg, 0))} />

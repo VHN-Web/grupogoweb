@@ -15,6 +15,7 @@ import { fiscalConfigSchema, parseFiscalConfig, parsePaymentConfig } from "@/cor
 import { setOrderStatus, setPaymentStatus } from "@/services/orders";
 import { issueFiscalForOrder } from "@/services/fiscal";
 import { addMovement, closeSession, openSession } from "@/services/cash";
+import { sendCashReport } from "@/services/intelligence";
 import { ivaIncluded } from "@/adapters/fiscal/FiscalProvider";
 import { saveImage, UploadError } from "@/adapters/storage";
 import { isIllustration } from "@/core/illustrations";
@@ -47,7 +48,7 @@ const base = (slug: string) => `/painel/${slug}`;
 
 // ---------------- Geral ----------------
 export async function toggleOpen(slug: string) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "orders");
   await db.update(schema.tenants).set({ isOpen: !t.isOpen }).where(eq(schema.tenants.id, t.id));
   revalidatePath(base(slug), "layout");
 }
@@ -59,27 +60,27 @@ export async function logout(slug: string) {
 
 // ---------------- Pedidos ----------------
 export async function updateOrderStatus(slug: string, orderId: string, status: OrderStatus) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "orders");
   if (!ORDER_STATUSES.includes(status)) throw new Error("status inválido");
   await setOrderStatus(t.id, orderId, status);
   revalidatePath(base(slug), "layout");
 }
 
 export async function markOrderPaid(slug: string, orderId: string) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "orders");
   await setPaymentStatus(t.id, orderId, "PAID");
   revalidatePath(base(slug), "layout");
 }
 
 export async function issueInvoiceForOrder(slug: string, orderId: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "fiscal");
   await issueFiscalForOrder(t.id, orderId, { ruc: optStr(f, "ruc") ?? undefined, name: optStr(f, "name") ?? undefined });
   revalidatePath(base(slug), "layout");
 }
 
 // ---------------- Produtos / estoque ----------------
 export async function saveProduct(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "products");
   const id = optStr(f, "id");
   const existing = id
     ? await db.query.products.findFirst({ where: and(eq(schema.products.id, id), eq(schema.products.tenantId, t.id)), columns: { imageUrl: true } })
@@ -101,6 +102,8 @@ export async function saveProduct(slug: string, f: FormData) {
     pricePyg: money(f, "pricePyg", t.currency),
     active: bool(f, "active"),
     trackStock: bool(f, "trackStock"),
+    // serviço agendável (GoInteligence): duração em minutos
+    durationMin: t.tier === "pro" && int(f, "durationMin") > 0 ? Math.min(480, int(f, "durationMin")) : null,
   };
   if (!values.name || values.pricePyg < 0) throw new Error("Dados inválidos");
   if (values.categoryId) {
@@ -122,13 +125,13 @@ export async function saveProduct(slug: string, f: FormData) {
 }
 
 export async function deleteProduct(slug: string, productId: string) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "products");
   await db.delete(schema.products).where(and(eq(schema.products.id, productId), eq(schema.products.tenantId, t.id)));
   revalidatePath(`${base(slug)}/produtos`);
 }
 
 export async function adjustStock(slug: string, productId: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "products");
   const delta = int(f, "delta");
   const reason = str(f, "reason") === "PURCHASE" ? "PURCHASE" : "ADJUSTMENT";
   if (!delta) return;
@@ -145,7 +148,7 @@ export async function adjustStock(slug: string, productId: string, f: FormData) 
 }
 
 export async function saveCategory(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "products");
   const id = optStr(f, "id");
   const name = str(f, "name");
   if (!name) return;
@@ -156,26 +159,31 @@ export async function saveCategory(slug: string, f: FormData) {
 }
 
 export async function deleteCategory(slug: string, id: string) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "products");
   await db.delete(schema.categories).where(and(eq(schema.categories.id, id), eq(schema.categories.tenantId, t.id)));
   revalidatePath(`${base(slug)}/produtos`);
 }
 
 // ---------------- Caixa ----------------
 export async function openCash(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "cash");
   await openSession(t.id, money(f, "openingAmountPyg", t.currency));
   revalidatePath(`${base(slug)}/caixa`);
 }
 
 export async function closeCash(slug: string, sessionId: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "cash");
   await closeSession(t.id, sessionId, money(f, "countedAmountPyg", t.currency), optStr(f, "notes") ?? undefined);
   revalidatePath(`${base(slug)}/caixa`);
+  // GoInteligence: relatório de fechamento enviado no canal preferido do lojista
+  if (t.tier === "pro") {
+    await sendCashReport(t, sessionId).catch(() => null);
+    redirect(`${base(slug)}/caixa/relatorio/${sessionId}`);
+  }
 }
 
 export async function addCashMovement(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "cash");
   const type = str(f, "type") === "IN" ? "IN" : "OUT";
   const amount = money(f, "amountPyg", t.currency);
   if (amount <= 0) return;
@@ -185,7 +193,7 @@ export async function addCashMovement(slug: string, f: FormData) {
 
 // ---------------- Notas fiscais ----------------
 export async function registerFiscalDoc(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "fiscal");
   const total = money(f, "totalPyg", t.currency);
   if (total <= 0) return;
   const ivaMode = str(f, "iva");
@@ -207,7 +215,7 @@ export async function registerFiscalDoc(slug: string, f: FormData) {
 }
 
 export async function updateFiscalDoc(slug: string, id: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "fiscal");
   const status = str(f, "status");
   await db
     .update(schema.fiscalDocuments)
@@ -221,7 +229,7 @@ export async function updateFiscalDoc(slug: string, id: string, f: FormData) {
 
 // ---------------- Mesas ----------------
 export async function addTables(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "tables");
   const label = str(f, "label");
   const qty = Math.min(50, Math.max(1, int(f, "qty", 1)));
   const existing = await db.query.diningTables.findMany({ where: eq(schema.diningTables.tenantId, t.id), columns: { id: true } });
@@ -235,7 +243,7 @@ export async function addTables(slug: string, f: FormData) {
 }
 
 export async function toggleTable(slug: string, id: string) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "tables");
   await db
     .update(schema.diningTables)
     .set({ active: sql`not ${schema.diningTables.active}` })
@@ -244,7 +252,7 @@ export async function toggleTable(slug: string, id: string) {
 }
 
 export async function regenerateTableCode(slug: string, id: string) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "tables");
   await db
     .update(schema.diningTables)
     .set({ code: randomTableCode() })
@@ -253,14 +261,14 @@ export async function regenerateTableCode(slug: string, id: string) {
 }
 
 export async function deleteTable(slug: string, id: string) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "tables");
   await db.delete(schema.diningTables).where(and(eq(schema.diningTables.id, id), eq(schema.diningTables.tenantId, t.id)));
   revalidatePath(`${base(slug)}/mesas`);
 }
 
 // ---------------- Aparência do site (tema, banner, logo) ----------------
 export async function saveAppearance(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "appearance");
   const theme = str(f, "theme") as ThemeId;
   const ill = str(f, "bannerIllustration");
   const color = str(f, "primaryColor");
@@ -292,12 +300,14 @@ export async function saveAppearance(slug: string, f: FormData) {
 
 // ---------------- Configuração (white-label) ----------------
 export async function saveGeneral(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "settings");
   await db
     .update(schema.tenants)
     .set({
       name: str(f, "name") || t.name,
       phone: isValidE164(str(f, "phone")) ? str(f, "phone") : null,
+      whatsapp: isValidE164(str(f, "whatsapp")) ? str(f, "whatsapp") : null,
+      instagram: str(f, "instagram").replace(/^@/, "").replace(/[^A-Za-z0-9._]/g, "").slice(0, 30) || null,
       address: optStr(f, "address"),
       ruc: optStr(f, "ruc"),
       acceptsDineIn: bool(f, "acceptsDineIn"),
@@ -310,7 +320,7 @@ export async function saveGeneral(slug: string, f: FormData) {
 
 /** País/moeda do estabelecimento. Trocar a moeda NÃO converte preços já cadastrados. */
 export async function saveRegion(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "settings");
   const country = str(f, "country");
   if (!(COUNTRIES as readonly string[]).includes(country)) throw new Error("País inválido");
   const r = getRegion(country);
@@ -328,7 +338,7 @@ export async function saveRegion(slug: string, f: FormData) {
 }
 
 export async function saveRates(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "settings");
   const usd = num(f, "rateUsd");
   const brl = num(f, "rateBrl");
   const pyg = num(f, "ratePyg");
@@ -344,7 +354,7 @@ export async function saveRates(slug: string, f: FormData) {
 }
 
 export async function saveDelivery(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "settings");
   const freeOver = str(f, "deliveryFreeOverPyg") ? money(f, "deliveryFreeOverPyg", t.currency) : null;
   await db
     .update(schema.tenants)
@@ -361,7 +371,7 @@ export async function saveDelivery(slug: string, f: FormData) {
 }
 
 export async function savePayments(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "settings");
   const cfg = parsePaymentConfig(t.paymentConfig);
   const region = getRegion(t.country);
   const allowed: Currency[] = [region.currency, ...region.extraCurrencies];
@@ -383,7 +393,7 @@ export async function savePayments(slug: string, f: FormData) {
 
 /** Conecta um gateway online do próprio estabelecimento (hoje: Mercado Pago). Token é testado antes de salvar. */
 export async function saveIntegration(slug: string, providerId: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "settings");
   const T = tr(getRegion(t.country).locale);
   const cfg = parsePaymentConfig(t.paymentConfig);
   const back = (k: "ok" | "err", msg: string) => redirect(`${base(slug)}/config?${k}=${encodeURIComponent(msg)}#${providerId}`);
@@ -415,7 +425,7 @@ export async function saveIntegration(slug: string, providerId: string, f: FormD
 }
 
 export async function removeIntegration(slug: string, providerId: string) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "settings");
   const T = tr(getRegion(t.country).locale);
   const cfg = parsePaymentConfig(t.paymentConfig);
   const { [providerId]: _removed, ...rest } = cfg.credentials;
@@ -429,7 +439,7 @@ export async function removeIntegration(slug: string, providerId: string) {
 }
 
 export async function saveFiscal(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "settings");
   const cur = parseFiscalConfig(t.fiscalConfig);
   const next = fiscalConfigSchema.parse({
     ...cur,
@@ -444,9 +454,34 @@ export async function saveFiscal(slug: string, f: FormData) {
 }
 
 export async function changePassword(slug: string, f: FormData) {
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "team");
   const p = str(f, "password");
   if (p.length < 8) throw new Error("Mínimo 8 caracteres");
   await db.update(schema.tenants).set({ adminPasswordHash: hashPassword(p) }).where(eq(schema.tenants.id, t.id));
+  revalidatePath(`${base(slug)}/config`);
+}
+
+export async function savePrinter(slug: string, f: FormData) {
+  const t = await requireTenantAdmin(slug, "settings");
+  const w = Number(str(f, "printerWidth"));
+  await db
+    .update(schema.tenants)
+    .set({ printerWidth: w === 58 ? 58 : 80, autoPrint: bool(f, "autoPrint") })
+    .where(eq(schema.tenants.id, t.id));
+  revalidatePath(base(slug), "layout");
+}
+
+export async function saveReport(slug: string, f: FormData) {
+  const t = await requireTenantAdmin(slug, "settings");
+  if (t.tier !== "pro") return;
+  const ch = str(f, "reportChannel");
+  const channel = ch === "email" || ch === "whatsapp" ? ch : "none";
+  let to = str(f, "reportTo");
+  if (channel === "whatsapp") {
+    to = "+" + to.replace(/\D/g, "");
+    if (!isValidE164(to)) redirect(`${base(slug)}/config?err=${encodeURIComponent(tr(getRegion(t.country).locale)("WhatsApp inválido (con código de país)", "WhatsApp inválido (com código do país, ex: +5581991234567)"))}`);
+  }
+  if (channel === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) redirect(`${base(slug)}/config?err=${encodeURIComponent("E-mail inválido")}`);
+  await db.update(schema.tenants).set({ reportChannel: channel, reportTo: channel === "none" ? null : to }).where(eq(schema.tenants.id, t.id));
   revalidatePath(`${base(slug)}/config`);
 }

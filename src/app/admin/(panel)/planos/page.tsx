@@ -25,7 +25,7 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
                 <span className="rounded-full bg-paper px-2 py-0.5 text-xs font-semibold">{PLATFORM_LABELS.interval[p.interval]}</span>
               </div>
               <p className="mt-1 text-sm">{formatMinor(p.pricePyg, "PYG")} · {formatMinor(p.priceUsdMinor, "USD")} · {formatMinor(p.priceBrlMinor, "BRL")}</p>
-              <p className="text-xs text-muted">Implantação {formatMinor(p.setupPyg, "PYG")} · {formatMinor(p.setupUsdMinor, "USD")} · {formatMinor(p.setupBrlMinor, "BRL")}{p.includesDomain && " · domínio grátis"}</p>
+              <p className="text-xs text-muted">Implantação {formatMinor(p.setupPyg, "PYG")} · {formatMinor(p.setupUsdMinor, "USD")} · {formatMinor(p.setupBrlMinor, "BRL")}{p.includesDomain && " · domínio grátis"}{p.intelligence && " · GoInteligence"}</p>
             </summary>
             <PlanForm p={p} />
           </details>
@@ -59,6 +59,7 @@ function PlanForm({ p }: { p?: Plan }) {
       <input name="setupBrl" className="input" placeholder="R$" defaultValue={major(p?.setupBrlMinor, 100)} />
       <div className="col-span-3"><label className="label">Funcionalidades (1 por linha)</label><textarea name="features" className="input min-h-20" defaultValue={p?.features ?? ""} /></div>
       <label className="col-span-3 flex items-center gap-2"><input type="checkbox" name="includesDomain" defaultChecked={p?.includesDomain ?? false} /> Domínio incluso grátis</label>
+      <label className="col-span-3 flex items-center gap-2"><input type="checkbox" name="intelligence" defaultChecked={p?.intelligence ?? false} /> Inclui GoInteligence (sugestões, carrinho abandonado, cupons, ofertas, agenda, equipe, relatórios)</label>
       <label className="col-span-2 flex items-center gap-2"><input type="checkbox" name="active" defaultChecked={p?.active ?? true} /> Ativo (aparece na contratação)</label>
       <input name="sortOrder" className="input" placeholder="Ordem" defaultValue={p?.sortOrder ?? 0} />
       <button className="btn-primary col-span-3 mt-1">{p ? "Salvar" : "Criar plano"}</button>

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CashPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "cash");
   const { T, L, fm, fmtDate, region } = panelI18n(t);
   const sym = CURRENCY_SYMBOL[t.currency as keyof typeof CURRENCY_SYMBOL];
   const session = await getOpenSession(t.id);
@@ -32,7 +32,7 @@ export default async function CashPage({ params }: { params: Promise<{ slug: str
             <button className="btn-brand w-full">{T("Abrir caja", "Abrir caixa")}</button>
           </form>
         </div>
-        <History items={history} T={T} fm={fm} fmtDate={fmtDate} />
+        <History items={history} T={T} fm={fm} fmtDate={fmtDate} reportBase={`/painel/${slug}/caixa/relatorio`} />
       </div>
     );
   }
@@ -125,7 +125,7 @@ export default async function CashPage({ params }: { params: Promise<{ slug: str
           </div>
         ))}
       </div>
-      <History items={history.filter((h) => h.closedAt)} T={T} fm={fm} fmtDate={fmtDate} />
+      <History items={history.filter((h) => h.closedAt)} T={T} fm={fm} fmtDate={fmtDate} reportBase={`/painel/${slug}/caixa/relatorio`} />
     </div>
   );
 }
@@ -150,7 +150,9 @@ function History({
   T,
   fm,
   fmtDate,
+  reportBase,
 }: {
+  reportBase: string;
   items: Awaited<ReturnType<typeof listSessions>>;
   T: (es: string, pt: string) => string;
   fm: (v: number) => string;
@@ -166,7 +168,10 @@ function History({
         {closed.map((c) => (
           <li key={c.id} className="flex justify-between gap-2">
             <span className="text-muted">{f.format(c.openedAt)} → {c.closedAt && f.format(c.closedAt)}</span>
-            <b>{fm(c.countedAmountPyg ?? 0)}</b>
+            <span className="flex items-center gap-3">
+              <a href={`${reportBase}/${c.id}`} className="text-xs underline">{T("Informe", "Relatório")}</a>
+              <b>{fm(c.countedAmountPyg ?? 0)}</b>
+            </span>
           </li>
         ))}
       </ul>

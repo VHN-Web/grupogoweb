@@ -12,7 +12,7 @@ export default async function FiscalPage({ params, searchParams }: { params: Pro
   const { slug } = await params;
   const { d } = await searchParams;
   const dir = d === "RECEIVED" ? "RECEIVED" : "ISSUED";
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "fiscal");
   const { T, fm, fmtDate, region } = panelI18n(t);
   const docs = await db.query.fiscalDocuments.findMany({
     where: eq(schema.fiscalDocuments.tenantId, t.id),

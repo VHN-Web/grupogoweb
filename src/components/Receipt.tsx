@@ -43,6 +43,7 @@ export function Receipt({ tenant, order }: { tenant: Pick<Tenant, "name" | "ruc"
       ))}
       <div className="my-2 border-t border-dashed border-black" />
       <Line k="Subtotal" v={m(order.subtotalPyg)} />
+      {order.discountPyg > 0 && <Line k={`${T("Descuento", "Desconto")}${order.couponCode ? ` (${order.couponCode})` : ""}`} v={`-${m(order.discountPyg)}`} />}
       {order.deliveryFeePyg > 0 && <Line k={T("Delivery", "Entrega")} v={m(order.deliveryFeePyg)} />}
       <Line k={<b>TOTAL</b>} v={<b>{m(order.totalPyg)}</b>} />
       {order.payCurrency !== base && (

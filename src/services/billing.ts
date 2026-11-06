@@ -28,6 +28,7 @@ import { getBillingProvider } from "@/adapters/billing/registry";
 import { sendEmail, sendWhatsApp } from "@/adapters/notify";
 import { provisionTenant, RESERVED_SLUGS } from "./provision";
 import { getRegion, tr } from "@/core/region";
+import { planName } from "@/core/plans";
 
 const Tc = (c: { country?: string | null }) => tr(getRegion(c.country).locale);
 import { hashPassword } from "@/lib/password";
@@ -156,7 +157,7 @@ export async function createCustomer(input: NewCustomerInput) {
     .values({
       customerId: customer.id,
       kind: "SETUP",
-      description: `${TT("Implementación — plan", "Implantação — plano")} ${plan.name}${domainNote}`,
+      description: `${TT("Implementación — plan", "Implantação — plano")} ${planName(plan.name, getRegion(customer.country).locale)}${domainNote}`,
       amountPyg: amounts.PYG,
       amountUsdMinor: amounts.USD,
       amountBrlMinor: amounts.BRL,
@@ -268,7 +269,11 @@ async function onSetupPaid(customerId: string) {
       slug = `${c.desiredSlug}-${i}`;
     }
     const tenant = await provisionTenant(db, { name: c.businessName, slug, password: randomPassword(16), tables: 10, theme: c.theme, country: c.country });
-    await db.update(schema.tenants).set({ ruc: c.ruc, phone: c.whatsapp }).where(eq(schema.tenants.id, tenant.id));
+    const plan = await db.query.plans.findFirst({ where: eq(schema.plans.id, c.planId) });
+    await db
+      .update(schema.tenants)
+      .set({ ruc: c.ruc, phone: c.whatsapp, whatsapp: c.whatsapp, tier: plan?.intelligence ? "pro" : "basic" })
+      .where(eq(schema.tenants.id, tenant.id));
     tenantId = tenant.id;
   }
 
@@ -386,7 +391,7 @@ async function createSubscriptionInvoice(c: Customer, plan: Plan, periodStart: D
     .values({
       customerId: c.id,
       kind: "SUBSCRIPTION",
-      description: `${Tc(c)("Plan", "Plano")} ${plan.name} — ${fmtDate(periodStart)} ${Tc(c)("a", "a")} ${fmtDate(periodEnd)}${domainLine}`,
+      description: `${Tc(c)("Plan", "Plano")} ${planName(plan.name, getRegion(c.country).locale)} — ${fmtDate(periodStart)} ${Tc(c)("a", "a")} ${fmtDate(periodEnd)}${domainLine}`,
       amountPyg: amounts.PYG,
       amountUsdMinor: amounts.USD,
       amountBrlMinor: amounts.BRL,
@@ -482,6 +487,13 @@ export async function setCustomerSuspended(customerId: string, suspended: boolea
   if (!c) return;
   await db.update(schema.customers).set({ status: suspended ? "SUSPENDED" : "ACTIVE" }).where(eq(schema.customers.id, c.id));
   if (c.tenantId) await db.update(schema.tenants).set({ suspended }).where(eq(schema.tenants.id, c.tenantId));
+}
+
+/** Liga/desliga o GoInteligence (recursos pro) do sistema do cliente. */
+export async function setCustomerTier(customerId: string, tier: "basic" | "pro") {
+  const c = await db.query.customers.findFirst({ where: eq(schema.customers.id, customerId) });
+  if (!c?.tenantId) throw new BillingError("Cliente sem sistema criado");
+  await db.update(schema.tenants).set({ tier }).where(eq(schema.tenants.id, c.tenantId));
 }
 
 export async function cancelCustomer(customerId: string) {

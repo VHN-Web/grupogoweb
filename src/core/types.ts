@@ -100,3 +100,19 @@ export const LABELS_PT = {
 export function getLabels(locale: "es" | "pt" | string | null | undefined): typeof LABELS {
   return (locale === "pt" ? LABELS_PT : LABELS) as typeof LABELS;
 }
+
+// ---- Painel: áreas e permissões da equipe ----
+export const PANEL_AREAS = ["orders", "cash", "products", "fiscal", "tables", "agenda", "marketing", "appearance", "settings", "team"] as const;
+export type PanelArea = (typeof PANEL_AREAS)[number];
+export const PANEL_AREA_LABELS: Record<PanelArea, { es: string; pt: string }> = {
+  orders: { es: "Pedidos", pt: "Pedidos" },
+  cash: { es: "Caja", pt: "Caixa" },
+  products: { es: "Productos y stock", pt: "Produtos e estoque" },
+  fiscal: { es: "Facturas", pt: "Notas fiscais" },
+  tables: { es: "Mesas y QR", pt: "Mesas e QR" },
+  agenda: { es: "Agenda", pt: "Agenda" },
+  marketing: { es: "Marketing (cupones, ofertas, carritos)", pt: "Marketing (cupons, ofertas, carrinhos)" },
+  appearance: { es: "Apariencia", pt: "Aparência" },
+  settings: { es: "Configuración", pt: "Configurações" },
+  team: { es: "Equipo", pt: "Equipe" },
+};

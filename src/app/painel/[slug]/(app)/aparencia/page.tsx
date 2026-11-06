@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function AppearancePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "appearance");
   const { T } = panelI18n(t);
 
   return (

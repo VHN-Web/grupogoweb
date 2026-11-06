@@ -2,7 +2,8 @@
 // Uso: npm run db:setup  (ou npm run db:seed)
 // Senha de todos os painéis demo: demo1234
 import "dotenv/config";
-import { eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { hashPassword } from "@/lib/password";
 import { createDb, type DB } from "./client";
 import * as schema from "./schema";
 import { provisionTenant } from "@/services/provision";
@@ -453,6 +454,87 @@ async function seedStore(db: DB, s: Store) {
   return tenant;
 }
 
+// ---------------- GoInteligence: plano e dados de demonstração (idempotente — roda a cada deploy)
+const GOI_FEATURES = [
+  "Todo del plan Mensual",
+  "Sugerencias inteligentes de venta",
+  "Carritos abandonados + cupones",
+  "Ofertas relámpago",
+  "Agenda con confirmación por WhatsApp",
+  "Equipo con login y permisos",
+  "Informe de cierre de caja por e-mail/WhatsApp",
+].join("\n");
+
+async function ensureGoInteligencePlan(db: DB) {
+  const has = await db.query.plans.findFirst({ where: eq(schema.plans.intelligence, true) });
+  if (has) return;
+  await db.insert(schema.plans).values({
+    name: "GoInteligence",
+    interval: "MONTHLY",
+    pricePyg: 450000,
+    priceUsdMinor: 6500,
+    priceBrlMinor: 29900,
+    setupPyg: 500000,
+    setupUsdMinor: 7000,
+    setupBrlMinor: 35000,
+    includesDomain: false,
+    intelligence: true,
+    features: GOI_FEATURES,
+    sortOrder: 3,
+  });
+}
+
+const BARBER_SLUGS = ["navalha", "barberia-filo"];
+
+async function demoExtras(db: DB) {
+  const demos = await db.query.tenants.findMany({ where: inArray(schema.tenants.slug, STORES.map((s) => s.slug)) });
+  for (const t of demos) {
+    const pt = t.country === "BR";
+    await db.update(schema.tenants).set({ tier: "pro", whatsapp: t.whatsapp ?? t.phone, instagram: t.instagram ?? t.slug.replace(/-/g, "") }).where(eq(schema.tenants.id, t.id));
+    // cupom de boas-vindas
+    const code = pt ? "BEMVINDO10" : "BIENVENIDO10";
+    const c = await db.query.coupons.findFirst({ where: and(eq(schema.coupons.tenantId, t.id), eq(schema.coupons.code, code)) });
+    if (!c) await db.insert(schema.coupons).values({ tenantId: t.id, code, kind: "PERCENT", value: 10 });
+    // oferta relâmpago sempre ativa nas demos (renova a cada deploy)
+    const prods = await db.query.products.findMany({ where: eq(schema.products.tenantId, t.id) });
+    const offer = prods.find((p) => !p.durationMin && p.promoEndsAt && p.promoEndsAt > new Date());
+    if (!offer) {
+      const target = BARBER_SLUGS.includes(t.slug) ? prods.find((p) => /pomad/i.test(p.name)) : prods[0];
+      if (target) {
+        const step = t.currency === "PYG" ? 1000 : 10;
+        const promo = Math.floor((target.pricePyg * 0.8) / step) * step;
+        await db.update(schema.products).set({ promoPricePyg: promo, promoEndsAt: new Date(Date.now() + 5 * 864e5) }).where(eq(schema.products.id, target.id));
+      }
+    }
+    // barbearias: agenda ativa e serviços com duração
+    if (BARBER_SLUGS.includes(t.slug)) {
+      const cfg = JSON.parse(t.bookingConfig || "{}");
+      if (!cfg.enabled) {
+        await db
+          .update(schema.tenants)
+          .set({ bookingConfig: JSON.stringify({ enabled: true, slotMin: 30, leadMin: 60, daysAhead: 14, hours: ["", "09:00-19:00", "09:00-19:00", "09:00-19:00", "09:00-20:00", "09:00-20:00", "08:00-14:00"] }) })
+          .where(eq(schema.tenants.id, t.id));
+      }
+      for (const p of prods) {
+        if (p.durationMin || /pomad|óleo|aceite|oleo/i.test(p.name)) continue;
+        const d = /barba \+|\+ barba|combo/i.test(p.name) ? 60 : /barba/i.test(p.name) ? 30 : /infantil/i.test(p.name) ? 30 : 40;
+        await db.update(schema.products).set({ durationMin: d }).where(eq(schema.products.id, p.id));
+      }
+    }
+    // funcionário de exemplo
+    const st = await db.query.staff.findFirst({ where: eq(schema.staff.tenantId, t.id) });
+    if (!st) {
+      await db.insert(schema.staff).values({
+        tenantId: t.id,
+        name: pt ? "Caixa (demo)" : "Caja (demo)",
+        username: pt ? "caixa" : "caja",
+        passwordHash: hashPassword("demo1234"),
+        permissions: JSON.stringify(["orders", "cash", "agenda"]),
+      });
+    }
+  }
+}
+
 async function main() {
   const db = createDb();
   // --if-empty: usado no deploy — só cria as lojas demo se o banco ainda não tiver nenhum estabelecimento
@@ -472,6 +554,8 @@ async function main() {
     if (existing.size > 0) {
       const missing = STORES.filter((s) => !existing.has(s.slug));
       for (const s of missing) await seedStore(db, s);
+      await ensureGoInteligencePlan(db);
+      await demoExtras(db);
       console.log(missing.length ? `Lojas demo adicionadas: ${missing.map((s) => s.slug).join(", ")}` : "Banco já tem dados — seed ignorado.");
       process.exit(0);
     }
@@ -518,7 +602,9 @@ async function main() {
       },
     ]);
   }
-  const monthly = (await db.query.plans.findMany()).find((p) => p.interval === "MONTHLY")!;
+  await ensureGoInteligencePlan(db);
+  await demoExtras(db);
+  const monthly = (await db.query.plans.findMany()).find((p) => p.interval === "MONTHLY" && !p.intelligence)!;
   const now = new Date();
   await db.insert(schema.customers).values({
     businessName: "La Esquina Burger",

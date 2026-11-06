@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function ProductsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ err?: string }> }) {
   const { slug } = await params;
   const { err } = await searchParams;
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "products");
   const { T, fm } = panelI18n(t);
   const [cats, prods, moves] = await Promise.all([
     db.query.categories.findMany({ where: eq(schema.categories.tenantId, t.id), orderBy: asc(schema.categories.sortOrder) }),
@@ -39,7 +39,7 @@ export default async function ProductsPage({ params, searchParams }: { params: P
         )}
         <details className="card p-4" open={prods.length === 0}>
           <summary className="cursor-pointer font-semibold">{T("+ Nuevo producto", "+ Novo produto")}</summary>
-          <ProductForm slug={slug} cats={cats} T={T} cur={t.currency as Currency} />
+          <ProductForm slug={slug} cats={cats} T={T} cur={t.currency as Currency} pro={t.tier === "pro"} />
         </details>
         <div className="card divide-y divide-line">
           {prods.map((p) => (
@@ -65,7 +65,7 @@ export default async function ProductsPage({ params, searchParams }: { params: P
                 <b className="w-28 text-right text-sm">{fm(p.pricePyg)}</b>
               </summary>
               <div className="space-y-4 border-t border-line bg-paper/60 px-4 py-4">
-                <ProductForm slug={slug} cats={cats} p={p} T={T} cur={t.currency as Currency} />
+                <ProductForm slug={slug} cats={cats} p={p} T={T} cur={t.currency as Currency} pro={t.tier === "pro"} />
                 {p.trackStock && (
                   <form action={adjustStock.bind(null, slug, p.id)} className="flex flex-wrap items-end gap-2">
                     <div>
@@ -130,7 +130,7 @@ export default async function ProductsPage({ params, searchParams }: { params: P
   );
 }
 
-function ProductForm({ slug, cats, p, T, cur }: { slug: string; cats: Category[]; p?: Product; T: (es: string, pt: string) => string; cur: Currency }) {
+function ProductForm({ slug, cats, p, T, cur, pro }: { slug: string; cats: Category[]; p?: Product; T: (es: string, pt: string) => string; cur: Currency; pro: boolean }) {
   return (
     <form action={saveProduct.bind(null, slug)} className="mt-3 grid gap-3 sm:grid-cols-2">
       {p && <input type="hidden" name="id" value={p.id} />}
@@ -177,6 +177,12 @@ function ProductForm({ slug, cats, p, T, cur }: { slug: string; cats: Category[]
           ))}
         </select>
       </div>
+      {pro && (
+        <div>
+          <label className="label">{T("Duración en minutos (servicio con turno)", "Duração em minutos (serviço com agendamento)")}</label>
+          <input name="durationMin" type="number" min={0} max={480} className="input" defaultValue={p?.durationMin ?? ""} placeholder={T("Vacío = producto común", "Vazio = produto comum")} />
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-4 sm:col-span-2">
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="active" defaultChecked={p?.active ?? true} /> {T("Visible en el menú", "Visível no cardápio")}</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="trackStock" defaultChecked={p?.trackStock ?? false} /> {T("Controlar stock", "Controlar estoque")}</label>

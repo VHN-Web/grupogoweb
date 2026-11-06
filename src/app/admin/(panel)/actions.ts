@@ -16,6 +16,7 @@ import {
   runBillingCycle,
   setCustomDomain,
   setCustomerSuspended,
+  setCustomerTier,
   getSettings,
 } from "@/services/billing";
 
@@ -107,6 +108,12 @@ export async function suspendCustomer(customerId: string, suspended: boolean) {
   revalidatePath(`/admin/clientes/${customerId}`);
 }
 
+export async function setTier(customerId: string, tier: "basic" | "pro") {
+  await requirePlatformAdmin();
+  await setCustomerTier(customerId, tier);
+  back(`/admin/clientes/${customerId}`, tier === "pro" ? "GoInteligence ativado." : "GoInteligence desativado.");
+}
+
 export async function cancelCustomerAction(customerId: string) {
   await requirePlatformAdmin();
   await cancelCustomer(customerId);
@@ -134,6 +141,7 @@ export async function savePlan(f: FormData) {
     setupUsdMinor: money(f, "setupUsd", "USD"),
     setupBrlMinor: money(f, "setupBrl", "BRL"),
     includesDomain: bool(f, "includesDomain"),
+    intelligence: bool(f, "intelligence"),
     features: str(f, "features") || null,
     active: bool(f, "active"),
     sortOrder: Number(str(f, "sortOrder")) || 0,

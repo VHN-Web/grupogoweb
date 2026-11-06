@@ -11,6 +11,7 @@ import { PhoneInput } from "@/components/forms/PhoneInput";
 import { detectLocale, getRegion, isValidE164, isValidName, tr, type Locale } from "@/core/region";
 import { THEMES, THEME_IDS } from "@/core/themes";
 import { formatMinor } from "@/core/money";
+import { planName } from "@/core/plans";
 import { BillingError, createCustomer } from "@/services/billing";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +77,7 @@ export default async function Contratar({ searchParams }: { searchParams: Promis
   const setup = pt ? plan.setupBrlMinor : plan.setupPyg;
 
   return (
-    <AuthShell eyebrow={T("Contratar GoWeb", "Contratar a GoWeb")} title={plan.name}>
+    <AuthShell eyebrow={T("Contratar GoWeb", "Contratar a GoWeb")} title={planName(plan.name, locale)}>
       <p className="-mt-5 mb-6 text-sm text-[#B9B3A7]">
         {price} / {plan.interval === "YEARLY" ? T("año", "ano") : T("mes", "mês")}
         {setup > 0 && <> · {T("implementación", "implantação")} {formatMinor(setup, pt ? "BRL" : "PYG")}</>}

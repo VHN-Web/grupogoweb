@@ -6,6 +6,7 @@ import { Illustration } from "@/components/Illustration";
 import { formatMinor, formatPyg } from "@/core/money";
 import { THEMES, type ThemeId } from "@/core/themes";
 import { getSettings } from "@/services/billing";
+import { planFeature, planName } from "@/core/plans";
 import { headers } from "next/headers";
 import { detectLocale, tr, type Locale } from "@/core/region";
 
@@ -116,17 +117,6 @@ const FAQ_ES = [
   ["¿Puedo usar mi propio dominio?", "Sí. En el plan anual el dominio está incluido; en el mensual se agrega como adicional."],
   ["¿Sirve para tiendas, no solo restaurantes?", "Sí. Hay modelos para hamburgueserías, restaurantes, cafeterías, bares, barberías, perfumerías, tiendas de ropa y de informática."],
 ];
-
-// Tradução das features padrão dos planos (texto editável no admin; o que não estiver aqui aparece como cadastrado)
-const FEATURE_PT: Record<string, string> = {
-  "Menú QR y pedidos ilimitados": "Cardápio QR e pedidos ilimitados",
-  "Caja, stock y comprobantes": "Caixa, estoque e comprovantes",
-  "Pagos en Gs., US$ y R$": "Pagamentos por Pix, cartão e dinheiro",
-  "Dominio propio opcional (adicional)": "Domínio próprio opcional (adicional)",
-  "100% de las funciones": "100% dos recursos",
-  "Implementación prioritaria": "Implantação prioritária",
-  "Soporte por WhatsApp": "Suporte por WhatsApp",
-};
 
 const wrap = "mx-auto w-full max-w-[1200px] px-6 sm:px-8";
 
@@ -315,13 +305,19 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
       <section id="planes" className="py-24">
         <div className={`${wrap} flex flex-col gap-12`}>
           <SectionTitle eyebrow={T("Planes", "Planos")} title={T("Simple de contratar. Pagás como prefieras.", "Simples de contratar. Pague como preferir.")} sub={T("Guaraníes, dólares o reales.", "Pix, cartão ou boleto — em reais.")} />
-          <div className="grid max-w-[940px] grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-5">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(290px,1fr))] gap-5">
             {plans.map((p) => {
               const hi = p.interval === "YEARLY";
               return (
-                <div key={p.id} className="flex flex-col gap-5 rounded-3xl border-[1.5px] p-9" style={{ background: hi ? INK : "#FFFFFF", color: hi ? IVORY : INK, borderColor: hi ? BRAND : "#DDD6C8" }}>
-                  {hi ? <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider" style={{ background: BRAND, color: INK }}>{T("Más elegido", "Mais escolhido")}</span> : <span className="h-[30px]" />}
-                  <h3 style={{ fontFamily: H }} className="text-3xl font-extrabold">{p.name}</h3>
+                <div key={p.id} className="flex flex-col gap-5 rounded-3xl border-[1.5px] p-9" style={{ background: hi ? INK : "#FFFFFF", color: hi ? IVORY : INK, borderColor: hi ? BRAND : p.intelligence ? "#1F7FD8" : "#DDD6C8" }}>
+                  {hi ? (
+                    <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider" style={{ background: BRAND, color: INK }}>{T("Más elegido", "Mais escolhido")}</span>
+                  ) : p.intelligence ? (
+                    <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white" style={{ background: "linear-gradient(90deg,#1F7FD8,#3CC46B)" }}>✨ {T("Con inteligencia", "Com inteligência")}</span>
+                  ) : (
+                    <span className="h-[30px]" />
+                  )}
+                  <h3 style={{ fontFamily: H }} className="text-3xl font-extrabold">{planName(p.name, locale)}</h3>
                   <div className="flex flex-wrap items-baseline gap-2">
                     <span style={{ fontFamily: H }} className="text-[40px] font-extrabold tracking-tight">{pt ? formatMinor(p.priceBrlMinor, "BRL") : formatPyg(p.pricePyg)}</span>
                     <span style={{ color: hi ? MUTED : "#5F5A52" }}>/ {hi ? T("año", "ano") : T("mes", "mês")}</span>
@@ -337,7 +333,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                     )}
                   </p>
                   <ul className="flex flex-col gap-3 text-[15.5px]">
-                    {(p.features ?? "").split("\n").filter(Boolean).map((f) => (pt ? FEATURE_PT[f.trim()] ?? f : f)).map((f) => (
+                    {(p.features ?? "").split("\n").filter(Boolean).map((f) => planFeature(f, locale)).map((f) => (
                       <li key={f} className="flex items-start gap-2.5">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={BRAND} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>
                         {f}

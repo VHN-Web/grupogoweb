@@ -6,14 +6,15 @@ import { PhoneInput } from "@/components/forms/PhoneInput";
 import { parseFiscalConfig, parsePaymentConfig } from "@/core/tenant-config";
 import { listPaymentProviders } from "@/adapters/payments/registry";
 import { listFiscalProviders } from "@/adapters/fiscal/providers";
-import { changePassword, saveDelivery, saveFiscal, saveGeneral, savePayments, saveRates, saveIntegration, removeIntegration } from "../actions";
+import { changePassword, saveDelivery, saveFiscal, saveGeneral, savePayments, saveRates, saveIntegration, removeIntegration, savePrinter, saveReport } from "../actions";
+import { ProBadge, ProUpsell } from "@/components/ProUpsell";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConfigPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const t = await requireTenantAdmin(slug);
+  const t = await requireTenantAdmin(slug, "settings");
   const pay = parsePaymentConfig(t.paymentConfig);
   const fiscal = parseFiscalConfig(t.fiscalConfig);
   const providers = listPaymentProviders();
@@ -38,6 +39,13 @@ export default async function ConfigPage({ params, searchParams }: { params: Pro
         <form action={saveGeneral.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
           <Field label={T("Nombre", "Nome")}><input name="name" className="input" defaultValue={t.name} /></Field>
           <Field label={T("Teléfono / WhatsApp", "Telefone / WhatsApp")}><PhoneInput name="phone" defaultValue={t.phone} defaultCountry={t.country} locale={region.locale} /></Field>
+          <Field label={T("WhatsApp del local (ícono en el sitio)", "WhatsApp do negócio (ícone no site)")}><PhoneInput name="whatsapp" defaultValue={t.whatsapp} defaultCountry={t.country} locale={region.locale} /></Field>
+          <Field label="Instagram">
+            <div className="flex items-center rounded-xl border border-line bg-white pl-3 text-sm">
+              <span className="text-muted">@</span>
+              <input name="instagram" className="w-full bg-transparent px-1 py-2.5 outline-none" defaultValue={t.instagram ?? ""} placeholder={T("tu_local", "seu_negocio")} maxLength={30} />
+            </div>
+          </Field>
           <Field label={region.taxIdLabel}><input name="ruc" className="input" defaultValue={t.ruc ?? ""} /></Field>
           <Field label={T("Dirección", "Endereço")} wide><input name="address" className="input" defaultValue={t.address ?? ""} /></Field>
           <div className="flex flex-wrap gap-4 text-sm sm:col-span-2">
@@ -215,6 +223,60 @@ export default async function ConfigPage({ params, searchParams }: { params: Pro
         </form>
       </Section>
 
+      <Section
+        title={T("Impresora térmica", "Impressora térmica")}
+        desc={T(
+          "Funciona con cualquier impresora térmica instalada en la computadora (USB, red o Bluetooth). Elegí el ancho del papel.",
+          "Funciona com qualquer impressora térmica instalada no computador (USB, rede ou Bluetooth). Escolha a largura do papel.",
+        )}
+      >
+        <form action={savePrinter.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
+          <Field label={T("Ancho del papel", "Largura do papel")}>
+            <select name="printerWidth" defaultValue={String(t.printerWidth)} className="input">
+              <option value="80">80 mm</option>
+              <option value="58">58 mm</option>
+            </select>
+          </Field>
+          <label className="flex items-center gap-2 self-end pb-3 text-sm">
+            <input type="checkbox" name="autoPrint" defaultChecked={t.autoPrint} /> {T("Imprimir automáticamente cada pedido nuevo", "Imprimir automaticamente cada pedido novo")}
+          </label>
+          <p className="text-xs text-muted sm:col-span-2">
+            {T(
+              "Para imprimir sin la ventana de confirmación, abrí el panel en Chrome con la opción --kiosk-printing y dejá la térmica como impresora predeterminada.",
+              "Para imprimir sem a janela de confirmação, abra o painel no Chrome com a opção --kiosk-printing e deixe a térmica como impressora padrão.",
+            )}
+          </p>
+          <Save label={T("Guardar", "Salvar")} />
+        </form>
+      </Section>
+
+      <Section
+        title={<>{T("Informe de cierre de caja", "Relatório de fechamento de caixa")} <ProBadge /></>}
+        desc={T(
+          "Al cerrar la caja enviamos un resumen: total facturado, producto más vendido, stock actualizado, canal más usado y ticket promedio.",
+          "Ao fechar o caixa enviamos um resumo: total faturado, produto mais vendido, estoque atualizado, canal mais usado e ticket médio.",
+        )}
+      >
+        {t.tier === "pro" ? (
+          <form action={saveReport.bind(null, slug)} className="grid gap-3 sm:grid-cols-2">
+            <Field label={T("Enviar por", "Enviar por")}>
+              <select name="reportChannel" defaultValue={t.reportChannel} className="input">
+                <option value="none">{T("No enviar", "Não enviar")}</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">E-mail</option>
+              </select>
+            </Field>
+            <Field label={T("WhatsApp o e-mail de destino", "WhatsApp ou e-mail de destino")}>
+              <input name="reportTo" className="input" defaultValue={t.reportTo ?? ""} placeholder={T("+595981123456 o dueño@email.com", "+5581991234567 ou dono@email.com")} />
+            </Field>
+            <p className="text-xs text-muted sm:col-span-2">{T("También avisamos aquí cuando haya carritos abandonados.", "Também avisamos aqui quando houver carrinhos abandonados.")}</p>
+            <Save label={T("Guardar", "Salvar")} />
+          </form>
+        ) : (
+          <ProUpsell locale={region.locale} />
+        )}
+      </Section>
+
       <Section title={T("Seguridad", "Segurança")}>
         <form action={changePassword.bind(null, slug)} className="flex flex-wrap gap-2">
           <input name="password" type="password" minLength={8} className="input max-w-xs" placeholder={T("Nueva contraseña (mín. 8)", "Nova senha (mín. 8)")} required />
@@ -225,7 +287,7 @@ export default async function ConfigPage({ params, searchParams }: { params: Pro
   );
 }
 
-function Section({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
+function Section({ title, desc, children }: { title: React.ReactNode; desc?: string; children: React.ReactNode }) {
   return (
     <section className="card p-5">
       <h2 className="font-semibold">{title}</h2>
