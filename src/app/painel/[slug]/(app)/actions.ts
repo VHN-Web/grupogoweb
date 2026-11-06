@@ -530,3 +530,15 @@ export async function saveReport(slug: string, f: FormData) {
   await db.update(schema.tenants).set({ reportChannel: channel, reportTo: channel === "none" ? null : to }).where(eq(schema.tenants.id, t.id));
   revalidatePath(`${base(slug)}/config`);
 }
+
+// ---------------- Entrar com Google ----------------
+export async function saveLoginEmail(slug: string, f: FormData) {
+  const t = await requireTenantAdmin(slug, "team"); // só o dono
+  const T = tr(getRegion(t.country).locale);
+  const email = str(f, "loginEmail").toLowerCase();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) redirect(`${base(slug)}/config?err=${encodeURIComponent(T("E-mail inválido", "E-mail inválido"))}#seguranca`);
+  await db.update(schema.tenants).set({ loginEmail: email || null }).where(eq(schema.tenants.id, t.id));
+  await audit(t.id, await actorName(slug), "google.email", email || "(removido)");
+  revalidatePath(`${base(slug)}/config`);
+  redirect(`${base(slug)}/config?ok=${encodeURIComponent(T("Guardado", "Salvo"))}#seguranca`);
+}

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { timingSafeEqual } from "node:crypto";
 import { setSession } from "@/lib/auth";
+import { GoogleButton } from "@/components/brand/GoogleButton";
+import { adminEmails, googleEnabled } from "@/lib/google";
 import { audit, clearLimit, clientIp, isLimited, rateLimit } from "@/lib/security";
 import { AuthShell } from "@/components/brand/AuthShell";
 
@@ -25,16 +27,23 @@ async function login(f: FormData) {
   redirect("/admin");
 }
 
-export default async function AdminLogin({ searchParams }: { searchParams: Promise<{ e?: string }> }) {
-  const { e } = await searchParams;
+export default async function AdminLogin({ searchParams }: { searchParams: Promise<{ e?: string; m?: string }> }) {
+  const { e, m } = await searchParams;
   return (
     <AuthShell eyebrow="Plataforma" title="Admin">
       <form action={login} className="space-y-3">
         <label className="label" htmlFor="password">Senha</label>
         <input id="password" name="password" type="password" className="input" autoFocus />
-        {e && <p className="text-sm text-red-400">{e === "bloq" ? "Muitas tentativas. Aguarde 30 minutos." : "Senha incorreta"}</p>}
+        {e && e !== "google" && <p className="text-sm text-red-400">{e === "bloq" ? "Muitas tentativas. Aguarde 30 minutos." : "Senha incorreta"}</p>}
         <button className="btn-primary w-full py-3">Entrar</button>
       </form>
+      {googleEnabled() && adminEmails().length > 0 && (
+        <div className="mt-5 space-y-3">
+          <div className="flex items-center gap-3 text-xs text-[#8D877C]"><span className="h-px flex-1 bg-[#2C2C31]" />ou<span className="h-px flex-1 bg-[#2C2C31]" /></div>
+          <GoogleButton href="/api/auth/google?para=admin" label="Entrar com Google" />
+          {e === "google" && <p className="text-sm text-red-400">{m === "email" ? "Esta conta Google não tem acesso ao admin." : "Não foi possível entrar com Google. Tente de novo."}</p>}
+        </div>
+      )}
     </AuthShell>
   );
 }

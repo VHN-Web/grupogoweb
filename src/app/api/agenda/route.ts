@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     .returning();
   // avisa o estabelecimento (se houver WhatsApp configurado no servidor)
   const owner = t.whatsapp || t.phone;
-  if (owner) {
+  if (owner && !t.demo) { // loja de demonstração nunca dispara mensagem real
     const region = getRegion(t.country);
     const when = new Intl.DateTimeFormat(region.intlLocale, { dateStyle: "short", timeStyle: "short", timeZone: region.timeZone }).format(day);
     await sendWhatsApp(

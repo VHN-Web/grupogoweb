@@ -1,7 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { audit } from "@/lib/security";
 import { db, schema } from "@/db";
 import { clearSession, requirePlatformAdmin } from "@/lib/auth";
 import { isValidE164, isValidName } from "@/core/region";
@@ -194,4 +195,68 @@ export async function saveSettings(f: FormData) {
     })
     .where(eq(schema.platformSettings.id, "default"));
   back("/admin/config", "Configurações salvas.");
+}
+
+// ---------------- Apagar clientes (limpeza) ----------------
+/**
+ * Apaga clientes de vez: faturas, contratos, recibos e tarefas vão junto (cascata).
+ * Com "apagar a loja", o site/painel do cliente e todos os dados dele (produtos, pedidos, caixa…) também são apagados.
+ * Lojas de demonstração nunca são apagadas por aqui.
+ */
+async function removeCustomers(ids: string[], withStore: boolean) {
+  const list = await db.query.customers.findMany({ where: inArray(schema.customers.id, ids), with: { tenant: true } });
+  let stores = 0;
+  for (const c of list) {
+    await db.delete(schema.customers).where(eq(schema.customers.id, c.id));
+    if (withStore && c.tenant && !c.tenant.demo) {
+      await db.delete(schema.tenants).where(eq(schema.tenants.id, c.tenant.id));
+      stores++;
+    }
+    await audit(null, "admin GoWeb", "customer.delete", `${c.businessName}${withStore && c.tenant && !c.tenant.demo ? " + loja" : ""}`);
+  }
+  return { customers: list.length, stores };
+}
+
+export async function deleteCustomers(f: FormData) {
+  await requirePlatformAdmin();
+  const ids = f.getAll("ids").map(String).filter(Boolean);
+  if (!ids.length) back("/admin/clientes", "Selecione pelo menos um cliente.", "err");
+  if (str(f, "confirm").toUpperCase() !== "APAGAR") back("/admin/clientes", "Para confirmar, digite APAGAR.", "err");
+  const r = await removeCustomers(ids, bool(f, "withStore"));
+  revalidatePath("/admin/clientes");
+  back("/admin/clientes", `${r.customers} cliente(s) apagado(s)${r.stores ? ` e ${r.stores} loja(s)` : ""}.`);
+}
+
+export async function deleteCustomer(customerId: string, f: FormData) {
+  await requirePlatformAdmin();
+  const c = await db.query.customers.findFirst({ where: eq(schema.customers.id, customerId) });
+  if (!c) back("/admin/clientes", "Cliente não encontrado.", "err");
+  if (str(f, "confirm").toLowerCase() !== c!.businessName.trim().toLowerCase())
+    back(`/admin/clientes/${customerId}`, `Para apagar, digite o nome exato: ${c!.businessName}`, "err");
+  const r = await removeCustomers([customerId], bool(f, "withStore"));
+  revalidatePath("/admin/clientes");
+  back("/admin/clientes", `${c!.businessName} apagado${r.stores ? " (com a loja)" : ""}.`);
+}
+
+/** Lojas que ficaram sem cliente (testes antigos) — exceto as de demonstração. */
+export async function orphanStores() {
+  await requirePlatformAdmin();
+  const linked = (await db.query.customers.findMany({ columns: { tenantId: true } })).map((c) => c.tenantId).filter((x): x is string => !!x);
+  return db.query.tenants.findMany({
+    where: linked.length ? and(eq(schema.tenants.demo, false), notInArray(schema.tenants.id, linked)) : eq(schema.tenants.demo, false),
+    columns: { id: true, name: true, slug: true, createdAt: true },
+  });
+}
+
+export async function deleteOrphanStores(f: FormData) {
+  await requirePlatformAdmin();
+  const ids = f.getAll("ids").map(String).filter(Boolean);
+  if (!ids.length) back("/admin/clientes", "Selecione pelo menos uma loja.", "err");
+  if (str(f, "confirm").toUpperCase() !== "APAGAR") back("/admin/clientes", "Para confirmar, digite APAGAR.", "err");
+  const valid = new Set((await orphanStores()).map((t) => t.id));
+  const del = ids.filter((id) => valid.has(id));
+  if (del.length) await db.delete(schema.tenants).where(inArray(schema.tenants.id, del));
+  await audit(null, "admin GoWeb", "store.delete", `${del.length} loja(s) sem cliente`);
+  revalidatePath("/admin/clientes");
+  back("/admin/clientes", `${del.length} loja(s) sem cliente apagada(s).`);
 }

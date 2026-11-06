@@ -8,6 +8,7 @@ import { THEMES, type ThemeId } from "@/core/themes";
 import { getSettings } from "@/services/billing";
 import { planFeature, planName } from "@/core/plans";
 import { headers } from "next/headers";
+import { RevealOnScroll } from "@/components/motion/RevealOnScroll";
 import { detectLocale, tr, type Locale } from "@/core/region";
 
 export const dynamic = "force-dynamic";
@@ -158,9 +159,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
       </header>
 
       {/* HERO */}
-      <section style={{ background: INK, color: IVORY }} className="overflow-hidden">
-        <div className={`${wrap} flex flex-wrap items-center gap-14 pb-24 pt-16 sm:pt-20`}>
-          <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-7">
+      <section style={{ background: INK, color: IVORY }} className="relative overflow-hidden">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="anim-blob absolute -left-24 top-10 h-[380px] w-[380px] rounded-full opacity-25 blur-3xl" style={{ background: "#1F7FD8" }} />
+          <div className="anim-blob absolute right-[-120px] top-[30%] h-[420px] w-[420px] rounded-full opacity-20 blur-3xl" style={{ background: BRAND, animationDelay: "-6s" }} />
+        </div>
+        <div className={`${wrap} relative flex flex-wrap items-center gap-14 pb-24 pt-16 sm:pt-20`}>
+          <div className="stagger flex min-w-0 flex-[1_1_480px] flex-col gap-7">
             <span className="text-[13px] font-semibold uppercase tracking-[0.22em]" style={{ color: BRAND }}>{T("Restaurantes · Bares · Barberías · Tiendas", "Restaurantes · Barbearias · Perfumarias · Lojas")}</span>
             <h1 style={{ fontFamily: H }} className="text-[clamp(42px,5.4vw,76px)] font-extrabold leading-[1.02] tracking-[-0.025em]">
               {T("Tu negocio,", "Seu negócio,")}
@@ -174,8 +179,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
               )}
             </p>
             <div className="flex flex-wrap gap-3">
-              <a href={wa} className="rounded-2xl px-6 py-4 text-[17px] font-bold" style={{ background: BRAND, color: INK }}>{T("Quiero GoWeb en mi negocio", "Quero a GoWeb no meu negócio")}</a>
-              <a href="#modelos" className="rounded-2xl border border-[#45454B] px-6 py-4 text-[17px] font-semibold">{T("Ver modelos en vivo", "Ver modelos ao vivo")}</a>
+              <a href={wa} className="btn-shine rounded-2xl px-6 py-4 text-[17px] font-bold transition hover:-translate-y-0.5" style={{ background: BRAND, color: INK }}>{T("Quiero GoWeb en mi negocio", "Quero a GoWeb no meu negócio")}</a>
+              <a href="#modelos" className="rounded-2xl border border-[#45454B] px-6 py-4 text-[17px] font-semibold transition hover:-translate-y-0.5 hover:border-[#6A6A72]">{T("Ver modelos en vivo", "Ver modelos ao vivo")}</a>
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1 text-sm" style={{ color: MUTED }}>
               <span>{T("✓ Guaraníes, dólares y reales", "✓ Pix, cartão e dinheiro")}</span>
@@ -186,7 +191,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
 
           {/* Mock: celular + cartões */}
           <div className="relative h-[600px] min-w-0 flex-[1_1_420px]" aria-hidden="true">
-            <div className="absolute left-1/2 top-0 h-[600px] w-[300px] -translate-x-1/2 rounded-[46px] bg-[#2A2B2F] p-2.5 shadow-[0_40px_80px_rgba(0,0,0,0.5)]">
+            <div className="absolute left-1/2 top-0 h-[600px] w-[300px] -translate-x-1/2"><div className="anim-float h-full w-full"><div className="anim-pop-in h-full w-full rounded-[46px] bg-[#2A2B2F] p-2.5 shadow-[0_40px_80px_rgba(0,0,0,0.5)]">
               <div className="flex h-full w-full flex-col overflow-hidden rounded-[37px] bg-[#121212] text-white">
                 <div className="relative h-[190px] overflow-hidden bg-[#E63946]">
                   <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(-45deg, rgba(0,0,0,.08) 0 12px, transparent 12px 24px)" }} />
@@ -212,14 +217,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                 </div>
                 <div className="mt-auto m-3 flex justify-between rounded-2xl bg-[#FFC20E] px-4 py-3 text-sm font-extrabold text-black"><span>{T("Ver pedido · 2", "Ver pedido · 2")}</span><span>{T("Gs. 70.000", "R$ 49,80")}</span></div>
               </div>
-            </div>
-            <div className="absolute left-0 top-16 flex w-[230px] flex-col gap-1.5 rounded-[18px] bg-white p-4 text-[#0E0E10] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
+            </div></div></div>
+            <div className="anim-pop-in absolute left-0 top-16 w-[230px]" style={{ animationDelay: ".5s" }}><div className="anim-float-alt flex flex-col gap-1.5 rounded-[18px] bg-white p-4 text-[#0E0E10] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
               <span className="text-xs text-[#6A655C]">{T("Nuevo pedido · Mesa 4", "Novo pedido · Mesa 4")}</span>
               <span style={{ fontFamily: H }} className="text-3xl font-extrabold">#4821</span>
               <span className="text-[13px]">{T("1× Doble Brasa · 1× Papas", "1× Duplo Smash · 1× Batata")}</span>
               <div className="mt-1 flex items-center justify-between"><b className="text-sm">{T("US$ 9,60", "R$ 49,80")}</b><span className="rounded-full bg-[#DDEFE7] px-2.5 py-1 text-[11px] font-bold text-[#1F6F55]">{T("Pagado", "Pago · Pix")}</span></div>
-            </div>
-            <div className="absolute bottom-16 right-0 flex w-[230px] flex-col gap-2.5 rounded-[18px] border border-[#3A3A40] bg-[#2A2B2F] p-4 text-[13px] text-[#F4F1EA] shadow-[0_24px_50px_rgba(0,0,0,0.45)]">
+            </div></div>
+            <div className="anim-pop-in absolute bottom-16 right-0 w-[230px]" style={{ animationDelay: ".8s" }}><div className="anim-float flex flex-col gap-2.5 rounded-[18px] border border-[#3A3A40] bg-[#2A2B2F] p-4 text-[13px] text-[#F4F1EA] shadow-[0_24px_50px_rgba(0,0,0,0.45)]">
               <span className="text-xs" style={{ color: MUTED }}>{T("Caja de hoy (ejemplo)", "Caixa de hoje (exemplo)")}</span>
               {(pt
                 ? [["Pix", "R$ 1.840,00"], ["Cartão", "R$ 960,00"], ["Dinheiro", "R$ 310,00"]]
@@ -227,7 +232,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
               ).map(([k, v]) => (
                 <div key={k} className="flex justify-between"><span>{k}</span><b>{v}</b></div>
               ))}
-            </div>
+            </div></div>
           </div>
         </div>
       </section>
@@ -237,10 +242,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
         <div className={`${wrap} flex flex-col gap-12`}>
           <SectionTitle eyebrow={T("Modelos", "Modelos")} title={T("Un sitio con la cara de tu negocio.", "Um site com a cara do seu negócio.")} sub={T("Elegí el modelo, tu logo y tus colores. Tocá uno para probarlo en vivo.", "Escolha o modelo, seu logo e suas cores. Toque em um para testar ao vivo.")} />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
-            {DEMOS.map((d) => {
+            {DEMOS.map((d, i) => {
               const th = THEMES[d.theme];
               return (
-                <Link key={d.slug} href={`/${d.slug}`} className="group overflow-hidden rounded-3xl border border-[#DDD6C8] bg-white transition hover:-translate-y-1 hover:shadow-xl">
+                <Link key={d.slug} href={`/${d.slug}`} data-reveal style={{ "--d": `${(i % 4) * 0.07}s` } as React.CSSProperties} className="lift group overflow-hidden rounded-3xl border border-[#DDD6C8] bg-white">
                   <div className="relative h-52 overflow-hidden" style={{ background: th.colors.heroBg }}>
                     <div className="absolute -bottom-4 -right-6 transition group-hover:scale-105"><Illustration name={d.art} size={170} /></div>
                     <span
@@ -266,8 +271,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
         <div className={`${wrap} flex flex-col gap-12`}>
           <SectionTitle dark eyebrow={T("Funciones", "Recursos")} title={T("Todo lo que tu local necesita. Nada que sobre.", "Tudo o que o seu negócio precisa. Nada sobrando.")} />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-            {FEATURES.map((f) => (
-              <div key={f.t} className="flex flex-col gap-3.5 rounded-3xl border border-[#2C2C31] bg-[#141417] p-7">
+            {FEATURES.map((f, i) => (
+              <div key={f.t} data-reveal style={{ "--d": `${(i % 3) * 0.08}s` } as React.CSSProperties} className="flex flex-col gap-3.5 rounded-3xl border border-[#2C2C31] bg-[#141417] p-7 transition-colors duration-300 hover:border-[#3CC46B]/60">
                 <span className="grid h-12 w-12 place-items-center rounded-2xl" style={{ background: "#1F1F23" }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={BRAND} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     {ICONS[f.icon]}
@@ -291,7 +296,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                   ["03", "Empezás a vender", "Los pedidos llegan al panel; la caja y el stock se actualizan solos."],
                 ]
             ).map(([n, t, d]) => (
-              <div key={n} className="flex flex-col gap-3 border-t-2 pt-5" style={{ borderColor: BRAND }}>
+              <div key={n} data-reveal className="flex flex-col gap-3 border-t-2 pt-5" style={{ borderColor: BRAND, "--d": `${(Number(n) - 1) * 0.1}s` } as React.CSSProperties}>
                 <span style={{ fontFamily: H, color: BRAND }} className="text-[42px] font-extrabold leading-none">{n}</span>
                 <h3 style={{ fontFamily: H }} className="text-2xl font-bold text-[#F4F1EA]">{t}</h3>
                 <p className="leading-relaxed" style={{ color: MUTED }}>{d}</p>
@@ -309,7 +314,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
             {plans.map((p) => {
               const hi = p.interval === "YEARLY";
               return (
-                <div key={p.id} className="flex flex-col gap-5 rounded-3xl border-[1.5px] p-9" style={{ background: hi ? INK : "#FFFFFF", color: hi ? IVORY : INK, borderColor: hi ? BRAND : p.intelligence ? "#1F7FD8" : "#DDD6C8" }}>
+                <div key={p.id} data-reveal className="lift flex flex-col gap-5 rounded-3xl border-[1.5px] p-9" style={{ background: hi ? INK : "#FFFFFF", color: hi ? IVORY : INK, borderColor: hi ? BRAND : p.intelligence ? "#1F7FD8" : "#DDD6C8" }}>
                   {hi ? (
                     <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider" style={{ background: BRAND, color: INK }}>{T("Más elegido", "Mais escolhido")}</span>
                   ) : p.intelligence ? (
@@ -369,9 +374,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
         <div className={`${wrap} flex flex-col items-center gap-6`}>
           <h2 style={{ fontFamily: H }} className="text-[clamp(36px,4.4vw,64px)] font-extrabold leading-[1.04] tracking-tight text-[#F4F1EA]">{T("Llevá tu negocio al siguiente nivel.", "Leve seu negócio para o próximo nível.")}</h2>
           <p className="max-w-[560px] text-lg" style={{ color: MUTED }}>{T("Te mostramos GoWeb funcionando con tu propio menú. Sin compromiso.", "Mostramos a GoWeb funcionando com os seus produtos. Sem compromisso.")}</p>
-          <a href={wa} className="rounded-2xl px-8 py-4 text-lg font-bold" style={{ background: BRAND, color: INK }}>{T("Hablar por WhatsApp", "Falar no WhatsApp")}</a>
+          <a href={wa} className="btn-shine rounded-2xl px-8 py-4 text-lg font-bold transition hover:-translate-y-0.5" style={{ background: BRAND, color: INK }}>{T("Hablar por WhatsApp", "Falar no WhatsApp")}</a>
         </div>
       </section>
+      <RevealOnScroll />
       <footer style={{ background: INK }} className="border-t border-[#2C2C31]">
         <div className={`${wrap} flex flex-wrap items-center justify-between gap-4 py-8 text-sm`} style={{ color: MUTED }}>
           <span className="flex flex-col gap-1.5">
@@ -387,7 +393,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
 
 function SectionTitle({ eyebrow, title, sub, dark }: { eyebrow: string; title: string; sub?: string; dark?: boolean }) {
   return (
-    <div className="flex max-w-[720px] flex-col gap-3.5">
+    <div data-reveal className="flex max-w-[720px] flex-col gap-3.5">
       <span className="text-[13px] font-semibold uppercase tracking-[0.22em]" style={{ color: dark ? BRAND : GW_NAVY }}>{eyebrow}</span>
       <h2 style={{ fontFamily: H, color: dark ? IVORY : INK }} className="text-[clamp(32px,3.6vw,52px)] font-extrabold leading-[1.08] tracking-[-0.02em]">{title}</h2>
       {sub && <p className="text-lg" style={{ color: dark ? MUTED : "#5F5A52" }}>{sub}</p>}

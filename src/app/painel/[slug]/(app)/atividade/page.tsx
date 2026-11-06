@@ -28,6 +28,7 @@ const LABELS: Record<string, [string, string]> = {
   "staff.delete": ["Usuario del equipo eliminado", "Usuário da equipe excluído"],
   "integration.connect": ["Integración de pago conectada", "Integração de pagamento conectada"],
   "integration.remove": ["Integración de pago desconectada", "Integração de pagamento desconectada"],
+  "google.email": ["E-mail de Google para entrar cambiado", "E-mail Google para entrar alterado"],
 };
 
 const ALERT = new Set(["login.fail", "password.fail", "order.amount_mismatch", "order.mark_paid", "cash.out", "integration.remove"]);

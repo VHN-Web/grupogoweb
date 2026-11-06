@@ -114,6 +114,7 @@ export default async function StorePage({
     address: tenant.address,
     phone: tenant.phone,
     social: { whatsapp: tenant.whatsapp, instagram: tenant.instagram },
+    demo: tenant.demo,
     pro,
     suggestions,
     booking: pro && booking.enabled ? { daysAhead: booking.daysAhead } : null,

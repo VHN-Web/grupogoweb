@@ -1,6 +1,7 @@
 import { requireTenantAdmin } from "@/lib/auth";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import { openCredentials } from "@/lib/security";
+import { googleEnabled } from "@/lib/google";
 import { PAYMENT_METHODS, type Currency } from "@/core/types";
 import { panelI18n } from "@/lib/panel-i18n";
 import { CURRENCY_SYMBOL, minorToInput } from "@/core/money";
@@ -8,7 +9,7 @@ import { PhoneInput } from "@/components/forms/PhoneInput";
 import { parseFiscalConfig, parsePaymentConfig } from "@/core/tenant-config";
 import { listPaymentProviders } from "@/adapters/payments/registry";
 import { listFiscalProviders } from "@/adapters/fiscal/providers";
-import { changePassword, saveDelivery, saveFiscal, saveGeneral, savePayments, saveRates, saveIntegration, removeIntegration, savePrinter, saveReport } from "../actions";
+import { changePassword, saveDelivery, saveFiscal, saveGeneral, savePayments, saveRates, saveIntegration, removeIntegration, savePrinter, saveReport, saveLoginEmail } from "../actions";
 import { ProBadge, ProUpsell } from "@/components/ProUpsell";
 
 export const dynamic = "force-dynamic";
@@ -291,6 +292,15 @@ export default async function ConfigPage({ params, searchParams }: { params: Pro
           </div>
         </form>
       </Section>
+
+      {googleEnabled() && (
+        <Section title={T("Entrar con Google", "Entrar com Google")} desc={T("Además del e-mail del contrato, podés autorizar otra cuenta de Google para entrar al panel como dueño.", "Além do e-mail do contrato, você pode autorizar outra conta Google para entrar no painel como dono.")}>
+          <form action={saveLoginEmail.bind(null, slug)} className="flex flex-wrap gap-2">
+            <input name="loginEmail" type="email" className="input max-w-sm" defaultValue={t.loginEmail ?? ""} placeholder="voce@gmail.com" />
+            <button className="btn-primary">{T("Guardar", "Salvar")}</button>
+          </form>
+        </Section>
+      )}
     </div>
   );
 }

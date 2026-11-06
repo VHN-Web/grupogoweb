@@ -182,7 +182,7 @@ const STORES: Store[] = [
     country: "BR",
     lat: -25.4296,
     lng: -49.2713,
-    phone: "+5541991234567",
+    phone: "+5541900000001",
     banner: { tag: "Desde 2012", title: "Corte + Barba", subtitle: "Com toalha quente e cerveja gelada", highlight: "R$ 79,90", ill: "razor" },
     payments: PAYMENTS_BR,
     menu: {
@@ -234,7 +234,7 @@ const STORES: Store[] = [
     country: "BR",
     lat: -23.5617,
     lng: -46.6702,
-    phone: "+5511987654321",
+    phone: "+5511900000002",
     banner: { tag: "Dia das Mães", title: "Kits presenteáveis", highlight: "até 30% off", ill: "perfume" },
     payments: PAYMENTS_BR,
     menu: {
@@ -257,7 +257,7 @@ const STORES: Store[] = [
     color: "#FFC20E",
     tagline: "Entrega em 25–35 min",
     address: "Boa Viagem, Recife",
-    country: "BR", lat: -8.1189, lng: -34.9006, phone: "+5581991234567",
+    country: "BR", lat: -8.1189, lng: -34.9006, phone: "+5581900000003",
     payments: PAYMENTS_BR,
     banner: { tag: "Promo da semana", title: "Combo duplo + batata", highlight: "R$ 39,90", ill: "burger" },
     menu: {
@@ -278,7 +278,7 @@ const STORES: Store[] = [
     color: "#B5482F",
     tagline: "Cozinha italiana",
     address: "Casa Forte, Recife",
-    country: "BR", lat: -8.0346, lng: -34.9196, phone: "+5581987654321",
+    country: "BR", lat: -8.0346, lng: -34.9196, phone: "+5581900000004",
     payments: PAYMENTS_BR,
     banner: { title: "Pizza no forno a lenha", subtitle: "Massa de fermentação natural · 48 h", ill: "pizza" },
     menu: {
@@ -301,7 +301,7 @@ const STORES: Store[] = [
     color: "#4B2E1F",
     tagline: "Café especial e pães artesanais",
     address: "Olinda",
-    country: "BR", lat: -8.0089, lng: -34.8553, phone: "+5581999887766",
+    country: "BR", lat: -8.0089, lng: -34.8553, phone: "+5581900000005",
     payments: PAYMENTS_BR,
     banner: { title: "Café da manhã completo", subtitle: "Café + croissant + suco", highlight: "R$ 24,90", ill: "coffee" },
     menu: {
@@ -324,7 +324,7 @@ const STORES: Store[] = [
     color: "#0E0E10",
     tagline: "Frete grátis acima de R$ 299",
     address: "Recife",
-    country: "BR", lat: -8.0476, lng: -34.877, phone: "+5581988776655",
+    country: "BR", lat: -8.0476, lng: -34.877, phone: "+5581900000006",
     payments: PAYMENTS_BR,
     banner: { tag: "Primavera", title: "Nova coleção", highlight: "Ver tudo →", ill: "dress" },
     menu: {
@@ -343,7 +343,7 @@ const STORES: Store[] = [
     color: "#F2A900",
     tagline: "Cervejaria · Petiscos",
     address: "Recife Antigo",
-    country: "BR", lat: -8.0631, lng: -34.8711, phone: "+5581977665544",
+    country: "BR", lat: -8.0631, lng: -34.8711, phone: "+5581900000007",
     payments: PAYMENTS_BR,
     banner: { title: "Happy hour", highlight: "Chopp em dobro · 18h às 21h", ill: "beer" },
     menu: {
@@ -362,7 +362,7 @@ const STORES: Store[] = [
     color: "#22D3EE",
     tagline: "Informática · Celulares · Games",
     address: "Shopping Recife",
-    country: "BR", lat: -8.1185, lng: -34.9049, phone: "+5581966554433",
+    country: "BR", lat: -8.1185, lng: -34.9049, phone: "+5581900000008",
     payments: PAYMENTS_BR,
     banner: { tag: "Black Friday", title: "Notebooks com 15% off", highlight: "A partir de R$ 2.999", ill: "laptop" },
     menu: {
@@ -426,7 +426,7 @@ async function seedStore(db: DB, s: Store) {
       isOpen: true,
       tagline: s.tagline,
       address: s.address,
-      phone: s.phone ?? "+595981000000",
+      phone: s.phone ?? "+595900000000",
       deliveryFreeOverPyg: br ? 15000 : 200000,
       bannerTag: s.banner.tag ?? null,
       bannerTitle: s.banner.title,
@@ -522,7 +522,13 @@ async function demoExtras(db: DB) {
   const demos = await db.query.tenants.findMany({ where: inArray(schema.tenants.slug, STORES.map((s) => s.slug)) });
   for (const t of demos) {
     const pt = t.country === "BR";
-    await db.update(schema.tenants).set({ demo: true, tier: "pro", whatsapp: t.whatsapp ?? t.phone, instagram: t.instagram ?? t.slug.replace(/-/g, "") }).where(eq(schema.tenants.id, t.id));
+    // Contatos SEMPRE fictícios nas demos (nunca número/perfil de pessoa real) — os botões não abrem nada
+    const idx = String(demos.indexOf(t) + 1).padStart(2, "0");
+    const fakePhone = pt ? `+55819000000${idx}` : `+5959000000${idx}`;
+    await db
+      .update(schema.tenants)
+      .set({ demo: true, tier: "pro", phone: fakePhone, whatsapp: fakePhone, instagram: pt ? "sualoja" : "tutienda", reportTo: null, reportChannel: "none" })
+      .where(eq(schema.tenants.id, t.id));
     // cupom de boas-vindas
     const code = pt ? "BEMVINDO10" : "BIENVENIDO10";
     const c = await db.query.coupons.findFirst({ where: and(eq(schema.coupons.tenantId, t.id), eq(schema.coupons.code, code)) });

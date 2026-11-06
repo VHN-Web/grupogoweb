@@ -142,7 +142,7 @@ export async function setAppointmentStatus(slug: string, id: string, status: "CO
   if (status === "CONFIRMED") {
     // confirmação para o cliente: automática se houver API de WhatsApp; senão abre o WhatsApp com a mensagem pronta
     const msg = appointmentConfirmMessage(t, a);
-    const r = await sendWhatsApp(a.customerPhone, msg).catch(() => ({ status: "FAILED" as const }));
+    const r = t.demo ? { status: "SKIPPED" as const } : await sendWhatsApp(a.customerPhone, msg).catch(() => ({ status: "FAILED" as const }));
     if (r.status !== "SENT") redirect(waLink(a.customerPhone, msg));
   }
 }

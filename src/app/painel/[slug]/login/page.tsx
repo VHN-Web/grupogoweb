@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { ownerSubject, setSession, staffSubject, verifyPassword } from "@/lib/auth";
 import { audit, clearLimit, clientIp, isLimited, rateLimit } from "@/lib/security";
+import { GoogleButton } from "@/components/brand/GoogleButton";
+import { googleEnabled } from "@/lib/google";
 import { AuthShell } from "@/components/brand/AuthShell";
 import { getRegion, tr } from "@/core/region";
 
@@ -17,11 +19,11 @@ export default async function Login({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ e?: string }>;
+  searchParams: Promise<{ e?: string; m?: string }>;
 }) {
   const { slug } = await params;
-  const { e } = await searchParams;
-  const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { id: true, name: true, primaryColor: true, country: true, tier: true } });
+  const { e, m } = await searchParams;
+  const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { id: true, name: true, primaryColor: true, country: true, tier: true, demo: true } });
   if (!tenant) notFound();
   const T = tr(getRegion(tenant.country).locale);
 
@@ -82,6 +84,19 @@ export default async function Login({
         ) : null}
         <button className="btn-primary w-full py-3">Entrar</button>
       </form>
+      {googleEnabled() && !tenant.demo && (
+        <div className="mt-5 space-y-3">
+          <div className="flex items-center gap-3 text-xs text-[#8D877C]"><span className="h-px flex-1 bg-[#2C2C31]" />{T("o", "ou")}<span className="h-px flex-1 bg-[#2C2C31]" /></div>
+          <GoogleButton href={`/api/auth/google?para=painel&loja=${slug}`} label={T("Entrar con Google", "Entrar com Google")} />
+          {e === "google" && (
+            <p className="text-sm text-red-400">
+              {m === "email"
+                ? T("Esta cuenta de Google no está autorizada para este panel. Usá el e-mail del contrato o configuralo en Configuración → Seguridad.", "Esta conta Google não está autorizada neste painel. Use o e-mail do contrato ou cadastre-o em Configurações → Segurança.")
+                : T("No se pudo entrar con Google. Intentá de nuevo.", "Não foi possível entrar com Google. Tente de novo.")}
+            </p>
+          )}
+        </div>
+      )}
     </AuthShell>
   );
 }

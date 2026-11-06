@@ -48,6 +48,7 @@ export type StoreData = {
   address: string | null;
   phone: string | null;
   social: { whatsapp: string | null; instagram: string | null };
+  demo?: boolean;
   pro: boolean;
   suggestions: Record<string, string[]>;
   booking: { daysAhead: number } | null;
@@ -197,7 +198,7 @@ export function Storefront({ data }: { data: StoreData }) {
         {featured.length > 0 && (
           <section className="mt-6">
             <h2 className="th-h mb-3 px-5 text-[21px] font-bold">{T("Lo más pedido", "Mais pedidos")}</h2>
-            <div className="no-scrollbar flex gap-3 overflow-x-auto px-5">
+            <div className="stagger no-scrollbar flex gap-3 overflow-x-auto px-5">
               {featured.map((p, i) => (
                 <div key={p.id} className="flex w-36 shrink-0 flex-col gap-1.5">
                   <ProductImage p={p} tile={tileFor(i)} className="h-36 w-36" radius={theme.radius + 4} size={112} />
@@ -250,7 +251,7 @@ export function Storefront({ data }: { data: StoreData }) {
                   ))}
                 </div>
               ) : (
-                <ul className="flex flex-col gap-2.5">
+                <ul className="stagger flex flex-col gap-2.5">
                   {g.products.map((p, i) => (
                     <ProductRow key={p.id} p={p} theme={theme} tile={tileFor(gi * 3 + i)} qty={cart[p.id] ?? 0} onQty={(q) => setQty(p.id, q)} canOrder={data.isOpen} />
                   ))}
@@ -283,13 +284,15 @@ export function Storefront({ data }: { data: StoreData }) {
 
       {/* Barra do carrinho */}
       {count > 0 && view === "menu" && (
-        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="anim-fade-up fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <button
             onClick={() => setView("cart")}
             className="th-accent flex w-full items-center justify-between px-5 py-4 text-[15px] font-bold shadow-xl shadow-black/25 transition active:scale-[.99]"
             style={{ borderRadius: theme.radius }}
           >
-            <span>{T("Ver pedido", "Ver pedido")} · {count}</span>
+            <span>
+              {T("Ver pedido", "Ver pedido")} · <span key={count} className="anim-pop inline-block">{count}</span>
+            </span>
             <span>{money(subtotal)}</span>
           </button>
         </div>
@@ -755,8 +758,8 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
     };
   }, []);
   return (
-    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/50" onClick={onClose}>
-      <div className="th-bg flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
+    <div className="anim-fade-in fixed inset-0 z-30 flex items-end justify-center bg-black/50" onClick={onClose}>
+      <div className="anim-sheet-up th-bg flex max-h-[92dvh] w-full max-w-xl flex-col rounded-t-3xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
         <div className="th-line flex items-center justify-between border-b px-5 py-4">
           <h2 className="th-h text-lg font-bold">{title}</h2>
           <button onClick={onClose} className="th-surface th-line grid h-9 w-9 place-items-center rounded-full border" aria-label={T("Cerrar", "Fechar")}>
@@ -1216,9 +1219,21 @@ function SocialBar() {
   const { data, T } = useStore();
   const wa = data.social.whatsapp;
   const ig = data.social.instagram?.replace(/^@/, "");
+  const [hint, setHint] = useState(false);
   if (!wa && !ig) return null;
+  // Loja de demonstração: os botões são só ilustrativos (não abrem número/perfil de ninguém)
+  const demoProps = data.demo
+    ? {
+        href: undefined,
+        role: "button",
+        onClick: (e: React.MouseEvent) => {
+          e.preventDefault();
+          setHint(true);
+        },
+      }
+    : {};
   return (
-    <div className="mt-4 flex flex-wrap gap-2 px-5">
+    <div className="mt-4 flex flex-wrap items-center gap-2 px-5">
       {wa && (
         <a
           href={`https://wa.me/${wa.replace(/\D/g, "")}?text=${encodeURIComponent(T(`¡Hola ${data.name}!`, `Olá, ${data.name}!`))}`}
@@ -1227,6 +1242,7 @@ function SocialBar() {
           className="flex items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-semibold text-white"
           style={{ background: "#25D366" }}
           aria-label="WhatsApp"
+          {...demoProps}
         >
           {WA_ICON} WhatsApp
         </a>
@@ -1239,9 +1255,15 @@ function SocialBar() {
           className="flex items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-semibold text-white"
           style={{ background: "linear-gradient(45deg,#F58529,#DD2A7B 50%,#8134AF 80%,#515BD4)" }}
           aria-label="Instagram"
+          {...demoProps}
         >
-          {IG_ICON} @{ig}
+          {IG_ICON} {data.demo ? "Instagram" : `@${ig}`}
         </a>
+      )}
+      {hint && (
+        <span className="anim-fade-up w-full text-[12px] opacity-70">
+          {T("Demostración: en tu tienda, estos botones abren tu WhatsApp y tu Instagram.", "Demonstração: na sua loja, estes botões abrem o seu WhatsApp e o seu Instagram.")}
+        </span>
       )}
     </div>
   );
@@ -1292,7 +1314,7 @@ function FlashOffers({
           </span>
         )}
       </div>
-      <div className="no-scrollbar flex gap-3 overflow-x-auto px-5">
+      <div className="stagger no-scrollbar flex gap-3 overflow-x-auto px-5">
         {offers.map((p, i) => {
           const pct = Math.round((1 - p.pricePyg / p.regularPricePyg!) * 100);
           return (

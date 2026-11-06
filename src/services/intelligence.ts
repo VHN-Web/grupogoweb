@@ -142,7 +142,7 @@ export async function notifyOwnerAbandoned(t: Tenant) {
       .join("\n") +
     T(`\n\nEnviá un cupón para recuperarlos: ${appUrl()}/painel/${t.slug}/marketing`, `\n\nEnvie um cupom para recuperá-los: ${appUrl()}/painel/${t.slug}/marketing`);
   const to = t.reportTo || t.whatsapp || t.phone;
-  if (to) {
+  if (to && !t.demo) {
     if (t.reportChannel === "email" && to.includes("@")) await sendEmail(to, T("Carritos abandonados", "Carrinhos abandonados"), text);
     else if (/^\+\d+$/.test(to)) await sendWhatsApp(to, text);
   }
@@ -230,7 +230,7 @@ export async function cashReport(t: Tenant, sessionId: string) {
 
 /** Envia o relatório pelo canal escolhido pelo lojista. */
 export async function sendCashReport(t: Tenant, sessionId: string) {
-  if (!isPro(t) || t.reportChannel === "none" || !t.reportTo) return { status: "SKIPPED" as const };
+  if (!isPro(t) || t.demo || t.reportChannel === "none" || !t.reportTo) return { status: "SKIPPED" as const };
   const r = await cashReport(t, sessionId);
   if (!r) return { status: "SKIPPED" as const };
   const T = tr(getRegion(t.country).locale);

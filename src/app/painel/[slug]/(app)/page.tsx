@@ -85,7 +85,7 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
                 {list.map((o) => {
                   const next = nextStatus(o);
                   return (
-                    <article key={o.id} className="card p-3.5">
+                    <article key={o.id} className="anim-pop-in card p-3.5">
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <Link href={`/painel/${slug}/pedidos/${o.id}`} className="text-2xl font-black tabular-nums hover:underline">

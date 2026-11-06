@@ -9,7 +9,7 @@ import { tenantPublicUrl } from "@/lib/urls";
 import { invoiceUrl, getSettings } from "@/services/billing";
 import { Flash } from "@/components/Flash";
 import { StatusPill } from "@/components/StatusPill";
-import { cancelCustomerAction, cancelInvoice, confirmInvoicePaid, deliver, saveDomain, setTier, suspendCustomer, toggleTask } from "../../actions";
+import { deleteCustomer, cancelCustomerAction, cancelInvoice, confirmInvoicePaid, deliver, saveDomain, setTier, suspendCustomer, toggleTask } from "../../actions";
 
 export default async function CustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { id } = await params;
@@ -190,6 +190,22 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           <form action={cancelCustomerAction.bind(null, c.id)}><button className="btn-ghost text-red-600">Cancelar contrato</button></form>
         </section>
       )}
+
+      <details className="card border-red-200 p-5 text-sm">
+        <summary className="cursor-pointer font-semibold text-red-700">Apagar cliente</summary>
+        <form action={deleteCustomer.bind(null, c.id)} className="mt-3 space-y-3">
+          <p className="text-muted">
+            Remove o cliente da lista com faturas, contratos e recibos. Não dá para desfazer. Se ele ainda usa o sistema, prefira <b>Cancelar contrato</b>.
+          </p>
+          {c.tenant && !c.tenant.demo && (
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="withStore" defaultChecked className="h-4 w-4" /> apagar também a loja /{c.tenant.slug} (site, painel, pedidos, caixa)
+            </label>
+          )}
+          <input name="confirm" className="input" placeholder={`digite: ${c.businessName}`} autoComplete="off" />
+          <button className="btn-ghost text-red-600">Apagar de vez</button>
+        </form>
+      </details>
     </div>
   );
 }

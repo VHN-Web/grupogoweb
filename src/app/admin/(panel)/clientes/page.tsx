@@ -6,7 +6,7 @@ import { PLATFORM_LABELS } from "@/core/types";
 import { fmtDate } from "@/core/billing";
 import { Flash } from "@/components/Flash";
 import { StatusPill } from "@/components/StatusPill";
-import { newCustomer } from "../actions";
+import { deleteCustomers, deleteOrphanStores, newCustomer, orphanStores } from "../actions";
 import { THEMES, THEME_IDS } from "@/core/themes";
 import { NameInput } from "@/components/forms/NameInput";
 import { PhoneInput } from "@/components/forms/PhoneInput";
@@ -18,6 +18,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     db.query.customers.findMany({ with: { plan: true, tenant: true }, orderBy: desc(schema.customers.createdAt) }),
     db.query.plans.findMany({ where: eq(schema.plans.active, true), orderBy: asc(schema.plans.sortOrder) }),
   ]);
+  const orphans = await orphanStores();
 
   return (
     <div className="space-y-6">
@@ -79,6 +80,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         <table className="w-full min-w-[720px] text-sm">
           <thead className="text-left text-xs text-muted">
             <tr className="border-b border-line">
+              <th className="w-10 px-4 py-2.5 font-medium"><span className="sr-only">Selecionar</span></th>
               <th className="px-4 py-2.5 font-medium">Cliente</th>
               <th className="px-4 py-2.5 font-medium">Plano</th>
               <th className="px-4 py-2.5 font-medium">Status</th>
@@ -87,9 +89,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {customers.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-muted">Nenhum cliente ainda</td></tr>}
+            {customers.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-muted">Nenhum cliente ainda</td></tr>}
             {customers.map((c) => (
               <tr key={c.id} className="hover:bg-paper">
+                <td className="px-4 py-2.5">
+                  <input type="checkbox" name="ids" value={c.id} form="apagar-clientes" className="h-4 w-4" aria-label={`Selecionar ${c.businessName}`} />
+                </td>
                 <td className="px-4 py-2.5"><Link href={`/admin/clientes/${c.id}`} className="font-semibold hover:underline">{c.businessName}</Link><p className="text-xs text-muted">{c.contactName}</p></td>
                 <td className="px-4 py-2.5">{c.plan.name}</td>
                 <td className="px-4 py-2.5"><StatusPill status={c.status} /></td>
@@ -100,6 +105,38 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           </tbody>
         </table>
       </div>
+
+      {customers.length > 0 && (
+        <form id="apagar-clientes" action={deleteCustomers} className="card flex flex-wrap items-center gap-3 border-red-200 p-4 text-sm">
+          <span className="font-semibold text-red-700">Apagar selecionados</span>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="withStore" defaultChecked className="h-4 w-4" /> apagar também a loja (site, painel, pedidos, caixa)
+          </label>
+          <input name="confirm" className="input w-40 py-1.5" placeholder="digite APAGAR" autoComplete="off" />
+          <button className="btn-ghost text-red-600">Apagar de vez</button>
+          <p className="w-full text-xs text-muted">Some da lista junto com faturas, contratos e recibos. Não dá para desfazer. Lojas de demonstração são preservadas.</p>
+        </form>
+      )}
+
+      {orphans.length > 0 && (
+        <form action={deleteOrphanStores} className="card space-y-3 p-4 text-sm">
+          <p className="font-semibold">Lojas sem cliente ({orphans.length})</p>
+          <p className="text-xs text-muted">Sobras de testes: lojas criadas que não estão ligadas a nenhum cliente.</p>
+          <ul className="space-y-1">
+            {orphans.map((t) => (
+              <li key={t.id}>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" name="ids" value={t.id} className="h-4 w-4" /> {t.name} <span className="text-muted">/{t.slug} · {fmtDate(t.createdAt)}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap items-center gap-3">
+            <input name="confirm" className="input w-40 py-1.5" placeholder="digite APAGAR" autoComplete="off" />
+            <button className="btn-ghost text-red-600">Apagar lojas selecionadas</button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

@@ -111,6 +111,7 @@ export const tenants = pgTable("tenants", {
   // Segurança
   demo: boolean("demo").notNull().default(false), // loja de demonstração (único caso em que o pagamento simulado é aceito)
   sessionVersion: integer("session_version").notNull().default(1), // trocar a senha derruba as outras sessões
+  loginEmail: text("login_email"), // e-mail Google do dono (além do e-mail do contrato) para "Entrar com Google"
   createdAt: createdAt(),
 });
 
