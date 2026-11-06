@@ -44,13 +44,24 @@ export async function getSettings() {
   return created ?? (await db.query.platformSettings.findFirst())!;
 }
 
+/**
+ * Gateway efetivo por moeda. Regras de segurança/fallback:
+ * - Mercado Pago configurado (token na Vercel) substitui o "Simulado" em BRL — dinheiro real vence a demonstração.
+ * - Gateway escolhido que não está configurado cai para pagamento manual (transferência).
+ */
 export function gatewayMap(raw: string): Record<Currency, string> {
+  let j: Partial<Record<Currency, string>> = {};
   try {
-    const j = JSON.parse(raw);
-    return { PYG: j.PYG ?? "manual", USD: j.USD ?? "manual", BRL: j.BRL ?? "manual" };
-  } catch {
-    return { PYG: "manual", USD: "manual", BRL: "manual" };
+    j = JSON.parse(raw) ?? {};
+  } catch {}
+  const out = { PYG: j.PYG ?? "manual", USD: j.USD ?? "manual", BRL: j.BRL ?? "manual" } as Record<Currency, string>;
+  const mp = getBillingProvider("mercadopago");
+  for (const c of CURRENCIES) {
+    if (c === "BRL" && out[c] === "mock" && mp?.isConfigured()) out[c] = "mercadopago";
+    const p = getBillingProvider(out[c]);
+    if (!p || !p.isConfigured() || !p.currencies.includes(c)) out[c] = "manual";
   }
+  return out;
 }
 
 export const invoiceUrl = (id: string) => `${appUrl()}/fatura/${id}`;
