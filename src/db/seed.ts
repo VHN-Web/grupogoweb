@@ -3,7 +3,7 @@
 // Senha de todos os painéis demo: demo1234
 import "dotenv/config";
 import { sealCredentials } from "../lib/secrets";
-import { planToPt } from "../core/plans";
+import { planToPt, withGrowthFeatures } from "../core/plans";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { hashPassword } from "@/lib/password";
 import { createDb, type DB } from "./client";
@@ -516,9 +516,18 @@ async function plansToPortuguese(db: DB) {
   }
 }
 
+/** Crescimento: base ganha carteira/origem/kit/SEO (+ avaliações e vitrine opcionais); GoInteligence ganha campanhas, indicação, fidelidade e aniversário. */
+async function growthPlanFeatures(db: DB) {
+  for (const p of await db.query.plans.findMany()) {
+    const next = withGrowthFeatures(p.features, p.intelligence);
+    if (next !== (p.features ?? "")) await db.update(schema.plans).set({ features: next }).where(eq(schema.plans.id, p.id));
+  }
+}
+
 async function demoExtras(db: DB) {
   await sealStoredCredentials(db);
   await plansToPortuguese(db);
+  await growthPlanFeatures(db);
   const demos = await db.query.tenants.findMany({ where: inArray(schema.tenants.slug, STORES.map((s) => s.slug)) });
   for (const t of demos) {
     const pt = t.country === "BR";

@@ -17,8 +17,8 @@ export function ProUpsell({ locale, feature }: { locale: "es" | "pt"; feature?: 
       </p>
       <p className="mt-1 text-sm text-muted">
         {pt
-          ? "Sugestões inteligentes de venda, recuperação de carrinho com cupom, ofertas relâmpago, agenda com confirmação, equipe com login e relatório de caixa automático."
-          : "Sugerencias inteligentes de venta, recuperación de carritos con cupón, ofertas relámpago, agenda con confirmación, equipo con login e informe de caja automático."}
+          ? "Campanhas de reativação no WhatsApp, indique e ganhe, cartão fidelidade/cashback, cupom de aniversário, sugestões inteligentes, recuperação de carrinho, ofertas relâmpago, agenda, equipe com login e relatório de caixa automático."
+          : "Campañas de reactivación por WhatsApp, recomendá y ganá, tarjeta de fidelidad/cashback, cupón de cumpleaños, sugerencias inteligentes, carritos abandonados, ofertas relámpago, agenda, equipo con login e informe de caja automático."}
       </p>
       <p className="mt-3 text-sm font-semibold">{pt ? "Fale com o suporte para ativar no seu plano." : "Hablá con soporte para activarlo en tu plan."}</p>
     </div>

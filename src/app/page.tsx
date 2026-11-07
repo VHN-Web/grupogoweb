@@ -49,6 +49,9 @@ const FEATURES_ES = [
   { icon: "box", t: "Control de stock", d: "Los productos se descuentan con cada venta y se marcan como agotados automáticamente." },
   { icon: "route", t: "Delivery con distancia", d: "La tarifa se recalcula según la ubicación del cliente, con radio máximo y envío gratis." },
   { icon: "doc", t: "Comprobantes y facturas", d: "Comprobante automático en cada pedido y registro de facturas. Preparado para SIFEN." },
+  { icon: "users", t: "Cartera de clientes", d: "Cada cliente queda guardado con sus compras. Sabé de dónde viene cada venta: Instagram, WhatsApp, Google o volante." },
+  { icon: "star", t: "Más clientes desde Google", d: "Tienda optimizada para Google, kit con QR y artes listas, pedido de reseña y Vitrina de la ciudad." },
+  { icon: "gift", t: "Clientes que vuelven", d: "En GoInteligence: campañas con cupón, recomendá y ganá, tarjeta de fidelidad/cashback y cupón de cumpleaños." },
 ];
 const FEATURES_PT = [
   { icon: "qr", t: "Cardápio com QR por mesa", d: "Cada mesa tem seu código. O cliente escaneia, escolhe e pede sem baixar nada." },
@@ -57,9 +60,15 @@ const FEATURES_PT = [
   { icon: "box", t: "Controle de estoque", d: "Os produtos são baixados a cada venda e marcados como esgotados automaticamente." },
   { icon: "route", t: "Delivery por distância", d: "A taxa é recalculada pela localização do cliente, com raio máximo e frete grátis." },
   { icon: "doc", t: "Comprovantes e notas", d: "Comprovante automático em cada pedido e registro das notas fiscais emitidas e recebidas." },
+  { icon: "users", t: "Carteira de clientes", d: "Cada cliente fica salvo com o histórico de compras. Saiba de onde vem cada venda: Instagram, WhatsApp, Google ou panfleto." },
+  { icon: "star", t: "Mais clientes pelo Google", d: "Loja otimizada para o Google, kit com QR e artes prontas, pedido de avaliação e Vitrine da cidade." },
+  { icon: "gift", t: "Clientes que voltam", d: "No GoInteligence: campanhas com cupom, indique e ganhe, cartão fidelidade/cashback e cupom de aniversário." },
 ];
 
 const ICONS: Record<string, React.ReactNode> = {
+  users: (<><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5" /><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.8 3.1 2.6 3.5 5.2" /></>),
+  star: (<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />),
+  gift: (<><rect x="3.5" y="8.5" width="17" height="4" rx="1" /><path d="M5 12.5V20h14v-7.5M12 8.5V20M12 8.5C10 4 6.5 4.5 7 7c.3 1.4 2.5 1.5 5 1.5ZM12 8.5c2-4.5 5.5-4 5-1.5-.3 1.4-2.5 1.5-5 1.5Z" /></>),
   qr: (
     <>
       <rect x="3" y="3" width="7" height="7" rx="1" />

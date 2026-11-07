@@ -32,7 +32,28 @@ const FEATURE_PT: Record<string, string> = {
   "Agenda con confirmación por WhatsApp": "Agenda com confirmação por WhatsApp",
   "Equipo con login y permisos": "Equipe com login e permissões",
   "Informe de cierre de caja por e-mail/WhatsApp": "Relatório de fechamento de caixa por e-mail/WhatsApp",
+  "Cartera de clientes y origen de las ventas": "Carteira de clientes e origem das vendas",
+  "Kit de divulgación + tienda optimizada para Google": "Kit de divulgação + loja otimizada para o Google",
+  "Reseñas en Google y Vitrina de la ciudad (opcionales)": "Avaliações no Google e Vitrine da cidade (opcionais)",
+  "Campañas de reactivación por WhatsApp": "Campanhas de reativação no WhatsApp",
+  "Recomendá y ganá": "Indique e ganhe",
+  "Tarjeta de fidelidad / cashback": "Cartão fidelidade / cashback",
+  "Cupón de cumpleaños automático": "Cupom de aniversário automático",
 };
+
+/** Recursos de Crescimento adicionados aos planos (cadastrados em PT). */
+export const GROWTH_PLAN_FEATURES = {
+  base: ["Carteira de clientes e origem das vendas", "Kit de divulgação + loja otimizada para o Google", "Avaliações no Google e Vitrine da cidade (opcionais)"],
+  pro: ["Campanhas de reativação no WhatsApp", "Indique e ganhe", "Cartão fidelidade / cashback", "Cupom de aniversário automático"],
+};
+
+/** Acrescenta as linhas que faltam (idempotente; compara nos dois idiomas). */
+export function withGrowthFeatures(features: string | null, pro: boolean): string {
+  const lines = (features ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const has = new Set(lines.map((l) => planFeature(l, "pt")));
+  const add = (pro ? GROWTH_PLAN_FEATURES.pro : GROWTH_PLAN_FEATURES.base).filter((f) => !has.has(f));
+  return [...lines, ...add].join("\n");
+}
 const FEATURE_ES: Record<string, string> = Object.fromEntries(Object.entries(FEATURE_PT).map(([es, pt]) => [pt, es]));
 
 /** Funciona nos dois sentidos: o plano pode estar cadastrado em espanhol ou em português. */

@@ -15,6 +15,8 @@ import { getDistanceProvider } from "@/adapters/distance";
 import { getExchangeRateProvider } from "@/adapters/exchange-rates";
 import { maybeAutoIssueFiscal } from "./fiscal";
 import { openCredentials } from "@/lib/security";
+import { featureOn, normalizeSource, parseBirthday } from "@/core/growth";
+import { growthOf, onOrderCompleted, resolveReferral, upsertShopper } from "./growth";
 
 export class OrderError extends Error {
   constructor(public code: string, message: string) {
@@ -50,6 +52,11 @@ export const createOrderSchema = z.object({
   couponCode: z.string().trim().max(30).optional().nullable(),
   cartId: z.string().max(60).optional().nullable(),
   customerDoc: z.string().max(20).optional().nullable(), // CPF opcional (Brasil)
+  // Crescimento
+  source: z.string().max(40).optional().nullable(),
+  refCode: z.string().max(20).optional().nullable(),
+  marketingOptIn: z.boolean().optional().nullable(),
+  birthday: z.string().max(10).optional().nullable(),
 });
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 
@@ -142,10 +149,29 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
     const c = await findCoupon(tenant.id, input.couponCode);
     const chk = c ? checkCoupon(c, subtotalPyg) : ({ ok: false, reason: "INACTIVE" } as const);
     if (!chk.ok || !c) throw new OrderError("COUPON", couponError(chk.ok ? "INACTIVE" : chk.reason, getRegion(tenant.country).locale, c ? formatMoney(c.minSubtotal, tenant.currency as Currency) : undefined));
+    // cupom pessoal (recompensa): só vale para o cliente dono dele
+    if (c.shopperId) {
+      const owner = await db.query.shoppers.findFirst({ where: eq(schema.shoppers.id, c.shopperId), columns: { phone: true } });
+      if (!owner || owner.phone !== input.customerPhone)
+        throw new OrderError("COUPON", T("Este cupón es personal: usá el mismo WhatsApp que lo recibió", "Este cupom é pessoal: use o mesmo WhatsApp que recebeu o cupom"));
+    }
     discountPyg = chk.discount;
     couponId = c.id;
     couponCode = c.code;
   }
+
+  // ---- Indique e ganhe: desconto na primeira compra de quem foi indicado (não soma com cupom)
+  let referrerShopperId: string | null = null;
+  if (!couponId && input.refCode) {
+    const r = await resolveReferral(tenant, input.refCode, input.customerPhone);
+    if (r) {
+      discountPyg = Math.floor((subtotalPyg * r.pct) / 100);
+      referrerShopperId = r.referrer.id;
+    }
+  }
+  const growth = growthOf(tenant);
+  const birthday = featureOn(growth.cfg, "birthday", growth.pro) ? parseBirthday(input.birthday) : null;
+  const source = input.type === "DINE_IN" ? "mesa" : referrerShopperId ? "indicacao" : normalizeSource(input.source);
 
   // ---- Delivery (recalculado no servidor)
   let deliveryFeePyg = 0;
@@ -246,8 +272,22 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
         cashTenderedMinor,
         changeDuePyg: change,
         cashSessionId: openSession?.id ?? null,
+        source,
+        referrerShopperId,
       })
       .returning();
+
+    // carteira de clientes: todo pedido com WhatsApp vira (ou atualiza) um cliente da loja
+    if (input.customerPhone) {
+      const shopper = await upsertShopper(tx, tenant.id, {
+        phone: input.customerPhone,
+        name: input.customerName,
+        optIn: input.marketingOptIn ?? null,
+        birthday,
+        referredBy: referrerShopperId,
+      });
+      await tx.update(schema.orders).set({ shopperId: shopper.id }).where(eq(schema.orders.id, o.id));
+    }
 
     await tx.insert(schema.orderItems).values(
       lines.map((l) => ({
@@ -363,6 +403,8 @@ export async function setOrderStatus(tenantId: string, orderId: string, status: 
     }
     await tx.update(schema.orders).set({ status, updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
   });
+  // recompensas (fidelidade, indicação, avaliação) só quando o pedido é concluído
+  if (status === "COMPLETED") await onOrderCompleted(tenantId, orderId).catch((e) => console.error("[growth]", e));
 }
 
 export async function setPaymentStatus(tenantId: string, orderId: string, status: PaymentStatus, ref?: string) {

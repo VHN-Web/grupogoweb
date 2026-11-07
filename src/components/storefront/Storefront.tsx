@@ -50,6 +50,13 @@ export type StoreData = {
   social: { whatsapp: string | null; instagram: string | null };
   demo?: boolean;
   pro: boolean;
+  growth: {
+    referralPct: number | null;
+    referral: { code: string; firstName: string; pct: number } | null;
+    birthday: boolean;
+    consent: boolean;
+    phoneOnTable: boolean;
+  };
   suggestions: Record<string, string[]>;
   booking: { daysAhead: number } | null;
   isOpen: boolean;
@@ -118,6 +125,13 @@ export function Storefront({ data }: { data: StoreData }) {
   // Link de recuperação de carrinho (?carrinho=ID&cupom=CODE) e cupom vindo de campanha (?cupom=CODE)
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
+    // origem da visita (?origem= ou utm_source) e indicação (?indicacao=) ficam guardadas por 7 dias
+    try {
+      const src = sp.get("origem") ?? sp.get("utm_source");
+      if (src) localStorage.setItem(`gw_src_${data.slug}`, JSON.stringify({ v: src.slice(0, 40), at: Date.now() }));
+      const ind = sp.get("indicacao") ?? sp.get("ref");
+      if (ind) localStorage.setItem(`gw_ref_${data.slug}`, JSON.stringify({ v: ind.slice(0, 20), at: Date.now() }));
+    } catch {}
     const cupom = sp.get("cupom");
     if (cupom) setInitialCoupon(cupom);
     const cid = sp.get("carrinho");
@@ -177,6 +191,14 @@ export function Storefront({ data }: { data: StoreData }) {
       <div className="mx-auto max-w-xl pb-32">
         <Hero data={data} theme={theme} />
         <SocialBar />
+        {data.growth.referral && (
+          <div className="anim-fade-up mx-5 mt-4 rounded-2xl px-4 py-3 text-[14px] font-semibold" style={{ background: "var(--brand)", color: "var(--brand-fg)" }}>
+            {T(
+              `${data.growth.referral.firstName} te recomendó: ${data.growth.referral.pct}% de descuento en tu primera compra. Informá tu WhatsApp al finalizar.`,
+              `${data.growth.referral.firstName} indicou você: ${data.growth.referral.pct}% de desconto na primeira compra. Informe seu WhatsApp ao finalizar.`,
+            )}
+          </div>
+        )}
         <FlashOffers products={all} theme={theme} cart={cart} setQty={setQty} tileFor={tileFor} />
 
         {(data.table || data.invalidTable || !data.isOpen) && (
@@ -842,6 +864,9 @@ function Checkout({
   const [type, setType] = useState<OrderType>(data.table ? "DINE_IN" : typeOptions[0] ?? "PICKUP");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [optIn, setOptIn] = useState(false);
+  const refCode = readStored(`gw_ref_${data.slug}`);
   const [phone, setPhone] = useState<string | null>(null); // E.164 válido ou null
   const [address, setAddress] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -940,7 +965,9 @@ function Checkout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phone, name, itemsKey]);
 
-  const discount = coupon?.discount ?? 0;
+  // indicação: desconto na primeira compra (o servidor confere; não soma com cupom)
+  const refDiscount = !coupon && refCode && data.growth.referralPct && phone ? Math.floor((subtotal * data.growth.referralPct) / 100) : 0;
+  const discount = coupon?.discount ?? refDiscount;
   const deliveryFee = type === "DELIVERY" && quote.state === "ok" ? quote.feePyg : 0;
   const total = subtotal - discount + deliveryFee;
   const totalInCurrency = fromBase(total, base, currency, data.rates);
@@ -984,6 +1011,10 @@ function Checkout({
           cashTenderedMinor: method === "CASH" ? tenderedMinor : null,
           couponCode: coupon?.code ?? null,
           cartId,
+          source: readStored(`gw_src_${data.slug}`),
+          refCode,
+          marketingOptIn: data.growth.consent && phone ? optIn : null,
+          birthday: data.growth.birthday && birthday ? birthday : null,
         }),
       });
       const out = await res.json();
@@ -1035,13 +1066,40 @@ function Checkout({
             )}
           </div>
         )}
-        {(type === "DELIVERY" || type === "PICKUP") && (
+        {(type === "DELIVERY" || type === "PICKUP" || data.growth.phoneOnTable) && (
           <div>
             <label className="label" htmlFor="phone">
               WhatsApp{!phoneRequired && ` (${T("opcional", "opcional")})`}
             </label>
             <PhoneInput id="phone" defaultCountry={data.country} locale={data.locale} onChange={(e) => setPhone(e)} />
+            {data.growth.phoneOnTable && !phoneRequired && (
+              <p className="th-muted mt-1 text-[12px]">{T("Con tu WhatsApp acumulás beneficios y recibís tus premios.", "Com seu WhatsApp você acumula benefícios e recebe seus prêmios.")}</p>
+            )}
           </div>
+        )}
+        {data.growth.birthday && phone && (
+          <div>
+            <label className="label" htmlFor="bday">{T("Tu cumpleaños (opcional)", "Seu aniversário (opcional)")}</label>
+            <input
+              id="bday"
+              className="input"
+              inputMode="numeric"
+              placeholder={T("DD/MM", "DD/MM")}
+              value={birthday}
+              maxLength={5}
+              onChange={(e) => {
+                const d = e.target.value.replace(/\D/g, "").slice(0, 4);
+                setBirthday(d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d);
+              }}
+            />
+            <p className="th-muted mt-1 text-[12px]">{T("Te mandamos un regalo en tu cumpleaños.", "A gente manda um presente no seu aniversário.")}</p>
+          </div>
+        )}
+        {data.growth.consent && phone && (
+          <label className="flex items-start gap-3 text-[13.5px]">
+            <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} />
+            <span>{T(`Quiero recibir ofertas de ${data.name} por WhatsApp. Puedo cancelar cuando quiera.`, `Quero receber ofertas da ${data.name} pelo WhatsApp. Posso cancelar quando quiser.`)}</span>
+          </label>
         )}
         {type === "DELIVERY" && (
           <div className="space-y-2">
@@ -1134,7 +1192,15 @@ function Checkout({
 
       <div className={`${box} space-y-1.5 p-4 text-sm`}>
         <Row k="Subtotal" v={money(subtotal)} />
-        {discount > 0 && <Row k={`${T("Descuento", "Desconto")} (${coupon!.code})`} v={<span className="text-emerald-600">-{money(discount)}</span>} />}
+        {discount > 0 && (
+          <Row
+            k={coupon ? `${T("Descuento", "Desconto")} (${coupon.code})` : `${T("Descuento por recomendación", "Desconto de indicação")} (${data.growth.referralPct}%)`}
+            v={<span className="text-emerald-600">-{money(discount)}</span>}
+          />
+        )}
+        {!coupon && refCode && data.growth.referralPct && !phone && (
+          <p className="text-[12px] text-emerald-600">{T(`Informá tu WhatsApp para usar el ${data.growth.referralPct}% de descuento por recomendación (primera compra).`, `Informe seu WhatsApp para usar ${data.growth.referralPct}% de desconto de indicação (primeira compra).`)}</p>
+        )}
         {type === "DELIVERY" && <Row k={T("Delivery", "Entrega")} v={quote.state === "ok" ? (quote.free ? T("Gratis", "Grátis") : money(deliveryFee)) : "—"} />}
         <div className="th-line my-2 border-t" />
         <Row k={<b>Total</b>} v={<b className="text-lg">{money(total)}</b>} />
@@ -1500,4 +1566,16 @@ function BookingSheet({ product, onClose }: { product: StoreProduct; onClose: ()
       )}
     </Sheet>
   );
+}
+
+/** Valor guardado pela loja (origem/indicação), válido por 7 dias. */
+function readStored(key: string): string | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const j = JSON.parse(raw) as { v: string; at: number };
+    return Date.now() - j.at < 7 * 864e5 ? j.v : null;
+  } catch {
+    return null;
+  }
 }

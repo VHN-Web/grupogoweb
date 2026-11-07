@@ -111,6 +111,8 @@ export const tenants = pgTable("tenants", {
   // Segurança
   demo: boolean("demo").notNull().default(false), // loja de demonstração (único caso em que o pagamento simulado é aceito)
   sessionVersion: integer("session_version").notNull().default(1), // trocar a senha derruba as outras sessões
+  // Crescimento (carteira de clientes, indicação, fidelidade, campanhas…) — JSON validado em core/growth.ts
+  growthConfig: text("growth_config").notNull().default("{}"),
   loginEmail: text("login_email"), // e-mail Google do dono (além do e-mail do contrato) para "Entrar com Google"
   createdAt: createdAt(),
 });
@@ -249,6 +251,11 @@ export const orders = pgTable(
     changeDuePyg: integer("change_due_pyg"), // vuelto em guaraníes
 
     status: text("status").$type<OrderStatus>().notNull().default("RECEIVED"),
+    // Crescimento: cliente da loja, de onde veio e quem indicou
+    shopperId: text("shopper_id"),
+    source: text("source"),
+    referrerShopperId: text("referrer_shopper_id"),
+    growthDone: boolean("growth_done").notNull().default(false), // recompensas já processadas (uma vez só)
     cashSessionId: text("cash_session_id").references(() => cashSessions.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -511,10 +518,52 @@ export const coupons = pgTable(
     uses: integer("uses").notNull().default(0),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
+    // Cupom pessoal (recompensa): só vale para este cliente da loja
+    shopperId: text("shopper_id"),
+    purpose: text("purpose"), // loyalty | cashback | referral | birthday | campaign | null (manual)
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("coupons_tenant_code_uq").on(t.tenantId, t.code)],
 );
+
+// =============================================================================
+// Crescimento: carteira de clientes da loja e campanhas
+// =============================================================================
+export const shoppers = pgTable(
+  "shoppers",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(), // E.164
+    name: text("name").notNull(),
+    birthday: text("birthday"), // MM-DD
+    marketingOptIn: boolean("marketing_opt_in").notNull().default(false),
+    optInAt: timestamp("opt_in_at", { withTimezone: true }),
+    refCode: text("ref_code").notNull(),
+    referredBy: text("referred_by"),
+    stamps: integer("stamps").notNull().default(0),
+    lastBirthdayYear: integer("last_birthday_year"),
+    lastReviewAskAt: timestamp("last_review_ask_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("shoppers_tenant_phone_uq").on(t.tenantId, t.phone), uniqueIndex("shoppers_tenant_ref_uq").on(t.tenantId, t.refCode)],
+);
+
+export const campaigns = pgTable("campaigns", {
+  id: id(),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  segment: text("segment").notNull(),
+  message: text("message").notNull(),
+  couponCode: text("coupon_code"),
+  recipients: text("recipients").notNull().default("[]"), // JSON [{id,name,phone}]
+  sentCount: integer("sent_count").notNull().default(0),
+  createdAt: createdAt(),
+});
 
 export const carts = pgTable(
   "carts",
@@ -667,3 +716,5 @@ export type Staff = typeof staff.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type Contract = typeof contracts.$inferSelect;
 export type ServiceInvoice = typeof serviceInvoices.$inferSelect;
+export type Shopper = typeof shoppers.$inferSelect;
+export type Campaign = typeof campaigns.$inferSelect;

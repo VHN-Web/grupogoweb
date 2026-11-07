@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { featureOn } from "@/core/growth";
+import { growthOf, referralBanner } from "@/services/growth";
 import { effectivePrice, parseBookingConfig, promoActive } from "@/core/intelligence";
 import { tenantSuggestions } from "@/services/intelligence";
 import type { Metadata } from "next";
@@ -10,6 +12,7 @@ import { Storefront, type StoreData } from "@/components/storefront/Storefront";
 import { getTheme, readableOn } from "@/core/themes";
 import { getRegion, tenantRates } from "@/core/region";
 import type { Currency } from "@/core/types";
+import { appUrl, tenantPublicUrl } from "@/lib/urls";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +24,21 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const t = await load((await params).slug);
   if (!t) return { title: "GoWeb" };
   const pt = getRegion(t.country).locale === "pt";
+  const g = growthOf(t).cfg;
+  const city = g.directory.city || "";
+  const title = t.tagline ? `${t.name} — ${t.tagline}` : t.name;
+  const description = pt
+    ? `Peça online na ${t.name}${city ? ` em ${city}` : ""}${t.tagline ? ` · ${t.tagline}` : ""}. Cardápio completo, delivery e retirada.`
+    : `Pedí online en ${t.name}${city ? ` en ${city}` : ""}${t.tagline ? ` · ${t.tagline}` : ""}. Menú completo, delivery y retiro.`;
+  const url = tenantPublicUrl(t);
+  const image = t.logoUrl ? (t.logoUrl.startsWith("/") ? `${appUrl()}${t.logoUrl}` : t.logoUrl) : `${appUrl()}/api/kit/${t.slug}?formato=post`;
   return {
-    title: t.tagline ? `${t.name} — ${t.tagline}` : t.name,
-    description: pt ? `Peça online na ${t.name}.` : `Pedí online en ${t.name}.`,
+    title,
+    description,
+    alternates: { canonical: url },
+    robots: t.demo || t.suspended ? { index: false, follow: false } : undefined,
+    openGraph: { title, description, url, siteName: t.name, type: "website", locale: pt ? "pt_BR" : "es_PY", images: [{ url: image }] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
   };
 }
 
@@ -32,10 +47,10 @@ export default async function StorePage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ mesa?: string }>;
+  searchParams: Promise<{ mesa?: string; indicacao?: string; ref?: string }>;
 }) {
   const { slug } = await params;
-  const { mesa } = await searchParams;
+  const { mesa, indicacao, ref } = await searchParams;
   const tenant = await load(slug);
   if (!tenant) notFound();
   if (tenant.suspended) {
@@ -84,6 +99,7 @@ export default async function StorePage({
 
   const theme = getTheme(tenant.theme);
   const region = getRegion(tenant.country);
+  const growth = growthOf(tenant);
   const pro = tenant.tier === "pro";
   const booking = parseBookingConfig(tenant.bookingConfig);
   const suggestions = pro
@@ -116,6 +132,15 @@ export default async function StorePage({
     social: { whatsapp: tenant.whatsapp, instagram: tenant.instagram },
     demo: tenant.demo,
     pro,
+    growth: {
+      referralPct: featureOn(growth.cfg, "referral", growth.pro) ? growth.cfg.referral.friendPct : null,
+      referral: await referralBanner(tenant, indicacao ?? ref ?? null),
+      birthday: featureOn(growth.cfg, "birthday", growth.pro),
+      // pede autorização para ofertas quando a loja usa campanhas ou aniversário
+      consent: featureOn(growth.cfg, "campaigns", growth.pro) || featureOn(growth.cfg, "birthday", growth.pro),
+      // WhatsApp também na mesa, quando há fidelidade/indicação (para acumular e receber recompensas)
+      phoneOnTable: featureOn(growth.cfg, "loyalty", growth.pro) || featureOn(growth.cfg, "referral", growth.pro),
+    },
     suggestions,
     booking: pro && booking.enabled ? { daysAhead: booking.daysAhead } : null,
     isOpen: tenant.isOpen,
@@ -148,6 +173,25 @@ export default async function StorePage({
     <>
       {/* Fontes do tema (carregadas no navegador do cliente) */}
       <link rel="stylesheet" href={theme.fonts.google} precedence="default" />
+      {/* SEO local: dados estruturados para o Google entender o negócio */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Restaurant",
+            name: tenant.name,
+            description: tenant.tagline ?? undefined,
+            url: tenantPublicUrl(tenant),
+            image: tenant.logoUrl ? (tenant.logoUrl.startsWith("/") ? `${appUrl()}${tenant.logoUrl}` : tenant.logoUrl) : undefined,
+            telephone: tenant.demo ? undefined : (tenant.whatsapp ?? tenant.phone ?? undefined),
+            address: tenant.address ? { "@type": "PostalAddress", streetAddress: tenant.address, addressLocality: growth.cfg.directory.city || undefined, addressCountry: tenant.country } : undefined,
+            sameAs: tenant.instagram && !tenant.demo ? [`https://instagram.com/${tenant.instagram}`] : undefined,
+            hasMenu: tenantPublicUrl(tenant),
+            servesCuisine: tenant.tagline ?? undefined,
+          }).replace(/</g, "\\u003c"),
+        }}
+      />
       <Storefront data={data} />
     </>
   );
