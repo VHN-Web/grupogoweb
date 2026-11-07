@@ -48,7 +48,7 @@ export default async function MyPlan({ params, searchParams }: { params: Promise
       : `mailto:${settings.supportEmail ?? "suporte@goweboficial.com"}?subject=${encodeURIComponent(L(m))}`;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="max-w-3xl space-y-5">
       {blocked && mods && !mods.includes(blocked) && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-semibold">{T(`"${L(blocked)}" no está en tu plan.`, `"${L(blocked)}" não faz parte do seu plano.`)}</p>
@@ -81,7 +81,7 @@ export default async function MyPlan({ params, searchParams }: { params: Promise
       )}
       {mods ? null : t.tier === "pro" ? (
         <p className="rounded-2xl bg-gradient-to-r from-[#1F7FD8]/10 to-[#3CC46B]/10 px-5 py-4 text-sm font-semibold ring-1 ring-[#3CC46B]/40">
-          ✨ GoInteligence {T("activo", "ativo")}
+          GoInteligence {T("activo", "ativo")}
         </p>
       ) : (
         <ProUpsell locale={region.locale} />
@@ -103,13 +103,13 @@ export default async function MyPlan({ params, searchParams }: { params: Promise
         )}
         {docs.contracts.map((d) => (
           <div key={d.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
-            <span className="min-w-40 flex-1">📄 {T("Contrato", "Contrato")} {d.number}<br /><span className="text-xs text-muted">{T("aceptado el", "aceito em")} {fmtDate(d.acceptedAt)}</span></span>
+            <span className="min-w-40 flex-1">{T("Contrato", "Contrato")} {d.number}<br /><span className="text-xs text-muted">{T("aceptado el", "aceito em")} {fmtDate(d.acceptedAt)}</span></span>
             <a href={`/contrato/${d.id}`} target="_blank" className="btn-ghost px-3 py-1.5 text-xs">{T("Ver / imprimir", "Ver / imprimir")}</a>
           </div>
         ))}
         {docs.receipts.map((r) => (
           <div key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
-            <span className="min-w-40 flex-1">🧾 {r.kind === "NFSE" ? T("Factura", "Nota fiscal") : T("Recibo", "Recibo")} {r.number}<br /><span className="text-xs text-muted">{r.description}</span></span>
+            <span className="min-w-40 flex-1">{r.kind === "NFSE" ? T("Factura", "Nota fiscal") : T("Recibo", "Recibo")} {r.number}<br /><span className="text-xs text-muted">{r.description}</span></span>
             <b>{formatMinor(r.amountMinor, r.currency)}</b>
             <a href={`/recibo/${r.id}`} target="_blank" className="btn-ghost px-3 py-1.5 text-xs">{T("Ver", "Ver")}</a>
           </div>

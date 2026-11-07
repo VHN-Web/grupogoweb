@@ -22,7 +22,7 @@ export function printUrl(url: string) {
 export function ThermalPrintButton({ url, label, className }: { url: string; label: string; className?: string }) {
   return (
     <button type="button" onClick={() => printUrl(url)} className={className ?? "btn-ghost"}>
-      🖨️ {label}
+      {label}
     </button>
   );
 }
@@ -58,7 +58,7 @@ export function AutoPrinter({ slug, enabled, label = "Imprimir" }: { slug: strin
   // se o navegador bloquear a impressão sem clique, o lojista reimprime aqui
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
-      <span>🖨️ Pedido novo enviado para a impressora.</span>
+      <span>Pedido novo enviado para a impressora.</span>
       {pending.map((id) => (
         <button key={id} type="button" className="underline" onClick={() => printUrl(`/painel/${slug}/imprimir/${id}`)}>
           {label}

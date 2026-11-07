@@ -1,3 +1,4 @@
+import { A11yBoot } from "@/components/a11y/A11yBoot";
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { detectLocale } from "@/core/region";
@@ -25,7 +26,10 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const lang = detectLocale(await headers()) === "pt" ? "pt-BR" : "es";
   return (
-    <html lang={lang}>
+    <html lang={lang} suppressHydrationWarning>
+      <head>
+        <A11yBoot />
+      </head>
       <body className="min-h-dvh font-sans antialiased">{children}</body>
     </html>
   );

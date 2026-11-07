@@ -23,7 +23,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   const auto = canAutoSend(t);
   const seg = SEGMENT_LABELS[c.segment as Segment] ?? SEGMENT_LABELS.all;
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="max-w-4xl space-y-5">
       <Link href={`/painel/${slug}/clientes`} className="text-sm text-muted">← {T("Clientes", "Clientes")}</Link>
       <div>
         <h1 className="text-xl font-bold">{c.name}</h1>

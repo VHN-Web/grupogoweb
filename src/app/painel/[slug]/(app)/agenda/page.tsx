@@ -28,7 +28,7 @@ export default async function AgendaPage({ params, searchParams }: { params: Pro
   const { T, fm, region } = panelI18n(t);
   if (t.tier !== "pro")
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <div className="max-w-3xl space-y-4">
         <h1 className="text-xl font-bold">Agenda <ProBadge /></h1>
         <ProUpsell locale={region.locale} />
       </div>
@@ -63,7 +63,7 @@ export default async function AgendaPage({ params, searchParams }: { params: Pro
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <AutoRefresh ms={15000} />
       <h1 className="text-xl font-bold">Agenda <ProBadge /></h1>
       {sp.ok && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{sp.ok}</p>}

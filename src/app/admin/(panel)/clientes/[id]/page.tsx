@@ -165,7 +165,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
             <li key={n.id} className="py-2">
               <details>
                 <summary className="cursor-pointer">
-                  <span className="font-medium">{n.channel === "EMAIL" ? "✉️" : "💬"} {n.subject ?? n.body.slice(0, 50)}</span>{" "}
+                  <span className="font-medium">{n.channel === "EMAIL" ? "E-mail:" : "WhatsApp:"} {n.subject ?? n.body.slice(0, 50)}</span>{" "}
                   <span className={`text-xs ${n.status === "FAILED" ? "text-red-600" : "text-muted"}`}>
                     {n.status === "LOGGED" ? "registrado (envio não configurado)" : n.status === "SENT" ? "enviado" : `falhou: ${n.error}`} · {fmtDate(n.createdAt)}
                   </span>

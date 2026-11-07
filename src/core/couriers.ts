@@ -19,15 +19,15 @@ export type DeliveryInfo = {
 export function courierMessage(d: DeliveryInfo, T: (es: string, pt: string) => string): string {
   const map = d.lat != null && d.lng != null ? `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}` : d.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.address)}` : null;
   const lines = [
-    `🛵 ${T("Entrega", "Entrega")} #${d.number} — ${d.storeName}`,
+    `*${T("Entrega", "Entrega")} #${d.number} — ${d.storeName}*`,
     "",
-    `👤 ${d.customerName}${d.customerPhone ? ` · ${d.customerPhone}` : ""}`,
-    d.address ? `📍 ${d.address}` : null,
-    map ? `🗺️ ${map}` : null,
+    `${T("Cliente", "Cliente")}: ${d.customerName}${d.customerPhone ? ` · ${d.customerPhone}` : ""}`,
+    d.address ? `${T("Dirección", "Endereço")}: ${d.address}` : null,
+    map ? `${T("Mapa", "Mapa")}: ${map}` : null,
     "",
-    `📦 ${d.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}`,
-    d.collect ? `💵 ${T("Cobrar", "Cobrar")}: ${d.collect}${d.change ? ` · ${T("llevar vuelto", "levar troco")}: ${d.change}` : ""}` : `✅ ${T("Ya pagado", "Já pago")} (${d.total})`,
-    d.notes ? `📝 ${d.notes}` : null,
+    `${T("Pedido", "Itens")}: ${d.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}`,
+    d.collect ? `${T("Cobrar", "Cobrar")}: ${d.collect}${d.change ? ` · ${T("llevar vuelto", "levar troco")}: ${d.change}` : ""}` : `${T("Ya pagado", "Já pago")} (${d.total})`,
+    d.notes ? `${T("Obs.", "Obs.")}: ${d.notes}` : null,
   ];
   return lines.filter((l) => l !== null).join("\n");
 }

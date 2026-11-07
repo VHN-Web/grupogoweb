@@ -35,7 +35,7 @@ export default async function ConfigPage({ params, searchParams }: { params: Pro
   const rateField: Record<Currency, "rateUsd" | "rateBrl" | "ratePyg"> = { USD: "rateUsd", BRL: "rateBrl", PYG: "ratePyg" };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <h1 className="text-xl font-bold">{T("Configuración", "Configurações")}</h1>
 
       <Section title={T("Datos del local", "Dados do estabelecimento")} desc={T("Logo, colores y banner están en Apariencia.", "Logo, cores e banner ficam em Aparência.")}>

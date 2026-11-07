@@ -1,3 +1,5 @@
+import { ImageUpload } from "@/components/forms/ImageUpload";
+import { uploadLabels } from "@/components/forms/upload-labels";
 import Link from "next/link";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
@@ -15,7 +17,7 @@ export default async function AppearancePage({ params, searchParams }: { params:
   const { T, region } = panelI18n(t);
 
   return (
-    <form action={saveAppearance.bind(null, slug)} className="mx-auto max-w-4xl space-y-6">
+    <form action={saveAppearance.bind(null, slug)} className="max-w-5xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">{T("Apariencia del sitio", "Aparência do site")}</h1>
@@ -74,17 +76,8 @@ export default async function AppearancePage({ params, searchParams }: { params:
           <input id="tagline" name="tagline" className="input" defaultValue={t.tagline ?? ""} placeholder={T("Cucina italiana · Cervecería · Envíos a todo Asunción", "Cortes clássicos · Perfumes importados · Entrega na cidade toda")} />
         </div>
         <div className="sm:col-span-2">
-          <label className="label" htmlFor="logoFile">{T("Logo (cuadrado, JPG/PNG/WEBP, máx. 4 MB)", "Logo (quadrado, JPG/PNG/WEBP, máx. 4 MB)")}</label>
-          <div className="flex flex-wrap items-center gap-4">
-            {t.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={t.logoUrl} alt="Logo actual" className="h-16 w-16 rounded-full object-cover ring-1 ring-line" />
-            ) : (
-              <span className="grid h-16 w-16 place-items-center rounded-full bg-paper text-xs text-muted ring-1 ring-line">{T("sin logo", "sem logo")}</span>
-            )}
-            <input id="logoFile" name="logoFile" type="file" accept="image/*" className="text-sm" />
-            {t.logoUrl && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="removeLogo" /> {T("Quitar logo", "Remover logo")}</label>}
-          </div>
+          <label className="label" htmlFor="logoFile">{T("Logo (cuadrado)", "Logo (quadrado)")}</label>
+          <ImageUpload name="logoFile" removeName="removeLogo" current={t.logoUrl} shape="round" maxSide={800} labels={uploadLabels(T)} />
         </div>
       </section>
 
@@ -99,14 +92,7 @@ export default async function AppearancePage({ params, searchParams }: { params:
         <div><label className="label" htmlFor="bannerHighlight">{T("Destaque (precio u horario)", "Destaque (preço ou horário)")}</label><input id="bannerHighlight" name="bannerHighlight" className="input" defaultValue={t.bannerHighlight ?? ""} placeholder={T("Gs. 59.000 · 2x1 de 18 a 21 h", "R$ 59,90 · de 18 às 21 h")} /></div>
         <div className="sm:col-span-2">
           <label className="label" htmlFor="bannerFile">{T("Foto del banner (opcional — si no, usa la ilustración)", "Foto do banner (opcional — senão usa a ilustração)")}</label>
-          <div className="flex flex-wrap items-center gap-4">
-            {t.bannerImageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={t.bannerImageUrl} alt="Banner actual" className="h-16 w-28 rounded-lg object-cover ring-1 ring-line" />
-            )}
-            <input id="bannerFile" name="bannerFile" type="file" accept="image/*" className="text-sm" />
-            {t.bannerImageUrl && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="removeBanner" /> {T("Quitar foto", "Remover foto")}</label>}
-          </div>
+          <ImageUpload name="bannerFile" removeName="removeBanner" current={t.bannerImageUrl} shape="wide" maxSide={2000} labels={uploadLabels(T)} />
         </div>
         <fieldset className="sm:col-span-2">
           <legend className="label">{T("Ilustración del banner", "Ilustração do banner")}</legend>

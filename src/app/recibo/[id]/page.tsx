@@ -25,7 +25,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
     <main className="mx-auto max-w-xl bg-white px-6 py-10 text-black print:px-0 print:py-0" lang={region.locale === "pt" ? "pt-BR" : "es"}>
       <div className="no-print mb-6 flex items-center justify-between gap-3">
         <GoWebLogo height={28} dark={false} />
-        <PrintButton className="btn-primary" label={T("🖨️ Imprimir / guardar PDF", "🖨️ Imprimir / salvar PDF")} />
+        <PrintButton className="btn-primary" label={T("Imprimir / guardar PDF", "Imprimir / salvar PDF")} />
       </div>
       {isNfse && si.pdfUrl ? (
         <p>

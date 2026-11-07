@@ -1,3 +1,4 @@
+import { Icon } from "@/components/ui/Icon";
 import Link from "next/link";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
@@ -35,12 +36,12 @@ export default async function ClientesPage({ params, searchParams }: { params: P
   const L = (o: { es: string; pt: string }) => (locale === "pt" ? o.pt : o.es);
   const campaignsOn = pro && cfg.campaigns.enabled;
   const tpl = T(
-    "¡Hola {nome}! Te extrañamos en {loja} 💚 Usá el cupón {cupom} en tu próximo pedido: {link}",
-    "Oi {nome}! Sentimos sua falta na {loja} 💚 Use o cupom {cupom} no seu próximo pedido: {link}",
+    "¡Hola {nome}! Te extrañamos en {loja} Usá el cupón {cupom} en tu próximo pedido: {link}",
+    "Oi {nome}! Sentimos sua falta na {loja} Use o cupom {cupom} no seu próximo pedido: {link}",
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">{T("Clientes", "Clientes")}</h1>
@@ -53,7 +54,7 @@ export default async function ClientesPage({ params, searchParams }: { params: P
 
       <section className="card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold">📍 {T("De dónde vienen tus ventas", "De onde vêm suas vendas")}</h2>
+          <h2 className="flex items-center gap-2 font-semibold"><Icon name="pin" size={18} className="text-[var(--section)]" />{T("De dónde vienen tus ventas", "De onde vêm suas vendas")}</h2>
           <div className="flex gap-1 text-xs">
             {[7, 30, 90].map((d) => (
               <Link key={d} href={`?dias=${d}`} className={`rounded-lg border border-transparent px-2.5 py-1 font-semibold ${d === days ? "bg-ink text-white" : "btn-ghost"}`}>{d} {T("días", "dias")}</Link>
@@ -74,7 +75,7 @@ export default async function ClientesPage({ params, searchParams }: { params: P
 
       {rewards.length > 0 && (
         <section className="card p-5">
-          <h2 className="font-semibold">🎁 {T("Premios para avisar", "Prêmios para avisar")}</h2>
+          <h2 className="flex items-center gap-2 font-semibold"><Icon name="gift" size={18} className="text-[var(--section)]" />{T("Premios para avisar", "Prêmios para avisar")}</h2>
           <p className="mt-0.5 text-sm text-muted">{T("Cupones generados por fidelidad, recomendación o cumpleaños que el cliente todavía no usó.", "Cupons gerados por fidelidade, indicação ou aniversário que o cliente ainda não usou.")}</p>
           <div className="mt-3 divide-y divide-line">
             {rewards.slice(0, 20).map(({ coupon: c, shopper: s }) => (
@@ -88,7 +89,7 @@ export default async function ClientesPage({ params, searchParams }: { params: P
       )}
 
       <section className="card p-5">
-        <h2 className="font-semibold">📣 {T("Campañas de reactivación", "Campanhas de reativação")} <ProBadge /></h2>
+        <h2 className="flex items-center gap-2 font-semibold"><Icon name="megaphone" size={18} className="text-[var(--section)]" />{T("Campañas de reactivación", "Campanhas de reativação")} <ProBadge /></h2>
         {!pro ? (
           <p className="mt-1 text-sm text-muted">{T("Mandá mensajes con cupón a quien no compra hace tiempo. Disponible en GoInteligence.", "Mande mensagens com cupom para quem sumiu. Disponível no GoInteligence.")} <Link className="font-semibold underline" href={`/painel/${slug}/plano`}>{T("Ver planes", "Ver planos")}</Link></p>
         ) : !cfg.campaigns.enabled ? (
@@ -125,10 +126,10 @@ export default async function ClientesPage({ params, searchParams }: { params: P
 
       {bdays.length > 0 && (
         <section className="card p-5">
-          <h2 className="font-semibold">🎂 {T("Cumpleañeros del mes", "Aniversariantes do mês")}</h2>
+          <h2 className="flex items-center gap-2 font-semibold"><Icon name="cake" size={18} className="text-[var(--section)]" />{T("Cumpleañeros del mes", "Aniversariantes do mês")}</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             {bdays.map((r) => (
-              <a key={r.id} target="_blank" rel="noopener noreferrer" href={waLink(r.phone, T(`¡Feliz cumpleaños, ${r.name.split(" ")[0]}! 🎉`, `Feliz aniversário, ${r.name.split(" ")[0]}! 🎉`))} className="btn-ghost rounded-full px-3 py-1.5 text-sm">{formatBirthday(r.birthday)} · {r.name}</a>
+              <a key={r.id} target="_blank" rel="noopener noreferrer" href={waLink(r.phone, T(`¡Feliz cumpleaños, ${r.name.split(" ")[0]}!`, `Feliz aniversário, ${r.name.split(" ")[0]}!`))} className="btn-ghost rounded-full px-3 py-1.5 text-sm">{formatBirthday(r.birthday)} · {r.name}</a>
             ))}
           </div>
         </section>
@@ -151,7 +152,7 @@ export default async function ClientesPage({ params, searchParams }: { params: P
               {shown.length === 0 && <tr><td colSpan={6} className="py-4 text-muted">{T("Los clientes aparecen aquí cuando informan el WhatsApp en un pedido.", "Os clientes aparecem aqui quando informam o WhatsApp em um pedido.")}</td></tr>}
               {shown.slice(0, 300).map((r) => (
                 <tr key={r.id}>
-                  <td className="py-2.5"><b>{r.name}</b><br /><span className="text-xs text-muted">{formatPhone(r.phone)}{r.birthday && ` · 🎂 ${formatBirthday(r.birthday)}`}</span></td>
+                  <td className="py-2.5"><b>{r.name}</b><br /><span className="text-xs text-muted">{formatPhone(r.phone)}{r.birthday && ` · ${formatBirthday(r.birthday)}`}</span></td>
                   <td>{r.orders}</td>
                   <td>{fm(r.total)}</td>
                   <td className="text-muted">{r.lastOrderAt ? fmtDate(r.lastOrderAt, { dateStyle: "short" }) : "—"}</td>

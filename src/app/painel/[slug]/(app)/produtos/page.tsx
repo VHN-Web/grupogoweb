@@ -1,3 +1,6 @@
+import { Icon } from "@/components/ui/Icon";
+import { ImageUpload } from "@/components/forms/ImageUpload";
+import { uploadLabels } from "@/components/forms/upload-labels";
 import { asc, desc, eq } from "drizzle-orm";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import { db, schema } from "@/db";
@@ -98,20 +101,20 @@ export default async function ProductsPage({ params, searchParams }: { params: P
               <li key={c.id} className="flex items-center gap-2">
                 <form action={saveCategory.bind(null, slug)} className="flex flex-1 gap-2">
                   <input type="hidden" name="id" value={c.id} />
-                  <input name="sortOrder" defaultValue={c.sortOrder} className="input w-14 px-2" aria-label="Orden" />
-                  <input name="name" defaultValue={c.name} className="input" />
-                  <button className="btn-ghost px-3">✓</button>
+                  <input name="sortOrder" defaultValue={c.sortOrder} className="input !w-14 shrink-0 px-2 text-center" aria-label={T("Orden", "Ordem")} />
+                  <input name="name" defaultValue={c.name} className="input min-w-0 flex-1" aria-label={T("Nombre de la categoría", "Nome da categoria")} />
+                  <button className="btn-ghost shrink-0 px-3" aria-label={T("Guardar categoría", "Salvar categoria")}><Icon name="check" size={16} /></button>
                 </form>
                 <form action={deleteCategory.bind(null, slug, c.id)}>
-                  <button className="px-1 text-muted hover:text-red-600" aria-label={T("Eliminar categoría", "Excluir categoria")}>✕</button>
+                  <button className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600" aria-label={T("Eliminar categoría", "Excluir categoria")}><Icon name="close" size={16} /></button>
                 </form>
               </li>
             ))}
           </ul>
           <form action={saveCategory.bind(null, slug)} className="mt-3 flex gap-2">
-            <input name="sortOrder" defaultValue={cats.length + 1} className="input w-14 px-2" aria-label="Orden" />
-            <input name="name" className="input" placeholder={T("Nueva categoría", "Nova categoria")} />
-            <button className="btn-primary px-3">+</button>
+            <input name="sortOrder" defaultValue={cats.length + 1} className="input !w-14 shrink-0 px-2 text-center" aria-label={T("Orden", "Ordem")} />
+            <input name="name" className="input min-w-0 flex-1" placeholder={T("Nueva categoría", "Nova categoria")} aria-label={T("Nueva categoría", "Nova categoria")} />
+            <button className="btn-primary shrink-0 px-3">{T("Agregar", "Adicionar")}</button>
           </form>
         </div>
         <div className="card p-4">
@@ -158,17 +161,8 @@ function ProductForm({ slug, cats, p, T, cur, pro }: { slug: string; cats: Categ
         <input name="newCategory" className="input mt-2" maxLength={40} placeholder={cats.length ? T("…o creá una nueva categoría", "…ou crie uma nova categoria") : T("Creá la primera categoría (ej.: Bebidas)", "Crie a primeira categoria (ex.: Bebidas)")} />
       </div>
       <div>
-        <label className="label">{T("Foto (JPG/PNG/WEBP, máx. 4 MB)", "Foto (JPG/PNG/WEBP, máx. 4 MB)")}</label>
-        <div className="flex items-center gap-3">
-          {p?.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={p.imageUrl} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover ring-1 ring-line" />
-          ) : p?.illustration ? (
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-paper ring-1 ring-line"><Illustration name={p.illustration} size={36} /></span>
-          ) : null}
-          <input name="imageFile" type="file" accept="image/*" className="min-w-0 text-sm" />
-        </div>
-        {p?.imageUrl && <label className="mt-1 flex items-center gap-2 text-xs"><input type="checkbox" name="removeImage" /> {T("Quitar foto", "Remover foto")}</label>}
+        <label className="label">{T("Foto", "Foto")}</label>
+        <ImageUpload name="imageFile" removeName="removeImage" current={p?.imageUrl} labels={uploadLabels(T)} />
       </div>
       <div>
         <label className="label">{T("Ilustración (si no hay foto)", "Ilustração (se não houver foto)")}</label>

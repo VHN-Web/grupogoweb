@@ -46,7 +46,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         <section className="card p-4">
           <h2 className="font-semibold">Tarefas pendentes</h2>
           <ul className="mt-2 divide-y divide-line text-sm">
-            {tasks.length === 0 && <li className="py-3 text-muted">Nada pendente 🎉</li>}
+            {tasks.length === 0 && <li className="py-3 text-muted">Nada pendente</li>}
             {tasks.map((t) => (
               <li key={t.id} className="py-2.5">
                 <Link href={`/admin/clientes/${t.customerId}`} className="font-medium hover:underline">{t.title}</Link>

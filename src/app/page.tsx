@@ -1,3 +1,4 @@
+import { A11yMenu } from "@/components/a11y/A11yMenu";
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -13,6 +14,17 @@ import { RevealOnScroll } from "@/components/motion/RevealOnScroll";
 import { detectLocale, tr, type Locale } from "@/core/region";
 
 export const dynamic = "force-dynamic";
+
+const COMPARE: { k: { es: string; pt: string }; sem: { es: string; pt: string }; com: { es: string; pt: string } }[] = [
+  { k: { es: "El pedido", pt: "O pedido" }, sem: { es: "El cliente manda audio por WhatsApp, alguien lo anota en papel y a veces se equivoca.", pt: "O cliente manda áudio no WhatsApp, alguém anota no papel e às vezes erra." }, com: { es: "El cliente elige en el menú y el pedido llega completo al panel y a la impresora.", pt: "O cliente escolhe no cardápio e o pedido chega completo no painel e na impressora." } },
+  { k: { es: "Comisión", pt: "Comissão" }, sem: { es: "Las apps de delivery se quedan con un porcentaje de cada venta.", pt: "Os aplicativos de delivery ficam com uma porcentagem de cada venda." }, com: { es: "Mensualidad fija. Lo que paga el cliente es tuyo.", pt: "Mensalidade fixa. O que o cliente paga é seu." } },
+  { k: { es: "El menú", pt: "O cardápio" }, sem: { es: "Cambió un precio: hay que reimprimir o tachar a mano.", pt: "Mudou um preço: tem que reimprimir ou riscar à mão." }, com: { es: "Cambiás el precio en el celular y el menú se actualiza al instante.", pt: "Você muda o preço no celular e o cardápio atualiza na hora." } },
+  { k: { es: "El cobro", pt: "O pagamento" }, sem: { es: "Revisar transferencias en el extracto y calcular el vuelto de cabeza.", pt: "Conferir Pix no extrato e calcular o troco de cabeça." }, com: { es: "Pago registrado en cada pedido y vuelto calculado solo.", pt: "Pix, cartão e dinheiro registrados no pedido, com troco calculado." } },
+  { k: { es: "El cliente", pt: "O cliente" }, sem: { es: "Compra una vez y no sabés quién es ni cómo hacer que vuelva.", pt: "Compra uma vez e você não sabe quem é nem como fazer ele voltar." }, com: { es: "Cartera con WhatsApp, cupón para volver y tarjeta de fidelidad.", pt: "Carteira com WhatsApp, cupom de volta e cartão fidelidade." } },
+  { k: { es: "La entrega", pt: "A entrega" }, sem: { es: "Copiar y pegar la dirección para el repartidor y sumar las entregas a mano.", pt: "Copiar e colar o endereço para o motoboy e somar as entregas à mão." }, com: { es: "Ruta con mapa enviada en un toque y pago al repartidor ya calculado.", pt: "Rota com mapa enviada em um toque e acerto do motoboy já calculado." } },
+  { k: { es: "La difusión", pt: "A divulgação" }, sem: { es: "Publicar sin saber si eso trae ventas.", pt: "Postar sem saber se aquilo traz venda." }, com: { es: "Un enlace por red y un informe de dónde viene cada venta.", pt: "Um link para cada rede e um relatório de onde vem cada venda." } },
+  { k: { es: "El cierre", pt: "O fechamento" }, sem: { es: "Sumar comanda por comanda al final del día.", pt: "Somar comanda por comanda no fim do dia." }, com: { es: "Caja cerrada con total por forma de pago y lo más vendido.", pt: "Caixa fechado com total por forma de pagamento e o mais vendido." } },
+];
 
 const INK = "#0E0E10";
 const IVORY = "#F4F1EA";
@@ -148,6 +160,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
 
   return (
     <div style={{ background: IVORY, color: INK }} className="font-sans" lang={pt ? "pt-BR" : "es"}>
+      <A11yMenu locale={pt ? "pt" : "es"} variant="floating" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Anton&display=swap" precedence="default" />
 
       {/* NAV */}
@@ -159,6 +172,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
           <div className="flex-1" />
           <a href="#modelos" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>{T("Modelos", "Modelos")}</a>
           <a href="#funciones" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>{T("Funciones", "Recursos")}</a>
+          <a href="#comparativo" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>{T("Comparativo", "Comparativo")}</a>
           <a href="#planes" className="hidden text-[15px] sm:inline" style={{ color: MUTED }}>{T("Planes", "Planos")}</a>
           <span className="flex overflow-hidden rounded-xl border border-[#45454B] text-[13px] font-bold">
             <a href="?lang=es" className="px-2.5 py-2" style={{ background: pt ? "transparent" : "#2A2B2F", color: pt ? MUTED : IVORY }}>ES</a>
@@ -317,6 +331,37 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
         </div>
       </section>
 
+      {/* COMPARATIVO */}
+      <section id="comparativo" className="py-24" style={{ background: "#FFFFFF" }}>
+        <div className={`${wrap} flex flex-col gap-10`}>
+          <SectionTitle eyebrow={T("Comparativo", "Comparativo")} title={T("Un día en tu negocio, sin y con GoWeb", "Um dia no seu negócio, sem e com a GoWeb")} />
+          <div className="overflow-hidden rounded-3xl ring-1 ring-black/10" role="table" aria-label={T("Comparativo sin y con GoWeb", "Comparativo sem e com a GoWeb")}>
+            <div role="row" className="hidden grid-cols-[180px_1fr_1fr] text-[15px] font-bold md:grid">
+              <span role="columnheader" className="bg-[#F3F5F9] px-6 py-4 text-[#5F5A52]">{T("Momento", "Momento")}</span>
+              <span role="columnheader" className="bg-[#F3F5F9] px-6 py-4 text-[#8A4B2F]">{T("Sin GoWeb", "Sem GoWeb")}</span>
+              <span role="columnheader" className="px-6 py-4 text-white" style={{ background: "#1E8A47" }}>{T("Con GoWeb", "Com GoWeb")}</span>
+            </div>
+            {COMPARE.map((r) => (
+              <div key={r.k.pt} role="row" className="grid border-t border-black/10 md:grid-cols-[180px_1fr_1fr]">
+                <span role="rowheader" className="bg-[#F3F5F9] px-6 pt-5 font-bold md:py-5" style={{ fontFamily: H }}>{pt ? r.k.pt : r.k.es}</span>
+                <p role="cell" className="flex gap-3 bg-[#F3F5F9] px-6 py-3 text-[15.5px] leading-relaxed text-[#5F5A52] md:bg-white md:py-5">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C0573A" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="mt-1 shrink-0"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                  <span><span className="sr-only">{T("Sin GoWeb: ", "Sem GoWeb: ")}</span>{pt ? r.sem.pt : r.sem.es}</span>
+                </p>
+                <p role="cell" className="flex gap-3 px-6 pb-5 pt-3 text-[15.5px] font-medium leading-relaxed md:py-5" style={{ background: "#ECF8F0", color: "#123B22" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E8A47" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-1 shrink-0"><path d="M5 12l5 5L20 7" /></svg>
+                  <span><span className="sr-only">{T("Con GoWeb: ", "Com GoWeb: ")}</span>{pt ? r.com.pt : r.com.es}</span>
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl p-7" style={{ background: INK, color: IVORY }}>
+            <p style={{ fontFamily: H }} className="max-w-xl text-2xl font-bold">{T("Menos tiempo anotando y corrigiendo. Más tiempo atendiendo.", "Menos tempo anotando e corrigindo. Mais tempo atendendo.")}</p>
+            <a href="#planes" className="rounded-2xl px-6 py-4 font-bold" style={{ background: BRAND, color: INK }}>{T("Ver planes", "Ver planos")}</a>
+          </div>
+        </div>
+      </section>
+
       {/* PLANES */}
       <section id="planes" className="py-24">
         <div className={`${wrap} flex flex-col gap-12`}>
@@ -329,7 +374,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                   {hi ? (
                     <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider" style={{ background: BRAND, color: INK }}>{T("Más elegido", "Mais escolhido")}</span>
                   ) : p.intelligence ? (
-                    <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white" style={{ background: "linear-gradient(90deg,#1F7FD8,#3CC46B)" }}>✨ {T("Con inteligencia", "Com inteligência")}</span>
+                    <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white" style={{ background: "linear-gradient(90deg,#1F7FD8,#3CC46B)" }}>{T("Con inteligencia", "Com inteligência")}</span>
                   ) : (
                     <span className="h-[30px]" />
                   )}
@@ -426,7 +471,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
 function SectionTitle({ eyebrow, title, sub, dark }: { eyebrow: string; title: string; sub?: string; dark?: boolean }) {
   return (
     <div data-reveal className="flex max-w-[720px] flex-col gap-3.5">
-      <span className="text-[13px] font-semibold uppercase tracking-[0.22em]" style={{ color: dark ? BRAND : GW_NAVY }}>{eyebrow}</span>
+      <span className="text-[15px] font-semibold" style={{ color: dark ? BRAND : GW_NAVY }}>{eyebrow}</span>
       <h2 style={{ fontFamily: H, color: dark ? IVORY : INK }} className="text-[clamp(32px,3.6vw,52px)] font-extrabold leading-[1.08] tracking-[-0.02em]">{title}</h2>
       {sub && <p className="text-lg" style={{ color: dark ? MUTED : "#5F5A52" }}>{sub}</p>}
     </div>

@@ -36,7 +36,7 @@ export default async function CrescimentoPage({ params, searchParams }: { params
     <label className="text-sm">{label}<input name={name} defaultValue={v} inputMode="numeric" className="input mt-1" /></label>
   );
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="max-w-4xl space-y-4">
       <div>
         <h1 className="text-xl font-bold">{T("Crecimiento", "Crescimento")}</h1>
         <p className="text-sm text-muted">{T("Herramientas para traer clientes nuevos y hacer que vuelvan. Encendé solo lo que quieras usar.", "Ferramentas para trazer clientes novos e fazer eles voltarem. Ligue só o que quiser usar.")}</p>
@@ -50,12 +50,12 @@ export default async function CrescimentoPage({ params, searchParams }: { params
       </div>
 
       <form action={saveGrowth.bind(null, slug)} className="space-y-4">
-        <Feature name="reviews" on={cfg.reviews.enabled} title={T("⭐ Pedir reseña en Google", "⭐ Pedir avaliação no Google")} desc={T("Después de entregar el pedido, mostramos un botón para reseñar (y avisamos por WhatsApp si tenés la integración).", "Depois que o pedido é finalizado, mostramos um botão para avaliar (e avisamos pelo WhatsApp se a integração estiver ligada).")}>
+        <Feature name="reviews" on={cfg.reviews.enabled} title={T("Pedir reseña en Google", "Pedir avaliação no Google")} desc={T("Después de entregar el pedido, mostramos un botón para reseñar (y avisamos por WhatsApp si tenés la integración).", "Depois que o pedido é finalizado, mostramos um botão para avaliar (e avisamos pelo WhatsApp se a integração estiver ligada).")}>
           <label className="text-sm sm:col-span-2">{T("Enlace de reseñas de tu ficha de Google", "Link de avaliação do seu Perfil da Empresa no Google")}<input name="googleUrl" defaultValue={cfg.reviews.googleUrl} placeholder="https://g.page/r/..." className="input mt-1" /></label>
           <p className="text-xs text-muted sm:col-span-2">{T("En Google Business Profile: «Pedir reseñas» → copiar enlace.", "No Google Perfil da Empresa: “Pedir avaliações” → copiar link.")}</p>
         </Feature>
 
-        <Feature name="directory" on={cfg.directory.enabled} title={T("🏙️ Vitrina de la ciudad", "🏙️ Vitrine da cidade")} desc={T("Tu tienda aparece en la página de negocios de tu ciudad en GoWeb, junto a otros comercios.", "Sua loja aparece na página de negócios da sua cidade na GoWeb, junto com outros comércios.")}>
+        <Feature name="directory" on={cfg.directory.enabled} title={T("Vitrina de la ciudad", "Vitrine da cidade")} desc={T("Tu tienda aparece en la página de negocios de tu ciudad en GoWeb, junto a otros comercios.", "Sua loja aparece na página de negócios da sua cidade na GoWeb, junto com outros comércios.")}>
           <label className="text-sm">{T("Ciudad", "Cidade")}<input name="city" defaultValue={cfg.directory.city} className="input mt-1" maxLength={60} /></label>
           <label className="text-sm">{T("Categoría", "Categoria")}<input name="category" defaultValue={cfg.directory.category} placeholder={T("Hamburguesería, Pizzería…", "Hamburgueria, Pizzaria…")} className="input mt-1" maxLength={40} /></label>
           {cfg.directory.enabled && cfg.directory.city && <p className="text-xs text-muted sm:col-span-2">{`${appUrl()}/vitrine/${citySlug(cfg.directory.city)}`}</p>}
@@ -63,14 +63,14 @@ export default async function CrescimentoPage({ params, searchParams }: { params
 
         <h2 className="pt-2 font-bold">GoInteligence <ProBadge /></h2>
 
-        <Feature name="campaigns" on={cfg.campaigns.enabled} locked={!pro} lockText={lock} title={T("📣 Campañas de reactivación", "📣 Campanhas de reativação")} desc={T("Mensajes con cupón para clientes que no compran hace 30/60/90 días, solo para quien aceptó recibir ofertas.", "Mensagens com cupom para quem sumiu há 30/60/90 dias, só para quem autorizou receber ofertas.")} />
+        <Feature name="campaigns" on={cfg.campaigns.enabled} locked={!pro} lockText={lock} title={T("Campañas de reactivación", "Campanhas de reativação")} desc={T("Mensajes con cupón para clientes que no compran hace 30/60/90 días, solo para quien aceptó recibir ofertas.", "Mensagens com cupom para quem sumiu há 30/60/90 dias, só para quem autorizou receber ofertas.")} />
 
-        <Feature name="referral" on={cfg.referral.enabled} locked={!pro} lockText={lock} title={T("🤝 Recomendá y ganá", "🤝 Indique e ganhe")} desc={T("Cada cliente recibe su enlace. El amigo gana descuento en la primera compra y quien recomendó gana un cupón cuando el pedido se entrega.", "Cada cliente recebe um link próprio. O amigo ganha desconto na primeira compra e quem indicou ganha cupom quando o pedido for finalizado.")}>
+        <Feature name="referral" on={cfg.referral.enabled} locked={!pro} lockText={lock} title={T("Recomendá y ganá", "Indique e ganhe")} desc={T("Cada cliente recibe su enlace. El amigo gana descuento en la primera compra y quien recomendó gana un cupón cuando el pedido se entrega.", "Cada cliente recebe um link próprio. O amigo ganha desconto na primeira compra e quem indicou ganha cupom quando o pedido for finalizado.")}>
           {pctField("friendPct", T("Descuento del amigo (%)", "Desconto do amigo (%)"), cfg.referral.friendPct)}
           {pctField("referrerPct", T("Premio de quien recomienda (%)", "Prêmio de quem indicou (%)"), cfg.referral.referrerPct)}
         </Feature>
 
-        <Feature name="loyalty" on={cfg.loyalty.enabled} locked={!pro} lockText={lock} title={T("💳 Tarjeta de fidelidad / cashback", "💳 Cartão fidelidade / cashback")} desc={T("Sellos por compra (ej.: 10 = premio) o un % de vuelta como cupón. Se identifica por el WhatsApp, sin app.", "Selos por compra (ex.: 10 = prêmio) ou um % de volta em cupom. Identificado pelo WhatsApp, sem app.")}>
+        <Feature name="loyalty" on={cfg.loyalty.enabled} locked={!pro} lockText={lock} title={T("Tarjeta de fidelidad / cashback", "Cartão fidelidade / cashback")} desc={T("Sellos por compra (ej.: 10 = premio) o un % de vuelta como cupón. Se identifica por el WhatsApp, sin app.", "Selos por compra (ex.: 10 = prêmio) ou um % de volta em cupom. Identificado pelo WhatsApp, sem app.")}>
           <label className="text-sm sm:col-span-2">{T("Modo", "Modo")}
             <select name="loyaltyMode" defaultValue={cfg.loyalty.mode} className="input mt-1">
               <option value="stamps">{T("Sellos", "Selos")}</option>
@@ -82,7 +82,7 @@ export default async function CrescimentoPage({ params, searchParams }: { params
           {pctField("cashbackPct", T("Cashback (%)", "Cashback (%)"), cfg.loyalty.cashbackPct)}
         </Feature>
 
-        <Feature name="birthday" on={cfg.birthday.enabled} locked={!pro} lockText={lock} title={T("🎂 Cumpleaños", "🎂 Aniversário")} desc={T("Pedimos la fecha (opcional) en el checkout y el día del cumpleaños el cliente gana un cupón.", "Pedimos a data (opcional) no checkout e no dia do aniversário o cliente ganha um cupom.")}>
+        <Feature name="birthday" on={cfg.birthday.enabled} locked={!pro} lockText={lock} title={T("Cumpleaños", "Aniversário")} desc={T("Pedimos la fecha (opcional) en el checkout y el día del cumpleaños el cliente gana un cupón.", "Pedimos a data (opcional) no checkout e no dia do aniversário o cliente ganha um cupom.")}>
           {pctField("birthdayPct", T("Regalo (% de descuento)", "Presente (% de desconto)"), cfg.birthday.pct)}
         </Feature>
 

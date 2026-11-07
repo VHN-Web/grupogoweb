@@ -135,7 +135,7 @@ export async function notifyOwnerAbandoned(t: Tenant) {
   const T = tr(getRegion(t.country).locale);
   const money = (v: number) => formatMoney(v, t.currency as Currency);
   const text =
-    T(`🛒 ${carts.length} carrito(s) abandonado(s) en ${t.name}:\n`, `🛒 ${carts.length} carrinho(s) abandonado(s) na ${t.name}:\n`) +
+    T(`${carts.length} carrito(s) abandonado(s) en ${t.name}:\n`, `${carts.length} carrinho(s) abandonado(s) na ${t.name}:\n`) +
     carts
       .slice(0, 10)
       .map((c) => `• ${c.customerName ?? "—"} (${formatPhone(c.customerPhone)}) — ${money(c.subtotalPyg)}`)
@@ -176,8 +176,8 @@ export function appointmentConfirmMessage(t: Tenant, a: { customerName: string; 
   const T = tr(region.locale);
   const when = new Intl.DateTimeFormat(region.intlLocale, { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: region.timeZone }).format(a.startsAt);
   return T(
-    `¡Hola ${a.customerName}! Tu turno en ${t.name} está CONFIRMADO ✅\n${a.serviceName} — ${when}\n${t.address ? `📍 ${t.address}\n` : ""}Si no podés venir, avisanos por aquí.`,
-    `Olá, ${a.customerName}! Seu horário na ${t.name} está CONFIRMADO ✅\n${a.serviceName} — ${when}\n${t.address ? `📍 ${t.address}\n` : ""}Se não puder vir, avise por aqui.`,
+    `¡Hola ${a.customerName}! Tu turno en ${t.name} está CONFIRMADO\n${a.serviceName} — ${when}\n${t.address ? `${t.address}\n` : ""}Si no podés venir, avisanos por aquí.`,
+    `Olá, ${a.customerName}! Seu horário na ${t.name} está CONFIRMADO\n${a.serviceName} — ${when}\n${t.address ? `${t.address}\n` : ""}Se não puder vir, avise por aqui.`,
   );
 }
 
@@ -209,18 +209,18 @@ export async function cashReport(t: Tenant, sessionId: string) {
   stock.sort((a, b) => a.stock - b.stock);
   const fmt = new Intl.DateTimeFormat(region.intlLocale, { dateStyle: "short", timeStyle: "short", timeZone: region.timeZone });
   const lines = [
-    T(`📊 Cierre de caja — ${t.name}`, `📊 Fechamento de caixa — ${t.name}`),
+    T(`Cierre de caja — ${t.name}`, `Fechamento de caixa — ${t.name}`),
     `${fmt.format(session.openedAt)} → ${session.closedAt ? fmt.format(session.closedAt) : T("abierta", "aberto")}`,
     "",
-    `💰 ${T("Total facturado", "Total faturado")}: ${money(s.paidTotalPyg)}`,
-    `🧾 ${T("Pedidos pagados", "Pedidos pagos")}: ${paid.length}`,
-    `🎯 ${T("Ticket promedio", "Ticket médio")}: ${money(avgTicket)}`,
-    `🏆 ${T("Producto más vendido", "Produto mais vendido")}: ${top ? `${top[0]} (${top[1]} un.)` : "—"}`,
-    `🚚 ${T("Canal más usado", "Canal mais usado")}: ${topChannel ? `${L.orderType[topChannel[0] as keyof typeof L.orderType]} (${topChannel[1]})` : "—"}`,
-    `💵 ${T("Esperado en caja", "Esperado no caixa")}: ${money(s.expectedPygInDrawer)}${session.countedAmountPyg != null ? ` · ${T("contado", "contado")}: ${money(session.countedAmountPyg)}` : ""}`,
+    `${T("Total facturado", "Total faturado")}: ${money(s.paidTotalPyg)}`,
+    `${T("Pedidos pagados", "Pedidos pagos")}: ${paid.length}`,
+    `${T("Ticket promedio", "Ticket médio")}: ${money(avgTicket)}`,
+    `${T("Producto más vendido", "Produto mais vendido")}: ${top ? `${top[0]} (${top[1]} un.)` : "—"}`,
+    `${T("Canal más usado", "Canal mais usado")}: ${topChannel ? `${L.orderType[topChannel[0] as keyof typeof L.orderType]} (${topChannel[1]})` : "—"}`,
+    `${T("Esperado en caja", "Esperado no caixa")}: ${money(s.expectedPygInDrawer)}${session.countedAmountPyg != null ? ` · ${T("contado", "contado")}: ${money(session.countedAmountPyg)}` : ""}`,
     "",
-    `📦 ${T("Stock actualizado", "Estoque atualizado")}:`,
-    ...(stock.length ? stock.slice(0, 15).map((p) => `${p.stock <= 3 ? "⚠️" : "•"} ${p.name}: ${p.stock}`) : [T("(sin productos con control de stock)", "(sem produtos com controle de estoque)")]),
+    `${T("Stock actualizado", "Estoque atualizado")}:`,
+    ...(stock.length ? stock.slice(0, 15).map((p) => `${p.stock <= 3 ? "(!)" : "•"} ${p.name}: ${p.stock}`) : [T("(sin productos con control de stock)", "(sem produtos com controle de estoque)")]),
   ];
   return {
     text: lines.join("\n"),

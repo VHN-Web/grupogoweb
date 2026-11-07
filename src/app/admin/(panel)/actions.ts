@@ -11,6 +11,7 @@ import { customerCurrency } from "@/services/documents";
 import { amountIn } from "@/core/billing";
 import { parseMajorToMinor } from "@/core/money";
 import { MODULES, parseModulePrices } from "@/core/modules";
+import { saveImage } from "@/adapters/storage";
 import {
   BillingError,
   cancelCustomer,
@@ -191,6 +192,22 @@ export async function saveModulePrices(f: FormData) {
   await db.update(schema.platformSettings).set({ modulePrices: JSON.stringify(parseModulePrices(JSON.stringify(prices))) }).where(eq(schema.platformSettings.id, "default"));
   await audit(null, await adminActor(), "plans.modules", prices.enabled ? "ativo" : "desligado");
   back("/admin/planos", "Preços do plano personalizado salvos (valem para novas contratações).");
+}
+
+/** Envia uma imagem minúscula de teste para conferir o armazenamento (Vercel Blob) em produção. */
+export async function testStorage() {
+  await requirePlatformAdmin();
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  let url: string | null = null;
+  let error = "";
+  try {
+    url = await saveImage(new File([png], "teste.png", { type: "image/png" }), "healthcheck");
+  } catch (e) {
+    error = e instanceof Error ? e.message : "erro desconhecido";
+  }
+  await audit(null, await adminActor(), "storage.test", url ?? `falhou: ${error}`);
+  if (url) back("/admin/config", `Imagem enviada com sucesso: ${url}`);
+  else back("/admin/config", `Falhou: ${error}`, "err");
 }
 
 // ---------------- configurações

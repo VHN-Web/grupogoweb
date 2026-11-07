@@ -21,7 +21,7 @@ export default async function ContractPage({ params, searchParams }: { params: P
     <main className="mx-auto max-w-2xl bg-white px-6 py-10 text-black print:px-0 print:py-0" lang={locale === "pt" ? "pt-BR" : "es"}>
       <div className="no-print mb-6 flex items-center justify-between gap-3">
         <GoWebLogo height={28} dark={false} />
-        <PrintButton className="btn-primary" label={T("🖨️ Imprimir / guardar PDF", "🖨️ Imprimir / salvar PDF")} />
+        <PrintButton className="btn-primary" label={T("Imprimir / guardar PDF", "Imprimir / salvar PDF")} />
       </div>
       <h1 className="text-xl font-bold">{ct.title}</h1>
       <ContractBody body={ct.body} className="mt-4" />

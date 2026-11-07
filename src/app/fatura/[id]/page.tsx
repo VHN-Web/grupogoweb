@@ -77,7 +77,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         <ul className="space-y-1 rounded-xl bg-amber-50 p-3 text-[13px] text-amber-950 ring-1 ring-amber-200">
           <li>✓ {T("Sin permanencia mínima: cancelás cuando quieras.", "Sem fidelidade: cancele quando quiser.")}</li>
           <li>✓ {T("Arrepentimiento en hasta 7 días: no se cobra ninguna mensualidad.", "Arrependimento em até 7 dias: nenhuma mensalidade é cobrada.")}</li>
-          <li>⚠️ <b>{T("La implementación no es reembolsable", "A implantação não é reembolsável")}</b>{T(" — es un servicio personalizado que empieza apenas pagás.", " — é um serviço personalizado que começa assim que você paga.")}</li>
+          <li><b>{T("La implementación no es reembolsable", "A implantação não é reembolsável")}</b>{T(" — es un servicio personalizado que empieza apenas pagás.", " — é um serviço personalizado que começa assim que você paga.")}</li>
         </ul>
       )}
       {contract && (

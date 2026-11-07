@@ -2,7 +2,8 @@ import { CURRENCIES } from "@/core/types";
 import { listBillingProviders } from "@/adapters/billing/registry";
 import { gatewayMap, getSettings } from "@/services/billing";
 import { Flash } from "@/components/Flash";
-import { saveSettings } from "../actions";
+import { saveSettings, testStorage } from "../actions";
+import { blobConfigured } from "@/adapters/storage";
 
 const CUR = { PYG: "Guarani (Gs.)", USD: "Dólar (US$)", BRL: "Real (R$)" } as const;
 
@@ -16,6 +17,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     <div className="mx-auto max-w-3xl space-y-5">
       <Flash {...sp} />
       <h1 className="text-xl font-bold">Configurações da plataforma</h1>
+      <section className="card flex flex-wrap items-center gap-3 p-5 text-sm">
+        <div className="min-w-48 flex-1">
+          <h2 className="font-semibold">Armazenamento de imagens</h2>
+          <p className="text-muted">{blobConfigured() ? "Vercel Blob conectado (fotos de produtos, logos e banners)." : process.env.VERCEL ? "Não configurado: os lojistas não conseguem enviar fotos. Conecte um Blob Store ao projeto na Vercel." : "Modo local: imagens ficam na pasta .uploads."}</p>
+        </div>
+        <form action={testStorage}><button className="btn-ghost">Testar envio de imagem</button></form>
+      </section>
       <form action={saveSettings} className="space-y-5">
         <Section title="Sua empresa">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -85,7 +93,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </div>
           <p className="mt-2 text-xs text-muted">
             {s.nfseEnabled
-              ? "✅ Ativada: novos pagamentos geram uma NFS-e com status \"em emissão\" na aba Notas, até a integração com o emissor ser concluída."
+              ? "Ativada: novos pagamentos geram uma NFS-e com status \"em emissão\" na aba Notas, até a integração com o emissor ser concluída."
               : "Só liga com CNPJ (14 dígitos) nos dados legais, inscrição municipal e emissor preenchidos. Até lá, os pagamentos geram recibos."}
           </p>
         </Section>

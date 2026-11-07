@@ -7,7 +7,7 @@ export default async function NoAccess({ params }: { params: Promise<{ slug: str
   const { T } = panelI18n(acc.tenant);
   return (
     <div className="mx-auto max-w-md py-16 text-center">
-      <p className="text-4xl">🔒</p>
+      
       <h1 className="mt-3 text-xl font-bold">{T("Sin acceso a esta área", "Sem acesso a esta área")}</h1>
       <p className="mt-2 text-sm text-muted">{T("Pedile al dueño que libere este permiso en Equipo.", "Peça ao dono para liberar esta permissão em Equipe.")}</p>
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { A11yMenu } from "@/components/a11y/A11yMenu";
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, parseMajorToMinor, fromBase, toBase, type Rates } from "@/core/money";
@@ -281,9 +282,12 @@ export function Storefront({ data }: { data: StoreData }) {
               )}
             </section>
           ))}
-          <p className="th-muted mt-10 flex items-center justify-center gap-1.5 text-[11px]">
-            {T("Hecho con", "Feito com")} <GoWebLogo height={14} ink="currentColor" />
-          </p>
+          <div className="mt-10 flex flex-col items-center gap-3">
+            <A11yMenu locale={data.locale} variant="light" />
+            <p className="th-muted flex items-center justify-center gap-1.5 text-[11px]">
+              {T("Hecho con", "Feito com")} <GoWebLogo height={14} ink="currentColor" />
+            </p>
+          </div>
         </main>
       </div>
 
@@ -1373,7 +1377,7 @@ function FlashOffers({
   return (
     <section className="mt-6">
       <div className="mb-3 flex items-center justify-between gap-2 px-5">
-        <h2 className="th-h whitespace-nowrap text-[19px] font-bold">⚡ {T("Oferta relámpago", "Oferta relâmpago")}</h2>
+        <h2 className="th-h whitespace-nowrap text-[19px] font-bold">{T("Oferta relámpago", "Oferta relâmpago")}</h2>
         {cd && (
           <span className="shrink-0 whitespace-nowrap rounded-full bg-red-600 px-3 py-1 text-[12px] font-bold tabular-nums text-white">
             {T("Termina en", "Acaba em")} {cd.text}
@@ -1425,7 +1429,7 @@ function Suggestions({
       <div className="th-surface th-line rounded-2xl border p-3 shadow-2xl shadow-black/30" style={{ borderRadius: theme.radius + 2 }}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-[13px] font-bold">
-            ✨ {T("Combina con", "Combina com")} <span className="th-muted font-semibold">{forProduct.name}</span>
+            {T("Combina con", "Combina com")} <span className="th-muted font-semibold">{forProduct.name}</span>
           </p>
           <button onClick={onClose} className="th-muted px-1 text-sm" aria-label={T("Cerrar", "Fechar")}>
             ✕
@@ -1502,7 +1506,7 @@ function BookingSheet({ product, onClose }: { product: StoreProduct; onClose: ()
     <Sheet onClose={onClose} title={`${T("Reservar", "Agendar")}: ${product.name}`}>
       {done ? (
         <div className="space-y-3 py-6 text-center">
-          <p className="text-4xl">📅</p>
+          
           <p className="text-lg font-bold">{T("¡Pedido de turno enviado!", "Pedido de horário enviado!")}</p>
           <p className="th-muted text-sm">
             {T("Te confirmamos por WhatsApp en breve.", "Você vai receber a confirmação no WhatsApp em breve.")}

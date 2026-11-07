@@ -13,7 +13,7 @@ export function ProUpsell({ locale, feature }: { locale: "es" | "pt"; feature?: 
     <div className="rounded-2xl border border-[#3CC46B]/40 bg-gradient-to-br from-[#1F7FD8]/10 to-[#3CC46B]/10 p-5">
       <p className="font-bold">
         {feature ? `${feature} — ` : ""}
-        {pt ? "disponível no GoInteligence" : "disponible en GoInteligence"} ✨
+        {pt ? "disponível no GoInteligence" : "disponible en GoInteligence"}
       </p>
       <p className="mt-1 text-sm text-muted">
         {pt

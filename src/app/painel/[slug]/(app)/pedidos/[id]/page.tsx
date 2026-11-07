@@ -1,3 +1,4 @@
+import { Icon } from "@/components/ui/Icon";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
@@ -55,7 +56,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
 
         {showCouriers && (
           <div className="card p-4 text-sm">
-            <h2 className="font-semibold">🛵 {T("Repartidor", "Motoboy")}</h2>
+            <h2 className="flex items-center gap-2 font-semibold"><Icon name="bike" size={18} className="text-[var(--section)]" />{T("Repartidor", "Motoboy")}</h2>
             {couriers.length === 0 ? (
               <p className="mt-1 text-muted">{T("Registrá tus repartidores para asignar la entrega.", "Cadastre seus motoboys para atribuir a entrega.")} <Link className="font-semibold underline" href={`/painel/${slug}/motoboys`}>{T("Registrar", "Cadastrar")}</Link></p>
             ) : (

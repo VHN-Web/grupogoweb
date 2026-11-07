@@ -15,7 +15,7 @@ export default async function CashReportPage({ params }: { params: Promise<{ slu
   const { T, fm, region } = panelI18n(t);
   if (t.tier !== "pro")
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <div className="max-w-3xl space-y-4">
         <h1 className="text-xl font-bold">{T("Informe de caja", "Relatório de caixa")} <ProBadge /></h1>
         <ProUpsell locale={region.locale} />
       </div>
@@ -28,7 +28,7 @@ export default async function CashReportPage({ params }: { params: Promise<{ slu
       ? T("Configurá en Configuración para recibirlo automáticamente.", "Configure em Configurações para receber automaticamente.")
       : `${T("Enviado a", "Enviado para")} ${to}`;
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="max-w-3xl space-y-5">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <Link href={`/painel/${slug}/caixa`} className="text-sm text-muted">← {T("Caja", "Caixa")}</Link>
         <div className="flex flex-wrap gap-2">

@@ -1,4 +1,5 @@
 import { hasModule } from "@/core/modules";
+import { Icon } from "@/components/ui/Icon";
 import Link from "next/link";
 import { and, desc, eq, gte } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -14,10 +15,10 @@ import { nextLabel, nextStatus } from "./order-flow";
 
 export const dynamic = "force-dynamic";
 
-const COLUMNS: { es: string; pt: string; statuses: OrderStatus[] }[] = [
-  { es: "Nuevos", pt: "Novos", statuses: ["RECEIVED"] },
-  { es: "En preparación", pt: "Em preparo", statuses: ["PREPARING"] },
-  { es: "Listos / en camino", pt: "Prontos / em rota", statuses: ["READY", "OUT_FOR_DELIVERY"] },
+const COLUMNS: { es: string; pt: string; statuses: OrderStatus[]; color: string; soft: string }[] = [
+  { es: "Nuevos", pt: "Novos", statuses: ["RECEIVED"], color: "#E0891F", soft: "#FDF3E4" },
+  { es: "En preparación", pt: "Em preparo", statuses: ["PREPARING"], color: "#1F7FD8", soft: "#E8F1FC" },
+  { es: "Listos / en camino", pt: "Prontos / em rota", statuses: ["READY", "OUT_FOR_DELIVERY"], color: "#2FAE5F", soft: "#E6F6EC" },
 ];
 
 export default async function OrdersBoard({ params }: { params: Promise<{ slug: string }> }) {
@@ -50,21 +51,22 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
         <div className="flex flex-wrap gap-2">
           {pendingAppts > 0 && (
             <Link href={`/painel/${slug}/agenda`} className="rounded-xl bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-900 ring-1 ring-blue-200">
-              📅 {pendingAppts} {T("turno(s) para confirmar", "horário(s) para confirmar")} →
+              {pendingAppts} {T("turno(s) para confirmar", "horário(s) para confirmar")}
             </Link>
           )}
           {abandoned > 0 && (
             <Link href={`/painel/${slug}/marketing`} className="rounded-xl bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 ring-1 ring-amber-200">
-              🛒 {abandoned} {T("carrito(s) abandonado(s) — enviá un cupón", "carrinho(s) abandonado(s) — envie um cupom")} →
+              {abandoned} {T("carrito(s) abandonado(s): enviá un cupón", "carrinho(s) abandonado(s): envie um cupom")}
             </Link>
           )}
         </div>
       )}
+      <h1>{T("Pedidos de hoy", "Pedidos de hoje")}</h1>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat k={T("Pedidos (24h)", "Pedidos (24h)")} v={String(today.length)} />
-        <Stat k={T("Vendido (24h)", "Vendido (24h)")} v={fm(today.reduce((s, o) => s + o.totalPyg, 0))} />
-        <Stat k={T("Cobrado", "Recebido")} v={fm(today.filter((o) => o.paymentStatus === "PAID").reduce((s, o) => s + o.totalPyg, 0))} />
-        <Stat k={T("Por cobrar", "A receber")} v={fm(today.filter((o) => o.paymentStatus !== "PAID").reduce((s, o) => s + o.totalPyg, 0))} />
+        <Stat k={T("Pedidos en 24 h", "Pedidos em 24 h")} v={String(today.length)} icon="orders" color="#0F2747" />
+        <Stat k={T("Vendido en 24 h", "Vendido em 24 h")} v={fm(today.reduce((s, o) => s + o.totalPyg, 0))} icon="growth" color="#2FAE5F" />
+        <Stat k={T("Cobrado", "Recebido")} v={fm(today.filter((o) => o.paymentStatus === "PAID").reduce((s, o) => s + o.totalPyg, 0))} icon="check" color="#1F7FD8" />
+        <Stat k={T("Por cobrar", "A receber")} v={fm(today.filter((o) => o.paymentStatus !== "PAID").reduce((s, o) => s + o.totalPyg, 0))} icon="clock" color="#E0891F" />
       </div>
 
       {!t.isOpen && (
@@ -77,17 +79,18 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
         {COLUMNS.map((col) => {
           const list = orders.filter((o) => col.statuses.includes(o.status)).reverse();
           return (
-            <section key={T(col.es, col.pt)} className="rounded-2xl bg-white/60 p-3 ring-1 ring-line">
-              <h2 className="mb-3 flex items-center justify-between px-1 text-[13px] font-semibold uppercase tracking-[.12em] text-muted">
-                {T(col.es, col.pt)}
-                <span className="rounded-full bg-ink px-2 py-0.5 text-[11px] text-white">{list.length}</span>
+            <section key={T(col.es, col.pt)} className="rounded-3xl p-3" style={{ background: col.soft }}>
+              <h2 className="mb-3 flex items-center gap-2 px-1 text-[15px] font-bold" style={{ color: col.color }}>
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: col.color }} aria-hidden="true" />
+                <span className="flex-1">{T(col.es, col.pt)}</span>
+                <span className="grid h-7 min-w-7 place-items-center rounded-full px-2 text-[13px] text-white" style={{ background: col.color }}>{list.length}</span>
               </h2>
               <div className="space-y-3">
-                {list.length === 0 && <p className="px-1 py-6 text-center text-sm text-muted">—</p>}
+                {list.length === 0 && <p className="px-1 py-6 text-center text-sm text-muted">{T("Nada por acá", "Nada por aqui")}</p>}
                 {list.map((o) => {
                   const next = nextStatus(o);
                   return (
-                    <article key={o.id} className="anim-pop-in card p-3.5">
+                    <article key={o.id} className="anim-pop-in card border-l-4 p-3.5" style={{ borderLeftColor: col.color }}>
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <Link href={`/painel/${slug}/pedidos/${o.id}`} className="text-2xl font-black tabular-nums hover:underline">
@@ -109,7 +112,7 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
                         ))}
                       </ul>
                       {o.notes && <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">{o.notes}</p>}
-                      {o.type === "DELIVERY" && o.address && <p className="mt-2 text-xs text-muted">📍 {o.address}</p>}
+                      {o.type === "DELIVERY" && o.address && <p className="mt-2 text-xs text-muted">{o.address}</p>}
                       <div className="mt-2.5 flex items-start justify-between gap-3 text-sm">
                         <span className="text-muted">
                           {L.paymentMethod[o.paymentMethod]}
@@ -141,7 +144,7 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
 
       {finished.length > 0 && (
         <section>
-          <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-[.12em] text-muted">{T("Finalizados (24h)", "Finalizados (24h)")}</h2>
+          <h2 className="mb-2 font-bold text-[#3F4654]">{T("Finalizados en 24 h", "Finalizados em 24 h")}</h2>
           <div className="card divide-y divide-line">
             {finished.map((o) => (
               <Link key={o.id} href={`/painel/${slug}/pedidos/${o.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-paper">
@@ -159,11 +162,16 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
   );
 }
 
-function Stat({ k, v }: { k: string; v: string }) {
+function Stat({ k, v, icon, color }: { k: string; v: string; icon: string; color: string }) {
   return (
-    <div className="card px-4 py-3">
-      <p className="text-xs text-muted">{k}</p>
-      <p className="mt-0.5 text-lg font-bold tabular-nums">{v}</p>
+    <div className="card flex flex-col items-start gap-2 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-3">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-white" style={{ background: color }}>
+        <Icon name={icon} size={20} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[13px] text-muted">{k}</p>
+        <p className="truncate text-lg font-extrabold tabular-nums">{v}</p>
+      </div>
     </div>
   );
 }

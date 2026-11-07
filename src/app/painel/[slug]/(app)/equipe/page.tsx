@@ -21,7 +21,7 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
   if (!hasModule(t, "equipe")) redirect(`/painel/${slug}/plano?modulo=team`);
   if (t.tier !== "pro")
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <div className="max-w-3xl space-y-4">
         <h1 className="text-xl font-bold">{T("Equipo", "Equipe")} <ProBadge /></h1>
         <ProUpsell locale={region.locale} />
       </div>
@@ -29,7 +29,7 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
   const list = await db.query.staff.findMany({ where: eq(schema.staff.tenantId, t.id), orderBy: asc(schema.staff.name) });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <h1 className="text-xl font-bold">{T("Equipo", "Equipe")} <ProBadge /></h1>
       {sp.ok && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{sp.ok}</p>}
       {sp.err && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{sp.err}</p>}

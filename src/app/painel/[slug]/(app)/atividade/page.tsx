@@ -41,7 +41,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ slug:
   const fmt = new Intl.DateTimeFormat(region.locale === "pt" ? "pt-BR" : "es-PY", { dateStyle: "short", timeStyle: "short", timeZone: region.timeZone });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="max-w-5xl space-y-4">
       <h1 className="text-xl font-bold">{T("Registro de actividad", "Registro de atividades")}</h1>
       <p className="text-sm text-muted">
         {T(

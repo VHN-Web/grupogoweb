@@ -94,7 +94,7 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
 
         {g?.rewards && g.rewards.length > 0 && (
           <div className="mt-6 rounded-2xl p-4 text-sm" style={{ background: "var(--brand)", color: "var(--brand-fg)" }}>
-            <p className="font-bold">{T("¡Tenés un regalo!", "Você ganhou um presente!")} 🎁</p>
+            <p className="font-bold">{T("¡Tenés un regalo!", "Você ganhou um presente!")}</p>
             {g.rewards.map((r) => (
               <p key={r.code} className="mt-1">
                 {T("Cupón", "Cupom")} <b className="tracking-wider">{r.code}</b> · {r.off} {T("de descuento en la próxima compra", "de desconto na próxima compra")}
@@ -132,7 +132,7 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
         )}
         {g?.review && order.status === "COMPLETED" && (
           <div className="th-surface th-line mt-6 rounded-2xl border p-4 text-center text-sm">
-            <p className="font-semibold">{T("¿Te gustó? Contalo en Google ⭐", "Gostou? Conta no Google ⭐")}</p>
+            <p className="font-semibold">{T("¿Te gustó? Contalo en Google", "Gostou? Conte no Google")}</p>
             <p className="th-muted mt-1">{T("Tu reseña ayuda mucho a este negocio.", "Sua avaliação ajuda muito este negócio.")}</p>
             <a className="th-accent mt-3 inline-block rounded-xl px-5 py-2.5 font-semibold" target="_blank" rel="noopener noreferrer" href={g.review}>{T("Dejar reseña", "Avaliar no Google")}</a>
           </div>

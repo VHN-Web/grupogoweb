@@ -26,7 +26,7 @@ export default async function MotoboysPage({ params, searchParams }: { params: P
   const total = rows.reduce((a, r) => a + r.payout, 0);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <div>
         <h1 className="text-xl font-bold">{T("Repartidores", "Motoboys")}</h1>
         <p className="text-sm text-muted">{T("Registrá tus repartidores, asigná cada delivery desde el pedido y mandá la ruta por WhatsApp. Acá ves cuántas entregas hizo cada uno y cuánto pagar.", "Cadastre seus motoboys, atribua cada entrega pela tela do pedido e envie a rota pelo WhatsApp. Aqui você vê quantas entregas cada um fez e quanto pagar.")}</p>

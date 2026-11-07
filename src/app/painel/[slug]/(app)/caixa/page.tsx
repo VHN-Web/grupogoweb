@@ -25,7 +25,7 @@ export default async function CashPage({ params }: { params: Promise<{ slug: str
 
   if (!session) {
     return (
-      <div className="mx-auto max-w-md space-y-6">
+      <div className="max-w-md space-y-6">
         <div className="card p-6">
           <h1 className="text-xl font-bold">{T("Abrir caja", "Abrir caixa")}</h1>
           <p className="mt-1 text-sm text-muted">{T("Los pedidos se asocian a la caja abierta para el cierre del día.", "Os pedidos ficam ligados ao caixa aberto para o fechamento do dia.")}</p>

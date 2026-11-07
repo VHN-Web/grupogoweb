@@ -22,7 +22,7 @@ export default async function Material({ params, searchParams }: { params: Promi
     <div className="mcard" style={{ borderColor: color }}>
       {t.logoUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img src={t.logoUrl} alt="" className="logo" />}
       <p className="name" style={{ color }}>{t.name}</p>
-      <p className="cta">{big ? T("Pedí por acá 👇", "Peça por aqui 👇") : T("Escaneá y pedí", "Aponte a câmera e peça")}</p>
+      <p className="cta">{big ? T("Pedí por acá", "Peça por aqui") : T("Escaneá y pedí", "Aponte a câmera e peça")}</p>
       <div className="qr" dangerouslySetInnerHTML={{ __html: qr }} />
       <p className="url">{short}</p>
       {kind === "panfleto" && <p className="sub">{T("Menú completo, pedido rápido y sin filas.", "Cardápio completo, pedido rápido e sem fila.")}</p>}

@@ -1,3 +1,4 @@
+import { Icon } from "@/components/ui/Icon";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import { db, schema } from "@/db";
@@ -20,7 +21,7 @@ export default async function MarketingPage({ params, searchParams }: { params: 
   const { T, fm, fmtDate, region } = panelI18n(t);
   if (t.tier !== "pro")
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <div className="max-w-3xl space-y-4">
         <h1 className="text-xl font-bold">Marketing <ProBadge /></h1>
         <ProUpsell locale={region.locale} />
       </div>
@@ -36,14 +37,14 @@ export default async function MarketingPage({ params, searchParams }: { params: 
   const couponLabel = (c: (typeof coupons)[number]) => (c.kind === "PERCENT" ? `${c.value}%` : fm(c.value));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <h1 className="text-xl font-bold">Marketing <ProBadge /></h1>
       {sp.ok && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{sp.ok}</p>}
       {sp.err && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{sp.err}</p>}
 
       {/* Carrinhos abandonados */}
       <section className="card p-5">
-        <h2 className="font-semibold">🛒 {T("Carritos abandonados", "Carrinhos abandonados")}</h2>
+        <h2 className="flex items-center gap-2 font-semibold"><Icon name="cart" size={18} className="text-[var(--section)]" />{T("Carritos abandonados", "Carrinhos abandonados")}</h2>
         <p className="mt-0.5 text-sm text-muted">
           {T(
             "Clientes que dejaron el WhatsApp en el checkout y no terminaron el pedido (más de 30 min). Mandales un mensaje con un cupón: el link abre el carrito listo.",
@@ -51,7 +52,7 @@ export default async function MarketingPage({ params, searchParams }: { params: 
           )}
         </p>
         <div className="mt-4 divide-y divide-line">
-          {carts.length === 0 && <p className="py-3 text-sm text-muted">{T("Ningún carrito abandonado por ahora. 🎉", "Nenhum carrinho abandonado por enquanto. 🎉")}</p>}
+          {carts.length === 0 && <p className="py-3 text-sm text-muted">{T("Ningún carrito abandonado por ahora.", "Nenhum carrinho abandonado por enquanto.")}</p>}
           {carts.map((c) => {
             const items = JSON.parse(c.items) as { name: string; quantity: number }[];
             return (
@@ -92,7 +93,7 @@ export default async function MarketingPage({ params, searchParams }: { params: 
 
       {/* Cupons */}
       <section className="card p-5">
-        <h2 className="font-semibold">🎟️ {T("Cupones de descuento", "Cupons de desconto")}</h2>
+        <h2 className="flex items-center gap-2 font-semibold"><Icon name="tag" size={18} className="text-[var(--section)]" />{T("Cupones de descuento", "Cupons de desconto")}</h2>
         <form action={saveCoupon.bind(null, slug)} className="mt-4 grid gap-2 sm:grid-cols-6">
           <input name="code" className="input uppercase sm:col-span-2" placeholder={T("CÓDIGO (ej: VOLVE10)", "CÓDIGO (ex: VOLTA10)")} required maxLength={24} />
           <select name="kind" className="input">
@@ -133,7 +134,7 @@ export default async function MarketingPage({ params, searchParams }: { params: 
 
       {/* Ofertas relâmpago */}
       <section className="card p-5">
-        <h2 className="font-semibold">⚡ {T("Oferta relámpago", "Oferta relâmpago")}</h2>
+        <h2 className="flex items-center gap-2 font-semibold"><Icon name="clock" size={18} className="text-[var(--section)]" />{T("Oferta relámpago", "Oferta relâmpago")}</h2>
         <p className="mt-0.5 text-sm text-muted">
           {T("Precio especial por tiempo limitado, con cuenta regresiva destacada en tu sitio.", "Preço especial por tempo limitado, com contagem regressiva em destaque no seu site.")}
         </p>
@@ -157,7 +158,7 @@ export default async function MarketingPage({ params, searchParams }: { params: 
             <option value="48">48 h</option>
             <option value="72">72 h</option>
           </select>
-          <button className="btn-brand sm:col-span-4">⚡ {T("Lanzar oferta", "Lançar oferta")}</button>
+          <button className="btn-brand sm:col-span-4">{T("Lanzar oferta", "Lançar oferta")}</button>
         </form>
         <ul className="mt-4 divide-y divide-line text-sm">
           {offers.map((p) => (
@@ -176,7 +177,7 @@ export default async function MarketingPage({ params, searchParams }: { params: 
       </section>
 
       <section className="card p-5 text-sm">
-        <h2 className="font-semibold">✨ {T("Sugerencias inteligentes", "Sugestões inteligentes")}</h2>
+        <h2 className="flex items-center gap-2 font-semibold"><Icon name="sparkle" size={18} className="text-[var(--section)]" />{T("Sugerencias inteligentes", "Sugestões inteligentes")}</h2>
         <p className="mt-1 text-muted">
           {T(
             "Activas automáticamente: cuando el cliente agrega un producto, el sitio sugiere lo que más se compra junto (y, sin historial, bebidas, acompañamientos y postres).",

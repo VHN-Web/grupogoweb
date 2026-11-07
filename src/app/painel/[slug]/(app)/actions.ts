@@ -96,7 +96,7 @@ export async function saveProduct(slug: string, f: FormData) {
   try {
     imageUrl = await imageField(f, "imageFile", "removeImage", existing?.imageUrl ?? null, `tenants/${t.id}/products`);
   } catch (e) {
-    if (e instanceof UploadError) redirect(`${base(slug)}/produtos?err=${encodeURIComponent(e.message)}`);
+    if (e instanceof UploadError) redirect(`${base(slug)}/produtos?err=${encodeURIComponent(e.text(getRegion(t.country).locale))}`);
     throw e;
   }
   const ill = str(f, "illustration");
@@ -316,7 +316,7 @@ export async function saveAppearance(slug: string, f: FormData) {
       })
       .where(eq(schema.tenants.id, t.id));
   } catch (e) {
-    if (e instanceof UploadError) redirect(`${base(slug)}/aparencia?err=${encodeURIComponent(e.message)}`);
+    if (e instanceof UploadError) redirect(`${base(slug)}/aparencia?err=${encodeURIComponent(e.text(getRegion(t.country).locale))}`);
     throw e;
   }
   revalidatePath(base(slug), "layout");
