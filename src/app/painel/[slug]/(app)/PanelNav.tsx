@@ -9,7 +9,7 @@ import type { ModuleKey } from "@/core/modules";
 import { Icon } from "@/components/ui/Icon";
 
 type Group = "sales" | "catalog" | "customers" | "admin";
-type Item = { href: string; es: string; pt: string; area: PanelArea; icon: string; group: Group; pro?: boolean; module?: ModuleKey };
+type Item = { href: string; es: string; pt: string; area?: PanelArea; icon: string; group: Group; pro?: boolean; module?: ModuleKey };
 
 export const GROUPS: Record<Group, { es: string; pt: string; color: string; soft: string }> = {
   sales: { es: "Ventas", pt: "Vendas", color: "#2FAE5F", soft: "#E3F5EA" },
@@ -34,6 +34,7 @@ const ITEMS: Item[] = [
   { href: "/equipe", es: "Equipo", pt: "Equipe", area: "team", icon: "team", group: "admin", pro: true, module: "equipe" },
   { href: "/config", es: "Configuración", pt: "Configurações", area: "settings", icon: "settings", group: "admin" },
   { href: "/plano", es: "Mi plan", pt: "Meu plano", area: "team", icon: "plan", group: "admin" },
+  { href: "/suporte", es: "Soporte GoWeb", pt: "Suporte GoWeb", icon: "chat", group: "admin" },
 ];
 
 const MOBILE_TABS = ["", "/produtos", "/clientes", "/caixa"];
@@ -55,7 +56,7 @@ export function PanelShell({ slug, locale, areas, pro, modules = null, store, ac
   const [open, setOpen] = useState(false);
   const base = `/painel/${slug}`;
   const L = (o: { es: string; pt: string }) => (locale === "pt" ? o.pt : o.es);
-  const items = ITEMS.filter((i) => areas.includes(i.area) && (!i.module || !modules || modules.includes(i.module)));
+  const items = ITEMS.filter((i) => (!i.area || areas.includes(i.area)) && (!i.module || !modules || modules.includes(i.module)));
   const isActive = (i: Item) => (i.href === "" ? path === base || path.startsWith(`${base}/pedidos`) : path.startsWith(base + i.href));
   const current = items.find(isActive);
   const g = GROUPS[current?.group ?? "sales"];

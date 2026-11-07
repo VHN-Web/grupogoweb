@@ -3,7 +3,7 @@ import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatMinor } from "@/core/money";
 import { PLATFORM_LABELS } from "@/core/types";
-import { fmtDate } from "@/core/billing";
+import { fmtDate, periodDueAt } from "@/core/billing";
 import { Flash } from "@/components/Flash";
 import { StatusPill } from "@/components/StatusPill";
 import { deleteCustomers, deleteOrphanStores, newCustomer, orphanStores } from "../actions";
@@ -98,7 +98,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 <td className="px-4 py-2.5"><Link href={`/admin/clientes/${c.id}`} className="font-semibold hover:underline">{c.businessName}</Link><p className="text-xs text-muted">{c.contactName}</p></td>
                 <td className="px-4 py-2.5">{c.plan.name}</td>
                 <td className="px-4 py-2.5"><StatusPill status={c.status} /></td>
-                <td className="px-4 py-2.5">{c.nextBillingAt ? fmtDate(c.nextBillingAt) : "—"}</td>
+                <td className="px-4 py-2.5">{c.nextBillingAt ? fmtDate(periodDueAt(c.nextBillingAt)) : "—"}</td>
                 <td className="px-4 py-2.5 text-muted">{c.tenant ? (c.tenant.customDomain ?? `/${c.tenant.slug}`) : `/${c.desiredSlug}`}</td>
               </tr>
             ))}

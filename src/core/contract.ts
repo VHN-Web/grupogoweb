@@ -9,7 +9,7 @@
 import { formatMoney } from "./money";
 import type { BillingInterval, Currency } from "./types";
 
-export const CONTRACT_VERSION = "2026.11";
+export const CONTRACT_VERSION = "2026.11b";
 
 export type ContractData = {
   number: string;
@@ -105,7 +105,7 @@ function buildPt(d: ContractData): ContractDoc {
     ...[
       `Taxa de implantação: ${m(d.setupMinor)}, em pagamento único e antecipado.`,
       ...(d.domainMinor > 0 ? [`Domínio próprio (1º ano): ${m(d.domainMinor)}, cobrado junto com a implantação; renovação anual pelo valor vigente, com aviso prévio.`] : []),
-      `${per[0].toUpperCase() + per.slice(1)}: ${m(d.recurringMinor)}, cobrada a partir da data de entrega do sistema e renovada automaticamente a cada período.`,
+      `${per[0].toUpperCase() + per.slice(1)}: ${m(d.recurringMinor)}, por período, com renovação automática. **Nenhuma ${per} é cobrada junto com a implantação:** cada período começa na entrega do sistema (e depois a cada renovação) e a respectiva fatura vence 30 (trinta) dias após o início do período.`,
       "As faturas são enviadas por e-mail (e WhatsApp, se autorizado) com link de pagamento.",
       `Em caso de atraso, incidirão multa de 2% (art. 52, §1º, do CDC) e juros de 1% ao mês. Após ${d.graceDays} dias de atraso, o site público do CONTRATANTE poderá ser suspenso até a regularização, sem perda dos dados; o acesso volta automaticamente com o pagamento.`,
       "Os valores poderão ser reajustados uma vez a cada 12 meses pelo IPCA (ou índice que o substitua), com aviso prévio mínimo de 30 dias.",
@@ -218,7 +218,7 @@ function buildEs(d: ContractData): ContractDoc {
     ...[
       `Implementación: ${m(d.setupMinor)}, pago único y anticipado.`,
       ...(d.domainMinor > 0 ? [`Dominio propio (1er año): ${m(d.domainMinor)}.`] : []),
-      `${per[0].toUpperCase() + per.slice(1)}: ${m(d.recurringMinor)}, desde la entrega del sistema, con renovación automática. Con más de ${d.graceDays} días de atraso el sitio público puede suspenderse hasta el pago.`,
+      `${per[0].toUpperCase() + per.slice(1)}: ${m(d.recurringMinor)} por período, con renovación automática. **No se cobra junto con la implementación:** cada período empieza con la entrega del sistema (y luego en cada renovación) y su factura vence 30 días después del inicio del período. Con más de ${d.graceDays} días de atraso el sitio público puede suspenderse hasta el pago.`,
     ].map((t, i) => `2.${i + 1}. ${t}`),
   );
   h("3. Vigencia y cancelación");

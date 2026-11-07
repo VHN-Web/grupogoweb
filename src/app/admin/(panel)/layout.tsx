@@ -1,3 +1,4 @@
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { AdminNav } from "./AdminNav";
 import { GoWebLogo } from "@/components/brand/GoWebLogo";
@@ -15,12 +16,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <GoWebLogo height={26} />
           <span className="rounded-full border border-white/15 px-2.5 py-0.5 text-[11px] uppercase tracking-[0.18em] text-[#B9B3A7]">Admin</span>
           <div className="flex-1" />
+          <ThemeToggle locale="pt" variant="compact" />
           <span className="hidden text-xs text-[#B9B3A7] sm:inline">{me.name}</span>
           <form action={adminLogout}><button className="text-xs text-[#B9B3A7] hover:underline">Sair</button></form>
         </div>
         <AdminNav />
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main className="admin-main mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );
 }

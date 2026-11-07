@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatMinor } from "@/core/money";
 import { PLATFORM_LABELS } from "@/core/types";
-import { fmtDate } from "@/core/billing";
+import { fmtDate, periodDueAt } from "@/core/billing";
 import { MODULES, MODULE_INFO, modulesLabel, parseModules } from "@/core/modules";
 import { tenantPublicUrl } from "@/lib/urls";
 import { invoiceUrl, getSettings } from "@/services/billing";
@@ -44,7 +44,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         <Step title="Em implantação — configure e entregue">
           <p>
             Abra o <a className="underline" target="_blank" href={`/painel/${c.tenant.slug}`}>painel do cliente</a> (você entra direto, logado como admin da plataforma)
-            e configure cardápio, marca e mesas. Ao clicar em <b>Entregar</b>, uma senha é gerada e enviada ao cliente junto com a 1ª mensalidade.
+            e configure cardápio, marca e mesas. Ao clicar em <b>Entregar</b>, uma senha é gerada e enviada ao cliente. A 1ª mensalidade vence 30 dias depois da entrega (o ciclo automático gera a fatura antes).
           </p>
           {openTasks > 0 && <p className="mt-1 text-amber-800">Ainda há {openTasks} tarefa(s) em aberto.</p>}
           <form action={deliver.bind(null, c.id)} className="mt-3">
@@ -60,7 +60,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           <Row k="Valor" v={`${formatMinor(c.plan.pricePyg, "PYG")} · ${formatMinor(c.plan.priceUsdMinor, "USD")} · ${formatMinor(c.plan.priceBrlMinor, "BRL")}`} />
           {c.plan.isCustom && <Row k="Módulos" v={modulesLabel(parseModules(c.plan.modules), "pt")} />}
           <Row k="Moeda preferida" v={c.preferredCurrency} />
-          <Row k="Próximo vencimento" v={c.nextBillingAt ? fmtDate(c.nextBillingAt) : "—"} />
+          <Row k="Próximo vencimento" v={c.nextBillingAt ? fmtDate(periodDueAt(c.nextBillingAt)) : "—"} />
           <Row k="Entregue em" v={c.deliveredAt ? fmtDate(c.deliveredAt) : "—"} />
           <Row k="Domínio" v={c.wantsDomain ? `${c.domainName ?? "a definir"}${c.plan.includesDomain ? " (grátis no plano)" : ""}` : "Não contratou"} />
         </section>

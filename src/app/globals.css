@@ -224,3 +224,118 @@ html.a11y-contrast img { filter: contrast(1.1); }
 .anim-drawer { animation: gwDrawer .22s ease-out; }
 @keyframes gwDrawer { from { transform: translateX(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .anim-drawer { animation: none; } }
+
+/* ------------------------------------------------------------------ tema escuro (html.dark — components/theme) */
+html.dark {
+  --color-ink: #eef1f6;
+  --color-paper: #0d121b;
+  --color-line: #263044;
+  --color-muted: #9aa4b5;
+}
+html.dark body { background: var(--color-paper); color: var(--color-ink); }
+html.dark .card,
+html.dark :is(.panel-main, .admin-main) .bg-white:not(.keep-light),
+html.dark .btn-ghost { background-color: #151c2a; }
+html.dark .order-col { background: color-mix(in srgb, var(--c) 14%, #0b111b) !important; }
+/* assistente no escuro */
+html.dark .assistant-box { background: #111827; color: #eef1f6; }
+html.dark .assistant-box .assistant-list { background: #0b111b; }
+html.dark .assistant-box .bubble-ai, html.dark .assistant-box .assistant-card, html.dark .assistant-box form { background: #151c2a; color: #eef1f6; }
+html.dark .assistant-box textarea { background: #0f1522; color: #eef1f6; border-color: #263044; }
+html.dark .assistant-box .chip-ai { background: #151c2a; color: #9fc6f2; }
+html.dark .btn-ghost:hover { background-color: #1c2536; }
+html.dark .input { background-color: #0f1522; color: var(--color-ink); }
+html.dark .btn-primary { background-color: #eef1f6; color: #0d121b; }
+html.dark .btn-primary:hover { background-color: #d9dee8; }
+html.dark .bg-emerald-50 { background-color: rgb(20 83 45 / .35); color: #b7efcd; }
+html.dark .bg-amber-50 { background-color: rgb(120 72 0 / .35); color: #fde3b0; }
+html.dark .bg-red-50 { background-color: rgb(127 29 29 / .35); color: #fecaca; }
+html.dark .bg-blue-50 { background-color: rgb(30 64 175 / .3); color: #c7dafe; }
+html.dark .text-emerald-800, html.dark .text-amber-900, html.dark .text-amber-950, html.dark .text-red-700, html.dark .text-blue-900 { color: inherit; }
+html.dark .ring-line, html.dark .ring-black\/5, html.dark .ring-black\/10 { --tw-ring-color: #263044; }
+html.dark .bg-black\/5 { background-color: rgb(255 255 255 / .06); }
+html.dark .hover\:bg-black\/5:hover { background-color: rgb(255 255 255 / .08); }
+html.dark .border-black\/10, html.dark .border-black\/15 { border-color: #263044; }
+/* painel */
+html.dark .panel-shell { background: #0b111b !important; --section-soft: color-mix(in srgb, var(--section) 18%, #0b111b) !important; }
+html.dark .panel-main h1 { color: #f3f5f9; }
+html.dark .panel-main .label { color: #a9b2c2; }
+html.dark .panel-shell nav[aria-label="Atalhos"], html.dark .panel-shell nav[aria-label="Atajos"] { background: #111827; border-color: #263044; }
+/* site do estabelecimento: troca a paleta do modelo quando o tema escolhido for o oposto */
+html.dark .th[data-native="light"] { --bg: #111214 !important; --fg: #f1efea !important; --surface: #1b1c20 !important; --muted: #a39e95 !important; --line: #2b2c31 !important; }
+html:not(.dark) .th[data-native="dark"] { --bg: #f7f6f3 !important; --fg: #16130f !important; --surface: #ffffff !important; --muted: #6b665c !important; --line: #e6e1d8 !important; }
+@media print {
+  html.dark { --color-ink: #16130f; --color-paper: #fff; --color-line: #ebe6df; --color-muted: #7a7268; }
+  html.dark .card, html.dark .bg-white { background: #fff !important; }
+}
+
+/* ------------------------------------------------------------------ Shopping GoWeb */
+.shop { --sh-bg: #f5f6fa; --sh-card: #ffffff; --sh-soft: #eef0f5; --sh-line: #e2e5ec; --sh-ink: #121826; --sh-muted: #5b6474; background: var(--sh-bg); color: var(--sh-ink); }
+html.dark .shop { --sh-bg: #0c1018; --sh-card: #151b27; --sh-soft: #1c2433; --sh-line: #253045; --sh-ink: #eef1f6; --sh-muted: #9aa4b5; }
+.shop .chip { flex-shrink: 0; border-radius: 999px; border: 1.5px solid var(--sh-line); background: var(--sh-card); padding: .5rem 1rem; font-size: 14px; font-weight: 600; transition: background-color .15s, color .15s, border-color .15s; }
+.shop .chip:hover { border-color: #1f7fd8; }
+.shop .chip-on { background: #1f7fd8; border-color: #1f7fd8; color: #fff; }
+.shop .chip-on-navy { background: #1d4f91; border-color: #1d4f91; color: #fff; }
+.street-track { animation: gwStreet 60s linear infinite; }
+.street:hover .street-track, .street:focus-within .street-track { animation-play-state: paused; }
+@keyframes gwStreet { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.facade { box-shadow: 0 10px 30px rgba(15, 23, 42, .12); transition: transform .3s ease; }
+.facade:hover { transform: translateY(-4px); }
+.store-card { transition: transform .25s ease, box-shadow .25s ease; }
+.store-card:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(15, 23, 42, .12); }
+.store-card .thumb { transition: transform .35s ease; }
+.store-card:hover .thumb { transform: translateY(-3px); }
+.store-card .enter { transition: padding .2s ease; }
+.store-card:hover .enter { padding-left: 1.1rem; padding-right: 1.1rem; }
+.shop-in { animation: gwShopIn .45s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes gwShopIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .street-track { animation: none; }
+  .street { overflow-x: auto; }
+  .shop-in { animation: none; }
+}
+html.a11y-motion .street { overflow-x: auto; }
+
+/* ------------------------------------------------------------------ site oficial (claro/escuro) */
+.site { --s-bg: #f4f1ea; --s-card: #ffffff; --s-soft: #efebe3; --s-ink: #0e0e10; --s-muted: #5f5a52; --s-line: #ddd6c8; --s-good-bg: #e8f7ee; --s-good-fg: #1e7a43; --s-good-cell: #ecf8f0; --s-good-ink: #123b22; --s-bad: #8a4b2f;
+  background: var(--s-bg); color: var(--s-ink); }
+html.dark .site { --s-bg: #0f1012; --s-card: #18191d; --s-soft: #202126; --s-ink: #f2f0ea; --s-muted: #a7a196; --s-line: #2c2d33; --s-good-bg: #12351f; --s-good-fg: #8fe0ad; --s-good-cell: #10261a; --s-good-ink: #c9f0d6; --s-bad: #e3a58a; }
+.plan-card { transition: transform .25s ease, box-shadow .25s ease; }
+.plan-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,.12); }
+@media (prefers-reduced-motion: reduce) { .plan-card:hover { transform: none; } }
+/* conversa de exemplo do assistente: as mensagens chegam em sequência quando o bloco aparece */
+.chat-demo .chat-1, .chat-demo .chat-2, .chat-demo .chat-3 { opacity: 0; transform: translateY(8px); }
+.chat-demo.is-in .chat-1 { animation: gwChat .45s ease .25s forwards; }
+.chat-demo.is-in .chat-2 { animation: gwChat .45s ease 1.05s forwards; }
+.chat-demo.is-in .chat-3 { animation: gwChat .5s ease 1.6s forwards; }
+@keyframes gwChat { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .chat-demo .chat-1, .chat-demo .chat-2, .chat-demo .chat-3 { opacity: 1; transform: none; animation: none !important; } }
+html.a11y-motion .chat-demo .chat-1, html.a11y-motion .chat-demo .chat-2, html.a11y-motion .chat-demo .chat-3 { opacity: 1; transform: none; }
+.faq summary { list-style: none; display: flex; justify-content: space-between; gap: 1rem; }
+.faq summary::after { content: "+"; font-weight: 400; transition: transform .2s ease; }
+.faq[open] summary::after { transform: rotate(45deg); }
+.pay-step { animation: gwShopIn .5s cubic-bezier(.2,.8,.2,1) both; }
+@media (prefers-reduced-motion: reduce) { .pay-step { animation: none; } }
+
+/* ------------------------------------------------------------------ loja do consumidor: movimento com propósito */
+.th [data-reveal] { transform: translateY(14px); transition-duration: .5s; }
+.th .product-row, .th .product-card { transition: transform .2s ease, box-shadow .25s ease, opacity .5s cubic-bezier(.2,.7,.2,1); }
+.th .product-row:active, .th .product-card:active { transform: scale(.985); }
+@media (hover: hover) {
+  .th .product-row:hover, .th .product-card:hover { box-shadow: 0 10px 28px rgba(0,0,0,.10); }
+  .th .product-row:hover .product-img, .th .product-card:hover .product-img { transform: scale(1.07) rotate(-1.5deg); }
+}
+.th .product-img { transition: transform .45s cubic-bezier(.2,.7,.2,1); }
+.th .add-btn { box-shadow: 0 4px 12px color-mix(in srgb, var(--brand) 40%, transparent); }
+.th .cart-bar { animation: gwCartIn .45s cubic-bezier(.2,.9,.25,1.2) both; }
+@keyframes gwCartIn { from { transform: translateY(120%); } to { transform: none; } }
+.th .cat-nav { backdrop-filter: saturate(1.4) blur(10px); background: color-mix(in srgb, var(--bg) 88%, transparent); }
+.th .hero-art { animation: gwFloat 6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .th .cart-bar, .th .hero-art { animation: none; } .th .product-img { transition: none; } }
+html.a11y-motion .th .cart-bar, html.a11y-motion .th .hero-art { animation: none; }
+.partner-btn { transition: transform .2s ease, box-shadow .2s ease; }
+.partner-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.12); }
+.th .hero-in > .relative > * { animation: gwFadeUp .6s cubic-bezier(.2,.7,.2,1) both; }
+.th .hero-in > .relative > *:nth-child(2) { animation-delay: .08s; }
+.th .hero-in > .relative > *:nth-child(3) { animation-delay: .16s; }
+@media (prefers-reduced-motion: reduce) { .th .hero-in > .relative > * { animation: none; } }

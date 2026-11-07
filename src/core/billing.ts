@@ -68,6 +68,12 @@ export function dunningState(oldestOpenDueAt: Date | null, now: Date, graceDays:
 }
 
 /** Deve gerar a próxima fatura agora? (X dias antes do vencimento) */
+/** Cada período é pago 30 dias depois que começa (a 1ª mensalidade vence 30 dias após a entrega do sistema). */
+export const PAY_AFTER_DAYS = 30;
+export function periodDueAt(periodStart: Date) {
+  return addDays(periodStart, PAY_AFTER_DAYS);
+}
+
 export function shouldInvoice(nextBillingAt: Date | null, now: Date, daysBefore: number) {
   return !!nextBillingAt && addDays(now, daysBefore).getTime() >= nextBillingAt.getTime();
 }

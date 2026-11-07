@@ -4,7 +4,7 @@ import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
 import { formatMinor } from "@/core/money";
-import { fmtDate } from "@/core/billing";
+import { fmtDate, periodDueAt } from "@/core/billing";
 import { invoiceUrl } from "@/services/billing";
 import { planFeature, planName } from "@/core/plans";
 import { ProUpsell } from "@/components/ProUpsell";
@@ -60,7 +60,7 @@ export default async function MyPlan({ params, searchParams }: { params: Promise
         <p className="text-xs text-muted">{T("Tu plan", "Seu plano")}</p>
         <p className="text-2xl font-bold">{planName(c.plan.name, region.locale)}</p>
         <p className="mt-1 text-sm">{formatMinor(price, cur)} / {c.plan.interval === "YEARLY" ? T("año", "ano") : T("mes", "mês")} · {T(CUSTOMER[c.status][0], CUSTOMER[c.status][1])}</p>
-        {c.nextBillingAt && <p className="text-sm text-muted">{T("Próximo vencimiento", "Próximo vencimento")}: {fmtDate(c.nextBillingAt)}</p>}
+        {c.nextBillingAt && <p className="text-sm text-muted">{T("Próximo vencimiento", "Próximo vencimento")}: {fmtDate(periodDueAt(c.nextBillingAt))}</p>}
         {c.plan.features && (
           <ul className="mt-3 space-y-1 text-sm">
             {c.plan.features.split("\n").filter(Boolean).map((f) => <li key={f}>✓ {planFeature(f, region.locale)}</li>)}

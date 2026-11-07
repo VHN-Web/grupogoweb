@@ -135,6 +135,7 @@ export default async function StorePage({
     social: { whatsapp: tenant.whatsapp, instagram: tenant.instagram },
     demo: tenant.demo,
     pro,
+    networkUrl: `${appUrl()}/shopping?lang=${getRegion(tenant.country).locale}&de=${tenant.slug}`,
     growth: {
       referralPct: featureOn(growth.cfg, "referral", growth.pro) ? growth.cfg.referral.friendPct : null,
       referral: await referralBanner(tenant, indicacao ?? ref ?? null),

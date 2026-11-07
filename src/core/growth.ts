@@ -15,6 +15,7 @@ export const GROWTH_FEATURES = {
   referral: { pro: true, optional: true },
   loyalty: { pro: true, optional: true },
   birthday: { pro: true, optional: true },
+  shopping: { pro: false, optional: true },
 } as const;
 export type GrowthFeature = keyof typeof GROWTH_FEATURES;
 
@@ -25,6 +26,7 @@ export type GrowthConfig = {
   referral: { enabled: boolean; friendPct: number; referrerPct: number };
   loyalty: { enabled: boolean; mode: "stamps" | "cashback"; stamps: number; rewardPct: number; cashbackPct: number };
   birthday: { enabled: boolean; pct: number };
+  shopping: { enabled: boolean }; // aparecer no Shopping GoWeb (ligado por padrão)
 };
 
 export const DEFAULT_GROWTH: GrowthConfig = {
@@ -34,6 +36,7 @@ export const DEFAULT_GROWTH: GrowthConfig = {
   referral: { enabled: false, friendPct: 10, referrerPct: 10 },
   loyalty: { enabled: false, mode: "stamps", stamps: 10, rewardPct: 50, cashbackPct: 5 },
   birthday: { enabled: false, pct: 15 },
+  shopping: { enabled: true },
 };
 
 const clamp = (n: unknown, min: number, max: number, def: number) => {
@@ -68,6 +71,7 @@ export function parseGrowth(raw: string | null | undefined): GrowthConfig {
       cashbackPct: clamp(g("loyalty").cashbackPct, 1, 30, D.loyalty.cashbackPct),
     },
     birthday: { enabled: g("birthday").enabled === true, pct: clamp(g("birthday").pct, 5, 50, D.birthday.pct) },
+    shopping: { enabled: g("shopping").enabled !== false },
   };
 }
 

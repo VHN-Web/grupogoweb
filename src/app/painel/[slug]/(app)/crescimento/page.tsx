@@ -61,6 +61,8 @@ export default async function CrescimentoPage({ params, searchParams }: { params
           {cfg.directory.enabled && cfg.directory.city && <p className="text-xs text-muted sm:col-span-2">{`${appUrl()}/vitrine/${citySlug(cfg.directory.city)}`}</p>}
         </Feature>
 
+        <Feature name="shopping" on={cfg.shopping.enabled} title={T("Shopping GoWeb", "Shopping GoWeb")} desc={T("Tu tienda aparece en el Shopping GoWeb, la red de comercios de GoWeb, con tus productos. Los clientes llegan y compran directo en tu sitio.", "Sua loja aparece no Shopping GoWeb, a rede de comércios da GoWeb, com seus produtos. Os clientes chegam e compram direto no seu site.")} />
+
         <h2 className="pt-2 font-bold">GoInteligence <ProBadge /></h2>
 
         <Feature name="campaigns" on={cfg.campaigns.enabled} locked={!pro} lockText={lock} title={T("Campañas de reactivación", "Campanhas de reativação")} desc={T("Mensajes con cupón para clientes que no compran hace 30/60/90 días, solo para quien aceptó recibir ofertas.", "Mensagens com cupom para quem sumiu há 30/60/90 dias, só para quem autorizou receber ofertas.")} />

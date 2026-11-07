@@ -56,11 +56,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <div className="flex justify-between gap-3"><span className="text-muted">{T("Dominio propio (1er año)", "Domínio próprio (1º ano)")}</span><b>{m(sum.domainMinor)}</b></div>
         )}
         <div className="flex justify-between gap-3">
-          <span className="text-muted">{per} {isSetup ? T("(desde la entrega del sistema)", "(a partir da entrega do sistema)") : ""}</span>
+          <span className="text-muted">{per} {isSetup ? T("(1er pago 30 días después de la entrega)", "(1º pagamento 30 dias após a entrega)") : ""}</span>
           <b>{m(sum.recurringMinor)}</b>
         </div>
         {isSetup && (
-          <div className="flex justify-between gap-3 border-t border-line pt-1.5"><span className="font-semibold">{T("Total a pagar hoy", "Total a pagar hoje")}</span><b className="text-base">{m(amountIn(inv, sum.currency))}</b></div>
+          <div className="flex justify-between gap-3 border-t border-line pt-1.5"><span className="font-semibold">{T("Total a pagar hoy (solo la implementación)", "Total a pagar hoje (só a implantação)")}</span><b className="text-base">{m(amountIn(inv, sum.currency))}</b></div>
         )}
       </div>
       {isSetup && (

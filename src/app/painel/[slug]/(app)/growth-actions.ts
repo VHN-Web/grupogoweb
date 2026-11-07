@@ -36,6 +36,7 @@ export async function saveGrowth(slug: string, f: FormData) {
       referral: { enabled: on("referral"), friendPct: num(f, "friendPct"), referrerPct: num(f, "referrerPct") },
       loyalty: { enabled: on("loyalty"), mode: str(f, "loyaltyMode"), stamps: num(f, "stamps"), rewardPct: num(f, "rewardPct"), cashbackPct: num(f, "cashbackPct") },
       birthday: { enabled: on("birthday"), pct: num(f, "birthdayPct") },
+      shopping: { enabled: on("shopping") },
     }),
   );
   await db.update(schema.tenants).set({ growthConfig: JSON.stringify(next) }).where(eq(schema.tenants.id, t.id));

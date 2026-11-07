@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import Link from "next/link";
 import { requirePanelAccess } from "@/lib/auth";
@@ -7,6 +7,7 @@ import { panelI18n } from "@/lib/panel-i18n";
 import { PanelShell } from "./PanelNav";
 import { Icon } from "@/components/ui/Icon";
 import { A11yMenu } from "@/components/a11y/A11yMenu";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Assistant } from "@/components/assistant/Assistant";
 import { assistantEnabled } from "@/services/assistant";
 import { GoWebLogo } from "@/components/brand/GoWebLogo";
@@ -57,8 +58,15 @@ export default async function PanelLayout({ children, params }: { children: Reac
       </button>
     </form>
   );
+  const unread = await db.$count(schema.supportTickets, and(eq(schema.supportTickets.tenantId, tenant.id), eq(schema.supportTickets.unreadByCustomer, true)));
   const footer = (
     <div className="space-y-1">
+      <Link href={`/painel/${slug}/suporte`} className="mb-2 flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/15">
+        <Icon name="chat" size={18} />
+        <span className="flex-1">{T("Hablar con GoWeb", "Falar com a GoWeb")}</span>
+        {unread > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#1F7FD8] px-1 text-[11px]" aria-label={T(`${unread} respuesta(s) nueva(s)`, `${unread} resposta(s) nova(s)`)}>{unread}</span>}
+      </Link>
+      <ThemeToggle locale={locale} />
       <A11yMenu locale={locale} />
       <form action={logout.bind(null, slug)}>
         <button className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-sm text-white/80 hover:text-white">

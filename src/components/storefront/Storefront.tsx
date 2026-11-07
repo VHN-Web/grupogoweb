@@ -1,6 +1,8 @@
 "use client";
 
 import { A11yMenu } from "@/components/a11y/A11yMenu";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { RevealOnScroll } from "@/components/motion/RevealOnScroll";
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, parseMajorToMinor, fromBase, toBase, type Rates } from "@/core/money";
@@ -51,6 +53,7 @@ export type StoreData = {
   social: { whatsapp: string | null; instagram: string | null };
   demo?: boolean;
   pro: boolean;
+  networkUrl: string;
   growth: {
     referralPct: number | null;
     referral: { code: string; firstName: string; pct: number } | null;
@@ -95,6 +98,32 @@ function useCart(slug: string) {
   return [cart, setCart] as const;
 }
 
+/** Respeita "menos movimento" (sistema ou menu de acessibilidade). */
+function calm() {
+  return typeof window !== "undefined" && (window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.classList.contains("a11y-motion"));
+}
+
+/** Uma bolinha na cor da loja sai do botão "+" e cai na barra do carrinho. */
+function flyToCart(from: HTMLElement | null) {
+  if (!from || calm()) return;
+  const r = from.getBoundingClientRect();
+  const dot = document.createElement("span");
+  dot.setAttribute("aria-hidden", "true");
+  Object.assign(dot.style, { position: "fixed", left: `${r.left + r.width / 2 - 9}px`, top: `${r.top + r.height / 2 - 9}px`, width: "18px", height: "18px", borderRadius: "999px", background: "var(--brand)", zIndex: "60", pointerEvents: "none", boxShadow: "0 4px 14px rgba(0,0,0,.25)" });
+  (document.querySelector(".th") ?? document.body).appendChild(dot);
+  const tx = window.innerWidth / 2 - (r.left + r.width / 2);
+  const ty = window.innerHeight - 48 - (r.top + r.height / 2);
+  const a = dot.animate(
+    [
+      { transform: "translate(0,0) scale(1)", opacity: 1 },
+      { transform: `translate(${tx * 0.5}px, ${Math.min(ty * 0.5, -60)}px) scale(1.15)`, opacity: 1, offset: 0.45 },
+      { transform: `translate(${tx}px, ${ty}px) scale(.45)`, opacity: 0.2 },
+    ],
+    { duration: 620, easing: "cubic-bezier(.3,.6,.4,1)" },
+  );
+  a.onfinish = () => dot.remove();
+}
+
 function initials(name: string) {
   return name
     .split(/\s+/)
@@ -109,6 +138,7 @@ export function Storefront({ data }: { data: StoreData }) {
   const [cart, setCart] = useCart(data.slug);
   const [view, setView] = useState<View>("menu");
   const [activeCat, setActiveCat] = useState(data.groups[0]?.id);
+  const [query, setQuery] = useState("");
 
   const all = useMemo(() => data.groups.flatMap((g) => g.products), [data.groups]);
   const products = useMemo(() => new Map(all.map((p) => [p.id, p])), [all]);
@@ -180,6 +210,32 @@ export function Storefront({ data }: { data: StoreData }) {
     "--font-b": theme.fonts.body,
   } as CSSProperties;
 
+  // busca no cardápio (nome ou descrição, sem acento)
+  const norm = (x: string) => x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const groups = useMemo(() => {
+    const q = norm(query.trim());
+    if (!q) return data.groups;
+    return data.groups.map((g) => ({ ...g, products: g.products.filter((p) => norm(`${p.name} ${p.description ?? ""}`).includes(q)) })).filter((g) => g.products.length > 0);
+  }, [data.groups, query]);
+
+  // a categoria em destaque acompanha a rolagem
+  useEffect(() => {
+    const els = groups.map((g) => document.getElementById(`c-${g.id}`)).filter((e): e is HTMLElement => !!e);
+    if (!els.length || !("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (vis) setActiveCat(vis.target.id.slice(2));
+      },
+      { rootMargin: "-80px 0px -55% 0px" },
+    );
+    els.forEach((e) => io.observe(e));
+    return () => io.disconnect();
+  }, [groups]);
+  useEffect(() => {
+    document.querySelector(`[data-cat="${activeCat}"]`)?.scrollIntoView({ inline: "center", block: "nearest", behavior: calm() ? "auto" : "smooth" });
+  }, [activeCat]);
+
   const tileFor = (i: number) => theme.colors.tiles[i % theme.colors.tiles.length];
   const featured = theme.featured ? all.filter((p) => !p.soldOut).slice(0, 6) : [];
 
@@ -188,8 +244,11 @@ export function Storefront({ data }: { data: StoreData }) {
 
   return (
     <StoreCtx.Provider value={ctx}>
-    <div style={vars} className="th min-h-dvh">
-      <div className="mx-auto max-w-xl pb-32">
+    <div style={vars} className="th min-h-dvh" data-native={isDarkColor(theme.colors.bg) ? "dark" : "light"}>
+      <div className="relative mx-auto max-w-xl pb-32">
+        <div className="absolute right-3 top-3 z-20">
+          <ThemeToggle locale={data.locale} variant="compact" tone="glass" />
+        </div>
         <Hero data={data} theme={theme} />
         <SocialBar />
         {data.growth.referral && (
@@ -236,18 +295,30 @@ export function Storefront({ data }: { data: StoreData }) {
           </section>
         )}
 
+        {all.length >= 5 && (
+          <div className="mx-5 mt-5">
+            <label htmlFor="menu-search" className="sr-only">{T("Buscar en el menú", "Buscar no cardápio")}</label>
+            <div className="th-surface th-line flex items-center gap-2 rounded-2xl border px-3.5">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="th-muted shrink-0" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <input id="menu-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={T("Buscar en el menú…", "Buscar no cardápio…")} className="h-12 w-full bg-transparent text-[15px] outline-none placeholder:opacity-60" />
+            </div>
+          </div>
+        )}
+
         {/* Categorias */}
         <nav
           aria-label={T("Categorías", "Categorias")}
-          className="no-scrollbar th-bg sticky top-0 z-10 mt-4 flex gap-2 overflow-x-auto px-5 py-3"
+          className="cat-nav no-scrollbar th-bg sticky top-0 z-10 mt-4 flex gap-2 overflow-x-auto px-5 py-3"
           style={{ boxShadow: `0 1px 0 ${theme.colors.line}` }}
         >
-          {data.groups.map((g) => (
+          {groups.map((g) => (
             <a
               key={g.id}
               href={`#c-${g.id}`}
+              data-cat={g.id}
+              aria-current={activeCat === g.id ? "true" : undefined}
               onClick={() => setActiveCat(g.id)}
-              className={`shrink-0 rounded-full border px-4 py-2 text-[13px] font-semibold transition ${
+              className={`shrink-0 rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors duration-300 ${
                 activeCat === g.id ? "th-accent border-transparent" : "th-surface th-line"
               }`}
             >
@@ -258,7 +329,10 @@ export function Storefront({ data }: { data: StoreData }) {
 
         <main className="px-5">
           {data.groups.length === 0 && <p className="th-muted py-16 text-center">{T("El menú todavía está vacío.", "O cardápio ainda está vazio.")}</p>}
-          {data.groups.map((g, gi) => (
+          {data.groups.length > 0 && groups.length === 0 && (
+            <p className="th-muted py-12 text-center">{T(`Nada con «${query}». Probá otra palabra.`, `Nada com «${query}». Tente outra palavra.`)}</p>
+          )}
+          {groups.map((g, gi) => (
             <section key={g.id} id={`c-${g.id}`} className="scroll-mt-16 pt-6">
               <h2
                 className={`th-h mb-3 ${theme.fonts.headingUpper ? "text-[22px] uppercase tracking-wide" : "text-[21px] font-bold"} ${
@@ -274,7 +348,7 @@ export function Storefront({ data }: { data: StoreData }) {
                   ))}
                 </div>
               ) : (
-                <ul className="stagger flex flex-col gap-2.5">
+                <ul className="flex flex-col gap-2.5">
                   {g.products.map((p, i) => (
                     <ProductRow key={p.id} p={p} theme={theme} tile={tileFor(gi * 3 + i)} qty={cart[p.id] ?? 0} onQty={(q) => setQty(p.id, q)} canOrder={data.isOpen} />
                   ))}
@@ -283,7 +357,18 @@ export function Storefront({ data }: { data: StoreData }) {
             </section>
           ))}
           <div className="mt-10 flex flex-col items-center gap-3">
+            <a href={data.networkUrl} className="partner-btn group flex items-center gap-3 rounded-2xl border px-4 py-3 text-left th-line th-surface">
+              <span className="grid h-10 w-10 place-items-center rounded-xl th-accent" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9 5.5 4h13L20 9" /><path d="M4 9h16v2a3 3 0 0 1-5.3 1.9A3 3 0 0 1 12 14a3 3 0 0 1-2.7-1.1A3 3 0 0 1 4 11z" /><path d="M5 13v7h14v-7" /></svg>
+              </span>
+              <span>
+                <span className="block text-[14px] font-bold">{T("Tiendas asociadas", "Lojas parceiras")}</span>
+                <span className="th-muted block text-[12px]">{T("Conocé otros comercios de la red GoWeb", "Conheça outros comércios da rede GoWeb")}</span>
+              </span>
+              <span className="th-muted transition-transform group-hover:translate-x-1" aria-hidden="true">›</span>
+            </a>
             <A11yMenu locale={data.locale} variant="light" />
+            <RevealOnScroll />
             <p className="th-muted flex items-center justify-center gap-1.5 text-[11px]">
               {T("Hecho con", "Feito com")} <GoWebLogo height={14} ink="currentColor" />
             </p>
@@ -310,7 +395,7 @@ export function Storefront({ data }: { data: StoreData }) {
 
       {/* Barra do carrinho */}
       {count > 0 && view === "menu" && (
-        <div className="anim-fade-up fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="cart-bar fixed inset-x-0 bottom-0 z-20 mx-auto max-w-xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <button
             onClick={() => setView("cart")}
             className="th-accent flex w-full items-center justify-between px-5 py-4 text-[15px] font-bold shadow-xl shadow-black/25 transition active:scale-[.99]"
@@ -319,7 +404,7 @@ export function Storefront({ data }: { data: StoreData }) {
             <span>
               {T("Ver pedido", "Ver pedido")} · <span key={count} className="anim-pop inline-block">{count}</span>
             </span>
-            <span>{money(subtotal)}</span>
+            <span key={subtotal} className="anim-pop inline-block tabular-nums">{money(subtotal)}</span>
           </button>
         </div>
       )}
@@ -378,7 +463,7 @@ function BannerArt({ data, size, className }: { data: StoreData; size: number; c
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={data.banner.imageUrl} alt="" className={`object-cover ${className ?? ""}`} />;
   }
-  return <Illustration name={data.banner.illustration} size={size} className={className} />;
+  return <Illustration name={data.banner.illustration} size={size} className={`hero-art ${className ?? ""}`} />;
 }
 
 function StatusLine({ data, extra }: { data: StoreData; extra?: string | null }) {
@@ -404,7 +489,7 @@ function Hero({ data, theme }: { data: StoreData; theme: Theme }) {
     case "promo":
       return (
         <header>
-          <div className="relative h-[300px] overflow-hidden" style={heroStyle}>
+          <div className="hero-in relative min-h-[300px] overflow-hidden pb-14" style={heroStyle}>
             <div aria-hidden className="absolute inset-0" style={{ background: `repeating-linear-gradient(-45deg, ${theme.colors.heroAlt} 0 14px, transparent 14px 28px)` }} />
             {hasPhoto ? (
               <BannerArt data={data} size={230} className="absolute inset-y-0 right-0 h-full w-[55%]" />
@@ -415,7 +500,7 @@ function Hero({ data, theme }: { data: StoreData; theme: Theme }) {
             )}
             <div className="relative flex w-[200px] flex-col gap-1.5 pl-5 pt-14">
               {b.tag && <span className="th-accent -rotate-3 self-start rounded-md px-2.5 py-1 text-xs font-extrabold uppercase">{b.tag}</span>}
-              <span className="th-h text-[42px] uppercase leading-[0.95]">{title}</span>
+              <span className="th-h text-[clamp(32px,10vw,42px)] uppercase leading-[0.95]">{title}</span>
               {b.highlight && <span className="th-h th-accent-text text-[26px]">{b.highlight}</span>}
             </div>
           </div>
@@ -688,9 +773,9 @@ function ProductImage({ p, tile, className, radius, size }: { p: StoreProduct; t
     <div className={`grid shrink-0 place-items-center overflow-hidden ${className}`} style={{ background: tile, borderRadius: radius }}>
       {p.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
+        <img src={p.imageUrl} alt={p.name} className="product-img h-full w-full object-cover" loading="lazy" />
       ) : p.illustration ? (
-        <Illustration name={p.illustration} size={size} />
+        <Illustration name={p.illustration} size={size} className="product-img" />
       ) : (
         <span className="th-h text-2xl font-bold opacity-40">{initials(p.name)}</span>
       )}
@@ -703,13 +788,16 @@ function AddButton({ onClick, label, round, small }: { onClick: () => void; labe
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        flyToCart(e.currentTarget);
+        onClick();
+      }}
       aria-label={`${T("Agregar", "Adicionar")} ${label}`}
-      className={`th-accent grid shrink-0 place-items-center font-bold transition active:scale-95 ${small ? "h-8 w-8 text-lg" : "h-10 w-10 text-xl"} ${
+      className={`add-btn th-accent grid shrink-0 place-items-center font-bold transition active:scale-90 ${small ? "h-8 w-8 text-lg" : "h-10 w-10 text-xl"} ${
         round ? "rounded-full" : "rounded-xl"
       }`}
     >
-      +
+      <svg width={small ? 16 : 18} height={small ? 16 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </button>
   );
 }
@@ -721,8 +809,8 @@ function Stepper({ qty, onQty, max }: { qty: number; onQty: (q: number) => void;
       <button onClick={() => onQty(qty - 1)} className="h-10 w-9 text-lg font-semibold" aria-label={T("Quitar uno", "Remover um")}>
         −
       </button>
-      <span className="w-6 text-center text-sm font-bold tabular-nums">{qty}</span>
-      <button onClick={() => onQty(qty + 1)} disabled={qty >= max} className="h-10 w-9 text-lg font-semibold disabled:opacity-30" aria-label={T("Agregar uno", "Adicionar um")}>
+      <span key={qty} className="anim-pop w-6 text-center text-sm font-bold tabular-nums" aria-live="polite">{qty}</span>
+      <button onClick={(e) => { flyToCart(e.currentTarget); onQty(qty + 1); }} disabled={qty >= max} className="h-10 w-9 text-lg font-semibold disabled:opacity-30" aria-label={T("Agregar uno", "Adicionar um")}>
         +
       </button>
     </div>
@@ -745,7 +833,7 @@ function Qty({ p, qty, onQty, canOrder, round, small }: { p: StoreProduct; qty: 
 
 function ProductRow({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
   return (
-    <li className={`th-surface flex items-center gap-3.5 p-3 ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
+    <li data-reveal className={`product-row th-surface flex items-center gap-3.5 p-3 ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
       <ProductImage p={p} tile={tile} className="h-[84px] w-[84px]" radius={theme.radius - 4} size={70} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h3 className={`th-h leading-tight ${theme.fonts.headingUpper ? "text-[19px] uppercase tracking-wide" : "text-[15.5px] font-bold"}`}>{p.name}</h3>
@@ -759,7 +847,7 @@ function ProductRow({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct;
 
 function ProductCard({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
   return (
-    <div className={`th-surface flex flex-col overflow-hidden border th-line ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
+    <div data-reveal className={`product-card th-surface flex flex-col overflow-hidden border th-line ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
       <ProductImage p={p} tile={tile} className="h-[130px] w-full" radius={0} size={110} />
       <div className="flex flex-1 flex-col gap-1.5 p-3">
         <h3 className="th-h text-[15.5px] font-bold leading-tight">{p.name}</h3>
@@ -1582,4 +1670,12 @@ function readStored(key: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** O modelo foi desenhado com fundo escuro? (usado pelo tema claro/escuro escolhido pelo visitante) */
+function isDarkColor(hex: string) {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return false;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b < 128;
 }

@@ -741,6 +741,50 @@ export const couriers = pgTable(
   (t) => [uniqueIndex("couriers_tenant_phone_uq").on(t.tenantId, t.phone)],
 );
 
+// Chamados de suporte do lojista para a GoWeb (protocolo + SLA)
+export const supportTickets = pgTable(
+  "support_tickets",
+  {
+    id: id(),
+    protocol: text("protocol").notNull(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    openedBy: text("opened_by").notNull(), // nome de quem abriu (dono ou funcionário)
+    contactEmail: text("contact_email"),
+    contactWhatsapp: text("contact_whatsapp"),
+    category: text("category").notNull(),
+    priority: text("priority").$type<"urgente" | "alta" | "normal" | "baixa">().notNull().default("normal"),
+    subject: text("subject").notNull(),
+    status: text("status").$type<"OPEN" | "IN_PROGRESS" | "WAITING_CUSTOMER" | "RESOLVED" | "CLOSED">().notNull().default("OPEN"),
+    assignedTo: text("assigned_to"),
+    firstResponseDueAt: timestamp("first_response_due_at", { withTimezone: true }).notNull(),
+    resolutionDueAt: timestamp("resolution_due_at", { withTimezone: true }).notNull(),
+    firstResponseAt: timestamp("first_response_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+    unreadByCustomer: boolean("unread_by_customer").notNull().default(false),
+    unreadByAdmin: boolean("unread_by_admin").notNull().default(true),
+    rating: integer("rating"), // 1 a 5, depois de resolvido
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("support_tickets_protocol_uq").on(t.protocol), index("support_tickets_tenant_idx").on(t.tenantId)],
+);
+
+export const supportMessages = pgTable("support_messages", {
+  id: id(),
+  ticketId: text("ticket_id")
+    .notNull()
+    .references(() => supportTickets.id, { onDelete: "cascade" }),
+  author: text("author").$type<"cliente" | "suporte">().notNull(),
+  authorName: text("author_name").notNull(),
+  body: text("body").notNull(),
+  internal: boolean("internal").notNull().default(false), // nota interna da equipe (o cliente não vê)
+  createdAt: createdAt(),
+});
+
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type SupportMessage = typeof supportMessages.$inferSelect;
 export type PlatformAdmin = typeof platformAdmins.$inferSelect;
 export type Courier = typeof couriers.$inferSelect;
 export type Tenant = typeof tenants.$inferSelect;
@@ -763,3 +807,11 @@ export type Contract = typeof contracts.$inferSelect;
 export type ServiceInvoice = typeof serviceInvoices.$inferSelect;
 export type Shopper = typeof shoppers.$inferSelect;
 export type Campaign = typeof campaigns.$inferSelect;
+
+export const supportTicketsRelations = relations(supportTickets, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [supportTickets.tenantId], references: [tenants.id] }),
+  messages: many(supportMessages),
+}));
+export const supportMessagesRelations = relations(supportMessages, ({ one }) => ({
+  ticket: one(supportTickets, { fields: [supportMessages.ticketId], references: [supportTickets.id] }),
+}));

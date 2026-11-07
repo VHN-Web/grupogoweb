@@ -122,7 +122,7 @@ export function Assistant({ slug, locale, enabled }: { slug: string; locale: "es
         <section
           role="dialog"
           aria-label={t.title}
-          className="fixed inset-x-0 bottom-0 z-50 flex h-[85dvh] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-black/10 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:h-[600px] sm:w-[400px] sm:rounded-3xl"
+          className="assistant-box fixed inset-x-0 bottom-0 z-50 flex h-[85dvh] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-black/10 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:h-[600px] sm:w-[400px] sm:rounded-3xl"
         >
           <header className="flex items-center gap-3 bg-[#0F2747] px-4 py-3 text-white">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#1F7FD8]"><Icon name="sparkle" size={18} /></span>
@@ -132,12 +132,12 @@ export function Assistant({ slug, locale, enabled }: { slug: string; locale: "es
             </button>
           </header>
 
-          <div ref={list} className="flex-1 space-y-3 overflow-y-auto bg-[#F3F5F9] p-4" aria-live="polite">
+          <div ref={list} className="assistant-list flex-1 space-y-3 overflow-y-auto bg-[#F3F5F9] p-4" aria-live="polite">
             <Bubble role="assistant" text={t.hello} />
             {msgs.length === 0 && (
               <div className="flex flex-wrap gap-2">
                 {t.chips.map((c) => (
-                  <button key={c} type="button" onClick={() => send(c)} className="rounded-full border border-[#1F7FD8]/30 bg-white px-3 py-1.5 text-sm font-medium text-[#1F5FA8] hover:bg-[#E1EEFB]">
+                  <button key={c} type="button" onClick={() => send(c)} className="chip-ai rounded-full border border-[#1F7FD8]/30 bg-white px-3 py-1.5 text-sm font-medium text-[#1F5FA8] hover:bg-[#E1EEFB]">
                     {c}
                   </button>
                 ))}
@@ -156,8 +156,8 @@ export function Assistant({ slug, locale, enabled }: { slug: string; locale: "es
                   </div>
                 )}
                 {m.pending?.map((p, pi) => (
-                  <div key={pi} className="rounded-2xl border-2 border-[#1F7FD8]/40 bg-white p-3 text-sm">
-                    <p className="font-semibold text-[#0F1B2D]">{p.summary}</p>
+                  <div key={pi} className="assistant-card rounded-2xl border-2 border-[#1F7FD8]/40 bg-white p-3 text-sm">
+                    <p className="font-semibold">{p.summary}</p>
                     {!p.state || p.state === "busy" ? (
                       <div className="mt-2 flex gap-2">
                         <button type="button" disabled={p.state === "busy"} onClick={() => decide(mi, pi, true)} className="flex-1 rounded-xl bg-[#2FAE5F] px-3 py-2 font-semibold text-white disabled:opacity-60">
@@ -217,7 +217,7 @@ export function Assistant({ slug, locale, enabled }: { slug: string; locale: "es
 function Bubble({ role, text }: { role: "user" | "assistant"; text: string }) {
   return (
     <div className={`flex ${role === "user" ? "justify-end" : "justify-start"}`}>
-      <p className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[15px] leading-snug ${role === "user" ? "rounded-br-md bg-[#1F7FD8] text-white" : "rounded-bl-md bg-white text-[#1B2230] ring-1 ring-black/5"}`}>
+      <p className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[15px] leading-snug ${role === "user" ? "rounded-br-md bg-[#1F7FD8] text-white" : "bubble-ai rounded-bl-md bg-white text-[#1B2230] ring-1 ring-black/5"}`}>
         {text}
       </p>
     </div>

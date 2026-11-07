@@ -1,4 +1,5 @@
 import { A11yBoot } from "@/components/a11y/A11yBoot";
+import { ThemeBoot } from "@/components/theme/ThemeBoot";
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { detectLocale } from "@/core/region";
@@ -29,6 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={lang} suppressHydrationWarning>
       <head>
         <A11yBoot />
+        <ThemeBoot />
       </head>
       <body className="min-h-dvh font-sans antialiased">{children}</body>
     </html>

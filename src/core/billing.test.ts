@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addInterval, chargesDomain, dunningState, setupAmounts, shouldInvoice, amountIn } from "./billing";
+import { addInterval, chargesDomain, dunningState, setupAmounts, shouldInvoice, amountIn, periodDueAt, PAY_AFTER_DAYS } from "./billing";
 import { verifyMercadoPagoSignature } from "@/adapters/billing/mercadopago";
 import { createHmac } from "node:crypto";
 
@@ -60,5 +60,13 @@ describe("Mercado Pago", () => {
     expect(verifyMercadoPagoSignature({ xSignature: `ts=1704908010,v1=${v1}`, xRequestId: "abc", dataId: "123", secret })).toBe(true);
     expect(verifyMercadoPagoSignature({ xSignature: `ts=1704908010,v1=${v1}`, xRequestId: "abc", dataId: "999", secret })).toBe(false);
     expect(verifyMercadoPagoSignature({ xSignature: null, xRequestId: "abc", dataId: "123", secret })).toBe(false);
+  });
+});
+
+describe("política de cobrança: mensalidade 30 dias após o início do período", () => {
+  it("1ª mensalidade vence 30 dias após a entrega", () => {
+    const d = new Date("2026-11-07T15:00:00Z");
+    expect(PAY_AFTER_DAYS).toBe(30);
+    expect(periodDueAt(d).toISOString()).toBe("2026-12-07T15:00:00.000Z");
   });
 });

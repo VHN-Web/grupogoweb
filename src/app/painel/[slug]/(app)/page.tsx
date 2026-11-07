@@ -79,7 +79,7 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
         {COLUMNS.map((col) => {
           const list = orders.filter((o) => col.statuses.includes(o.status)).reverse();
           return (
-            <section key={T(col.es, col.pt)} className="rounded-3xl p-3" style={{ background: col.soft }}>
+            <section key={T(col.es, col.pt)} className="order-col rounded-3xl p-3" style={{ background: col.soft, ["--c" as string]: col.color }}>
               <h2 className="mb-3 flex items-center gap-2 px-1 text-[15px] font-bold" style={{ color: col.color }}>
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: col.color }} aria-hidden="true" />
                 <span className="flex-1">{T(col.es, col.pt)}</span>

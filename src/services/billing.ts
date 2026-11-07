@@ -1,11 +1,12 @@
 import "server-only";
 // Ciclo comercial da plataforma:
 //   contratação -> fatura de implantação -> pago -> sistema criado (IMPLEMENTING) + tarefas
-//   -> você entrega -> 1ª mensalidade -> ciclo automático -> atraso -> suspensão -> pago -> reativa
+//   -> você entrega -> 1ª mensalidade 30 dias depois -> ciclo automático -> atraso -> suspensão -> pago -> reativa
 import { and, asc, eq, inArray, lt } from "drizzle-orm";
 import { db, schema } from "@/db";
 import {
   addDays,
+  periodDueAt,
   addInterval,
   amountIn,
   chargesDomain,
@@ -411,12 +412,12 @@ export async function deliverCustomer(customerId: string) {
   await db.update(schema.tenants).set({ adminPasswordHash: hashPassword(password) }).where(eq(schema.tenants.id, c.tenant.id));
 
   const now = new Date();
-  const periodEnd = addInterval(now, c.plan.interval);
-  // 1ª mensalidade: período começa hoje, com 3 dias para pagar
-  const inv = await createSubscriptionInvoice(c, c.plan, now, periodEnd, addDays(now, 3));
+  // Política: na entrega NÃO se cobra nada. O 1º período começa hoje e a fatura vence 30 dias depois
+  // (gerada pelo ciclo automático alguns dias antes do vencimento).
+  const firstDue = periodDueAt(now);
   await db
     .update(schema.customers)
-    .set({ status: "ACTIVE", deliveredAt: now, nextBillingAt: periodEnd })
+    .set({ status: "ACTIVE", deliveredAt: now, nextBillingAt: now })
     .where(eq(schema.customers.id, c.id));
 
   const site = tenantPublicUrl(c.tenant);
@@ -428,11 +429,11 @@ export async function deliverCustomer(customerId: string) {
       `Hola ${c.contactName}! El sistema de ${c.businessName} está listo.\n\n` +
         `Menú para tus clientes: ${site}\n` +
         `Panel: ${appUrl()}/painel/${c.tenant.slug}\nContraseña: ${password}\n(cambiala en Configuración)\n\n` +
-        `Tu primera ${c.plan.interval === "YEARLY" ? "anualidad" : "mensualidad"} (${amountsText(planPrice(c.plan))}) ya está disponible:\n${invoiceUrl(inv.id)}`,
+        `Tu primera ${c.plan.interval === "YEARLY" ? "anualidad" : "mensualidad"} (${amountsText(planPrice(c.plan))}) vence recién el ${fmtDate(firstDue)}, 30 días después de la entrega. Te avisamos antes.`,
       `Olá ${c.contactName}! O sistema de ${c.businessName} está pronto.\n\n` +
         `Cardápio/loja para seus clientes: ${site}\n` +
         `Painel: ${appUrl()}/painel/${c.tenant.slug}\nSenha: ${password}\n(troque em Configurações)\n\n` +
-        `Sua primeira ${c.plan.interval === "YEARLY" ? "anuidade" : "mensalidade"} (${amountsText(planPrice(c.plan))}) já está disponível:\n${invoiceUrl(inv.id)}`,
+        `Sua primeira ${c.plan.interval === "YEARLY" ? "anuidade" : "mensalidade"} (${amountsText(planPrice(c.plan))}) só vence em ${fmtDate(firstDue)}, 30 dias depois da entrega. A gente avisa antes.`,
     ),
   );
   return { password };
@@ -482,10 +483,12 @@ export async function runBillingCycle(now = new Date()) {
   for (const c of billable) {
     let next = c.nextBillingAt;
     let guard = 0;
-    while (next && shouldInvoice(next, now, settings.invoiceDaysBefore) && guard++ < 3) {
+    // nextBillingAt = início do próximo período ainda sem fatura; a fatura vence 30 dias depois do início
+    while (next && shouldInvoice(periodDueAt(next), now, settings.invoiceDaysBefore) && guard++ < 3) {
       const end = addInterval(next, c.plan.interval);
+      const due = periodDueAt(next);
       const fresh = (await db.query.customers.findFirst({ where: eq(schema.customers.id, c.id) }))!;
-      const inv = await createSubscriptionInvoice(fresh, c.plan, next, end, next);
+      const inv = await createSubscriptionInvoice(fresh, c.plan, next, end, due);
       await db.update(schema.customers).set({ nextBillingAt: end }).where(eq(schema.customers.id, c.id));
       out.invoicesCreated++;
       const T = Tc(fresh);
@@ -494,8 +497,8 @@ export async function runBillingCycle(now = new Date()) {
         fresh,
         `${settings.companyName}: ${T("nueva factura", "nova fatura")}`,
         T(
-          `Hola ${c.contactName}, tu factura de ${c.businessName} vence el ${fmtDate(next)}.\nValor: ${val}\nPagá aquí (guaraníes, dólares o reales): ${invoiceUrl(inv.id)}`,
-          `Olá ${c.contactName}, sua fatura de ${c.businessName} vence em ${fmtDate(next)}.\nValor: ${val}\nPague aqui: ${invoiceUrl(inv.id)}`,
+          `Hola ${c.contactName}, tu factura de ${c.businessName} vence el ${fmtDate(due)}.\nValor: ${val}\nPagá aquí (guaraníes, dólares o reales): ${invoiceUrl(inv.id)}`,
+          `Olá ${c.contactName}, sua fatura de ${c.businessName} vence em ${fmtDate(due)}.\nValor: ${val}\nPague aqui: ${invoiceUrl(inv.id)}`,
         ),
       );
       next = end;

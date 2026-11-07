@@ -75,7 +75,7 @@ export async function deliver(customerId: string) {
   } catch (e) {
     back(`/admin/clientes/${customerId}`, e instanceof BillingError ? e.message : "Erro ao entregar", "err");
   }
-  back(`/admin/clientes/${customerId}`, "Sistema entregue! Acessos e 1ª mensalidade enviados ao cliente.");
+  back(`/admin/clientes/${customerId}`, "Sistema entregue! Acessos enviados ao cliente. A 1ª mensalidade vence em 30 dias.");
 }
 
 export async function confirmInvoicePaid(customerId: string, invoiceId: string, f: FormData) {
