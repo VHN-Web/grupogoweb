@@ -16,6 +16,7 @@ import { getExchangeRateProvider } from "@/adapters/exchange-rates";
 import { maybeAutoIssueFiscal } from "./fiscal";
 import { openCredentials } from "@/lib/security";
 import { featureOn, normalizeSource, parseBirthday } from "@/core/growth";
+import { hasModule } from "@/core/modules";
 import { growthOf, onOrderCompleted, resolveReferral, upsertShopper } from "./growth";
 
 export class OrderError extends Error {
@@ -101,9 +102,9 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   if (tenant.suspended) throw new OrderError("SUSPENDED", T("El local no está disponible en este momento", "O estabelecimento não está disponível no momento"));
   if (!tenant.isOpen) throw new OrderError("CLOSED", T("El local está cerrado en este momento", "O estabelecimento está fechado no momento"));
 
-  if (input.type === "DINE_IN" && !tenant.acceptsDineIn) throw new OrderError("TYPE", T("No acepta pedidos en mesa", "Não aceita pedidos na mesa"));
+  if (input.type === "DINE_IN" && (!tenant.acceptsDineIn || !hasModule(tenant, "mesas"))) throw new OrderError("TYPE", T("No acepta pedidos en mesa", "Não aceita pedidos na mesa"));
   if (input.type === "PICKUP" && !tenant.acceptsPickup) throw new OrderError("TYPE", T("No acepta retiro en local", "Não aceita retirada no local"));
-  if (input.type === "DELIVERY" && !tenant.acceptsDelivery) throw new OrderError("TYPE", T("No hace delivery", "Não faz delivery"));
+  if (input.type === "DELIVERY" && (!tenant.acceptsDelivery || !hasModule(tenant, "delivery"))) throw new OrderError("TYPE", T("No hace delivery", "Não faz delivery"));
 
   // ---- Mesa
   let table: schema.DiningTable | undefined;
@@ -132,7 +133,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
     qtyByProduct.set(p.id, (qtyByProduct.get(p.id) ?? 0) + i.quantity);
     if (p.durationMin) throw new OrderError("PRODUCT", T(`${p.name} se agenda, no se pide`, `${p.name} é agendado, não pedido`));
     // preço efetivo: oferta relâmpago ativa (GoInteligence) ou preço normal
-    const unit = tenant.tier === "pro" ? effectivePrice(p) : p.pricePyg;
+    const unit = tenant.tier === "pro" && hasModule(tenant, "marketing") ? effectivePrice(p) : p.pricePyg;
     return { product: p, unit, quantity: i.quantity, notes: i.notes ?? null };
   });
   for (const [pid, qty] of qtyByProduct) {

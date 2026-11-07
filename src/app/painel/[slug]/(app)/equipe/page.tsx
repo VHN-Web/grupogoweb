@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { hasModule } from "@/core/modules";
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
@@ -16,6 +18,7 @@ export default async function TeamPage({ params, searchParams }: { params: Promi
   const t = await requireTenantAdmin(slug, "team");
   const { T, region } = panelI18n(t);
   const L = (a: PanelArea) => (region.locale === "pt" ? PANEL_AREA_LABELS[a].pt : PANEL_AREA_LABELS[a].es);
+  if (!hasModule(t, "equipe")) redirect(`/painel/${slug}/plano?modulo=team`);
   if (t.tier !== "pro")
     return (
       <div className="mx-auto max-w-2xl space-y-4">

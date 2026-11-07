@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { GoWebLogo, BRAND, GW_NAVY } from "@/components/brand/GoWebLogo";
 import { Illustration } from "@/components/Illustration";
@@ -7,6 +7,7 @@ import { formatMinor, formatPyg } from "@/core/money";
 import { THEMES, type ThemeId } from "@/core/themes";
 import { getSettings } from "@/services/billing";
 import { planFeature, planName } from "@/core/plans";
+import { CORE_INFO, parseModulePrices } from "@/core/modules";
 import { headers } from "next/headers";
 import { RevealOnScroll } from "@/components/motion/RevealOnScroll";
 import { detectLocale, tr, type Locale } from "@/core/region";
@@ -140,8 +141,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
   const DEMOS = pt ? DEMOS_PT : DEMOS_ES;
   const [settings, plans] = await Promise.all([
     getSettings(),
-    db.query.plans.findMany({ where: eq(schema.plans.active, true), orderBy: asc(schema.plans.sortOrder) }),
+    db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) }),
   ]);
+  const mp = parseModulePrices(settings.modulePrices);
   const wa = settings.supportWhatsapp ? `https://wa.me/${settings.supportWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(T("¡Hola! Quiero conocer GoWeb para mi negocio.", "Olá! Quero conhecer a GoWeb para o meu negócio."))}` : "#planes";
 
   return (
@@ -359,6 +361,27 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
                 </div>
               );
             })}
+            {mp.enabled && (
+              <div data-reveal className="lift flex flex-col gap-5 rounded-3xl border-[1.5px] border-dashed p-9" style={{ background: "#FFFFFF", color: INK, borderColor: BRAND }}>
+                <span className="self-start rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider" style={{ background: "#E8F7EE", color: "#1E7A43" }}>{T("Pagá solo lo que usás", "Pague só o que usa")}</span>
+                <h3 style={{ fontFamily: H }} className="text-3xl font-extrabold">{T("Personalizado", "Personalizado")}</h3>
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="text-[15px]" style={{ color: "#5F5A52" }}>{T("desde", "a partir de")}</span>
+                  <span style={{ fontFamily: H }} className="text-[40px] font-extrabold tracking-tight">{pt ? formatMinor(mp.core.BRL, "BRL") : formatPyg(mp.core.PYG)}</span>
+                  <span style={{ color: "#5F5A52" }}>/ {T("mes", "mês")}</span>
+                </div>
+                <p className="text-sm" style={{ color: "#5F5A52" }}>{pt ? <>+ implantação {formatMinor(mp.setup.BRL, "BRL")}</> : <>implementación {formatPyg(mp.setup.PYG)}</>}</p>
+                <ul className="flex flex-col gap-3 text-[15.5px]">
+                  {[pt ? CORE_INFO.pt : CORE_INFO.es, T("Sumá solo los módulos que necesitás: mesas, delivery, caja, marketing, agenda…", "Some só os módulos que precisa: mesas, delivery, caixa, marketing, agenda…"), T("Agregá o quitá módulos cuando quieras", "Adicione ou remova módulos quando quiser")].map((f) => (
+                    <li key={f} className="flex items-start gap-2.5">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={BRAND} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0"><path d="M5 12l5 5L20 7" /></svg>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link href={`/contratar?plano=personalizado&lang=${locale}`} className="mt-auto rounded-2xl py-4 text-center font-bold" style={{ background: BRAND, color: INK }}>{T("Armar mi plan", "Montar meu plano")}</Link>
+              </div>
+            )}
           </div>
         </div>
       </section>

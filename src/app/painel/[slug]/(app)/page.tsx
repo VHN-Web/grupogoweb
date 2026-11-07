@@ -1,3 +1,4 @@
+import { hasModule } from "@/core/modules";
 import Link from "next/link";
 import { and, desc, eq, gte } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -32,11 +33,12 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
   const finished = orders.filter((o) => o.status === "COMPLETED" || o.status === "CANCELLED");
   const today = orders.filter((o) => o.status !== "CANCELLED");
   const pro = t.tier === "pro";
+  const mkt = pro && hasModule(t, "marketing");
   // GoInteligence: avisa o lojista de carrinhos abandonados e mostra pendências
-  if (pro) await notifyOwnerAbandoned(t).catch(() => 0);
+  if (mkt) await notifyOwnerAbandoned(t).catch(() => 0);
   const [abandoned, pendingAppts] = pro
     ? await Promise.all([
-        listAbandonedCarts(t.id).then((c) => c.filter((x) => x.status === "OPEN").length),
+        mkt ? listAbandonedCarts(t.id).then((c) => c.filter((x) => x.status === "OPEN").length) : Promise.resolve(0),
         db.$count(schema.appointments, and(eq(schema.appointments.tenantId, t.id), eq(schema.appointments.status, "PENDING"), gte(schema.appointments.startsAt, new Date()))),
       ])
     : [0, 0];

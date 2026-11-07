@@ -20,13 +20,21 @@ import type { Currency } from "@/core/types";
 import { getRegion, tr } from "@/core/region";
 import { sendWhatsApp } from "@/adapters/notify";
 import { tenantPublicUrl } from "@/lib/urls";
+import { hasModule } from "@/core/modules";
 
 const isPro = (t: { tier: string }) => t.tier === "pro";
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbLike = typeof db | Tx;
 
 export function growthOf(t: Tenant): { cfg: GrowthConfig; pro: boolean } {
-  return { cfg: parseGrowth(t.growthConfig), pro: isPro(t) };
+  const cfg = parseGrowth(t.growthConfig);
+  // Plano personalizado: recurso fora dos módulos contratados fica desligado
+  if (!hasModule(t, "divulgacao")) {
+    cfg.reviews.enabled = false;
+    cfg.directory.enabled = false;
+  }
+  if (!hasModule(t, "fidelizacao")) for (const k of ["campaigns", "referral", "loyalty", "birthday"] as const) cfg[k].enabled = false;
+  return { cfg, pro: isPro(t) };
 }
 
 /** WhatsApp automático só quando há integração configurada e a loja não é demonstração. */

@@ -1,3 +1,4 @@
+import { hasModule } from "@/core/modules";
 import { tooMany } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: tr(getRegion(tt?.country).locale)("Revisá tu nombre y WhatsApp", "Confira seu nome e WhatsApp") }, { status: 400 });
   }
   const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, p.data.slug) });
-  if (!t || !isPro(t)) return NextResponse.json({ error: "—" }, { status: 404 });
+  if (!t || !isPro(t) || !hasModule(t, "agenda")) return NextResponse.json({ error: "—" }, { status: 404 });
   const T = tr(getRegion(t.country).locale);
   const prod = await db.query.products.findFirst({ where: and(eq(schema.products.id, p.data.productId), eq(schema.products.tenantId, t.id)) });
   if (!prod?.durationMin) return NextResponse.json({ error: T("Servicio no encontrado", "Serviço não encontrado") }, { status: 404 });

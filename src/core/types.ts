@@ -102,7 +102,7 @@ export function getLabels(locale: "es" | "pt" | string | null | undefined): type
 }
 
 // ---- Painel: áreas e permissões da equipe ----
-export const PANEL_AREAS = ["orders", "cash", "products", "fiscal", "tables", "agenda", "marketing", "customers", "appearance", "settings", "team"] as const;
+export const PANEL_AREAS = ["orders", "cash", "products", "fiscal", "tables", "agenda", "marketing", "customers", "couriers", "appearance", "settings", "team"] as const;
 export type PanelArea = (typeof PANEL_AREAS)[number];
 export const PANEL_AREA_LABELS: Record<PanelArea, { es: string; pt: string }> = {
   orders: { es: "Pedidos", pt: "Pedidos" },
@@ -113,6 +113,7 @@ export const PANEL_AREA_LABELS: Record<PanelArea, { es: string; pt: string }> = 
   agenda: { es: "Agenda", pt: "Agenda" },
   marketing: { es: "Marketing (cupones, ofertas, carritos)", pt: "Marketing (cupons, ofertas, carrinhos)" },
   customers: { es: "Clientes y divulgación", pt: "Clientes e divulgação" },
+  couriers: { es: "Repartidores", pt: "Motoboys" },
   appearance: { es: "Apariencia", pt: "Aparência" },
   settings: { es: "Configuración", pt: "Configurações" },
   team: { es: "Equipo", pt: "Equipe" },

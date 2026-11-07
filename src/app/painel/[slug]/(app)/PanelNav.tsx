@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { PanelArea } from "@/core/types";
+import type { ModuleKey } from "@/core/modules";
 
-const ITEMS: { href: string; es: string; pt: string; area: PanelArea; pro?: boolean }[] = [
+const ITEMS: { href: string; es: string; pt: string; area: PanelArea; pro?: boolean; module?: ModuleKey }[] = [
   { href: "", es: "Pedidos", pt: "Pedidos", area: "orders" },
   { href: "/caixa", es: "Caja", pt: "Caixa", area: "cash" },
   { href: "/produtos", es: "Productos y stock", pt: "Produtos e estoque", area: "products" },
@@ -14,18 +15,19 @@ const ITEMS: { href: string; es: string; pt: string; area: PanelArea; pro?: bool
   { href: "/marketing", es: "Marketing", pt: "Marketing", area: "marketing", pro: true },
   { href: "/notas", es: "Facturas", pt: "Notas fiscais", area: "fiscal" },
   { href: "/mesas", es: "Mesas y QR", pt: "Mesas e QR", area: "tables" },
+  { href: "/motoboys", es: "Repartidores", pt: "Motoboys", area: "couriers" },
   { href: "/aparencia", es: "Apariencia", pt: "Aparência", area: "appearance" },
-  { href: "/equipe", es: "Equipo", pt: "Equipe", area: "team", pro: true },
+  { href: "/equipe", es: "Equipo", pt: "Equipe", area: "team", pro: true, module: "equipe" },
   { href: "/config", es: "Configuración", pt: "Configurações", area: "settings" },
   { href: "/plano", es: "Mi plan", pt: "Meu plano", area: "team" },
 ];
 
-export function PanelNav({ slug, locale, areas, pro }: { slug: string; locale: "es" | "pt"; areas: PanelArea[]; pro: boolean }) {
+export function PanelNav({ slug, locale, areas, pro, modules = null }: { slug: string; locale: "es" | "pt"; areas: PanelArea[]; pro: boolean; modules?: ModuleKey[] | null }) {
   const path = usePathname();
   const base = `/painel/${slug}`;
   return (
     <nav className="no-scrollbar mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 pb-2">
-      {ITEMS.filter((i) => areas.includes(i.area)).map((i) => {
+      {ITEMS.filter((i) => areas.includes(i.area) && (!i.module || !modules || modules.includes(i.module))).map((i) => {
         const href = base + i.href;
         const active = i.href === "" ? path === base || path.startsWith(`${base}/pedidos`) : path.startsWith(href);
         return (

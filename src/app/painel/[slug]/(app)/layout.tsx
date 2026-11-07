@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import Link from "next/link";
 import { requirePanelAccess } from "@/lib/auth";
+import { hasModule, parseModules } from "@/core/modules";
 import { panelI18n } from "@/lib/panel-i18n";
 import { PanelNav } from "./PanelNav";
 import { GoWebLogo } from "@/components/brand/GoWebLogo";
@@ -50,7 +51,7 @@ export default async function PanelLayout({ children, params }: { children: Reac
             <button className="text-xs text-[#B9B3A7] hover:underline">{T("Salir", "Sair")}</button>
           </form>
         </div>
-        <PanelNav slug={slug} locale={locale} areas={[...access.areas]} pro={tenant.tier === "pro"} />
+        <PanelNav slug={slug} locale={locale} areas={[...access.areas]} pro={tenant.tier === "pro"} modules={parseModules(tenant.modules)} />
       </header>
       {tenant.suspended && (
         <div className="no-print bg-red-600 px-4 py-2.5 text-center text-sm font-semibold text-white">
@@ -60,7 +61,7 @@ export default async function PanelLayout({ children, params }: { children: Reac
       )}
       <main className="mx-auto max-w-6xl px-4 py-6">
         {/* impressão automática em qualquer tela do painel, assim que o pedido chega */}
-        {access.areas.has("orders") && tenant.autoPrint && (
+        {access.areas.has("orders") && tenant.autoPrint && hasModule(tenant, "impressora") && (
           <div className="no-print mb-4">
             <AutoPrinter slug={slug} enabled label={T("Reimprimir", "Reimprimir")} />
           </div>

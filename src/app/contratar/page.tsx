@@ -4,7 +4,7 @@ import { clientIp, rateLimit } from "@/lib/security";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { AuthShell } from "@/components/brand/AuthShell";
 import { NameInput } from "@/components/forms/NameInput";
@@ -13,7 +13,9 @@ import { detectLocale, getRegion, isValidE164, isValidName, tr, type Locale } fr
 import { THEMES, THEME_IDS } from "@/core/themes";
 import { formatMinor } from "@/core/money";
 import { planName } from "@/core/plans";
-import { BillingError, createCustomer } from "@/services/billing";
+import { BillingError, createCustomer, getSettings } from "@/services/billing";
+import { CORE_INFO, MODULES, MODULE_INFO, parseModulePrices, sanitizeModules } from "@/core/modules";
+import { ModulePicker } from "@/components/forms/ModulePicker";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,7 @@ async function contratar(f: FormData) {
   const lang = str(f, "lang") === "pt" ? "pt" : "es";
   const T = tr(lang);
   const planId = str(f, "planId");
+  const custom = planId === "personalizado";
   const back = (msg: string) => redirect(`/contratar?plano=${encodeURIComponent(planId)}&lang=${lang}&err=${encodeURIComponent(msg)}`);
 
   if (str(f, "website")) back("…"); // honeypot anti-robô
@@ -47,6 +50,7 @@ async function contratar(f: FormData) {
       ruc: str(f, "ruc") || null,
       desiredSlug: null,
       planId,
+      modules: custom ? sanitizeModules(f.getAll("modules").map(String)) : null,
       preferredCurrency: getRegion(country).currency,
       wantsDomain: false,
       domainName: null,
@@ -71,17 +75,24 @@ export default async function Contratar({ searchParams }: { searchParams: Promis
   const locale: Locale = sp.lang === "pt" || sp.lang === "es" ? sp.lang : detectLocale(await headers());
   const T = tr(locale);
   const pt = locale === "pt";
-  const plans = await db.query.plans.findMany({ where: eq(schema.plans.active, true), orderBy: asc(schema.plans.sortOrder) });
-  const plan = plans.find((p) => p.id === sp.plano) ?? plans[0];
-  if (!plan) redirect("/");
+  const plans = await db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) });
+  const mp = parseModulePrices((await getSettings()).modulePrices);
+  const custom = sp.plano === "personalizado" && mp.enabled;
+  const found = plans.find((p) => p.id === sp.plano) ?? plans[0];
+  if (!found && !custom) redirect("/");
+  const cur = pt ? ("BRL" as const) : ("PYG" as const);
   const country = pt ? "BR" : "PY";
-  const price = pt ? formatMinor(plan.priceBrlMinor, "BRL") : formatMinor(plan.pricePyg, "PYG");
+  // Plano personalizado: "a partir de" (núcleo) — o total final é calculado no servidor ao contratar
+  const plan = custom
+    ? { id: "personalizado", name: T("Personalizado", "Personalizado"), interval: "MONTHLY" as const, priceBrlMinor: mp.core.BRL, pricePyg: mp.core.PYG, setupBrlMinor: mp.setup.BRL, setupPyg: mp.setup.PYG }
+    : found!;
+  const price = formatMinor(pt ? plan.priceBrlMinor : plan.pricePyg, cur);
   const setup = pt ? plan.setupBrlMinor : plan.setupPyg;
 
   return (
     <AuthShell eyebrow={T("Contratar GoWeb", "Contratar a GoWeb")} title={planName(plan.name, locale)}>
       <p className="-mt-5 mb-6 text-sm text-[#B9B3A7]">
-        {price} / {plan.interval === "YEARLY" ? T("año", "ano") : T("mes", "mês")}
+        {custom && T("desde ", "a partir de ")}{price} / {plan.interval === "YEARLY" ? T("año", "ano") : T("mes", "mês")}
         {setup > 0 && <> · {T("implementación", "implantação")} {formatMinor(setup, pt ? "BRL" : "PYG")}</>}
         {plans.length > 1 && (
           <>
@@ -95,6 +106,21 @@ export default async function Contratar({ searchParams }: { searchParams: Promis
         <input type="hidden" name="planId" value={plan.id} />
         <input type="hidden" name="lang" value={locale} />
         <input name="website" className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true" />
+
+        {custom && (
+          <>
+            <p className="label">{T("Elegí lo que tu negocio necesita", "Escolha o que o seu negócio precisa")}</p>
+            <ModulePicker
+              core={mp.core[cur]}
+              coreLabel={pt ? CORE_INFO.pt : CORE_INFO.es}
+              coreDesc={pt ? CORE_INFO.descPt : CORE_INFO.descEs}
+              items={MODULES.map((m) => ({ key: m, label: pt ? MODULE_INFO[m].pt : MODULE_INFO[m].es, desc: pt ? MODULE_INFO[m].descPt : MODULE_INFO[m].descEs, price: mp.modules[m][cur], pro: MODULE_INFO[m].pro }))}
+              currency={cur}
+              perMonth={T("mes", "mês")}
+              setupText={T(`Implementación única: ${formatMinor(mp.setup[cur], cur)} · podés sumar módulos después`, `Implantação única: ${formatMinor(mp.setup[cur], cur)} · dá para adicionar módulos depois`)}
+            />
+          </>
+        )}
 
         {/* País definido pela região do visitante: Brasil (pt) ou Paraguai (es) */}
         <input type="hidden" name="country" value={country} />

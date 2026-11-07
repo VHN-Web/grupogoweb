@@ -20,6 +20,7 @@ import {
   add,
   type Amounts,
 } from "@/core/billing";
+import { CORE_INFO, MODULE_INFO, customPrice, needsPro, parseModulePrices, sanitizeModules, type ModuleKey } from "@/core/modules";
 import { formatMinor } from "@/core/money";
 import { slugify } from "@/core/codes";
 import { getTheme } from "@/core/themes";
@@ -116,12 +117,43 @@ export type NewCustomerInput = {
   notes?: string | null;
   theme?: string | null;
   country?: string;
+  /** Plano personalizado: módulos escolhidos (o preço é sempre calculado aqui, nunca vem do navegador). */
+  modules?: ModuleKey[] | null;
 };
 
+/** Cria o plano exclusivo desta contratação (oculto da lista) com o preço = núcleo + módulos. */
+async function createCustomPlan(settings: Awaited<ReturnType<typeof getSettings>>, selected: ModuleKey[]) {
+  const prices = parseModulePrices(settings.modulePrices);
+  if (!prices.enabled) throw new BillingError("Plano personalizado indisponível no momento");
+  const mods = sanitizeModules(selected);
+  const monthly = customPrice(prices, mods);
+  const [plan] = await db
+    .insert(schema.plans)
+    .values({
+      name: "Personalizado",
+      interval: "MONTHLY",
+      pricePyg: monthly.PYG,
+      priceUsdMinor: monthly.USD,
+      priceBrlMinor: monthly.BRL,
+      setupPyg: prices.setup.PYG,
+      setupUsdMinor: prices.setup.USD,
+      setupBrlMinor: prices.setup.BRL,
+      includesDomain: false,
+      intelligence: needsPro(mods),
+      modules: JSON.stringify(mods),
+      features: [CORE_INFO.pt, ...mods.map((m) => MODULE_INFO[m].pt)].join("\n"),
+      isCustom: true,
+      active: false, // não aparece na página de vendas nem no admin de planos
+      sortOrder: 99,
+    })
+    .returning();
+  return plan;
+}
+
 export async function createCustomer(input: NewCustomerInput) {
-  const plan = await db.query.plans.findFirst({ where: eq(schema.plans.id, input.planId) });
-  if (!plan) throw new BillingError("Plano não encontrado");
   const settings = await getSettings();
+  const plan = input.modules ? await createCustomPlan(settings, input.modules) : await db.query.plans.findFirst({ where: eq(schema.plans.id, input.planId) });
+  if (!plan) throw new BillingError("Plano não encontrado");
   const slug = slugify(input.desiredSlug || input.businessName);
   if (!slug || RESERVED_SLUGS.has(slug)) throw new BillingError("Endereço (slug) inválido");
   if (!input.email.includes("@")) throw new BillingError("E-mail inválido");
@@ -303,7 +335,7 @@ async function onSetupPaid(customerId: string) {
     const plan = await db.query.plans.findFirst({ where: eq(schema.plans.id, c.planId) });
     await db
       .update(schema.tenants)
-      .set({ ruc: c.ruc, phone: c.whatsapp, whatsapp: c.whatsapp, tier: plan?.intelligence ? "pro" : "basic" })
+      .set({ ruc: c.ruc, phone: c.whatsapp, whatsapp: c.whatsapp, tier: plan?.intelligence ? "pro" : "basic", modules: plan?.modules ?? null })
       .where(eq(schema.tenants.id, tenant.id));
     tenantId = tenant.id;
   }
@@ -525,6 +557,29 @@ export async function setCustomerTier(customerId: string, tier: "basic" | "pro")
   const c = await db.query.customers.findFirst({ where: eq(schema.customers.id, customerId) });
   if (!c?.tenantId) throw new BillingError("Cliente sem sistema criado");
   await db.update(schema.tenants).set({ tier }).where(eq(schema.tenants.id, c.tenantId));
+}
+
+/** Plano personalizado: troca os módulos do cliente e recalcula a mensalidade (vale a partir da próxima fatura). */
+export async function setCustomerModules(customerId: string, selected: ModuleKey[]) {
+  const c = await db.query.customers.findFirst({ where: eq(schema.customers.id, customerId), with: { plan: true } });
+  if (!c) throw new BillingError("Cliente não encontrado");
+  if (!c.plan.isCustom) throw new BillingError("Só clientes do plano personalizado escolhem módulos");
+  const prices = parseModulePrices((await getSettings()).modulePrices);
+  const mods = sanitizeModules(selected);
+  const monthly = customPrice(prices, mods);
+  await db
+    .update(schema.plans)
+    .set({
+      pricePyg: monthly.PYG,
+      priceUsdMinor: monthly.USD,
+      priceBrlMinor: monthly.BRL,
+      intelligence: needsPro(mods),
+      modules: JSON.stringify(mods),
+      features: [CORE_INFO.pt, ...mods.map((m) => MODULE_INFO[m].pt)].join("\n"),
+    })
+    .where(eq(schema.plans.id, c.planId));
+  if (c.tenantId) await db.update(schema.tenants).set({ modules: JSON.stringify(mods), tier: needsPro(mods) ? "pro" : "basic" }).where(eq(schema.tenants.id, c.tenantId));
+  return { mods, monthly };
 }
 
 export async function cancelCustomer(customerId: string) {

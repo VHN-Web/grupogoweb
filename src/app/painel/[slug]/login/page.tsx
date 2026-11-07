@@ -1,3 +1,4 @@
+import { hasModule } from "@/core/modules";
 import { notFound, redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -23,7 +24,7 @@ export default async function Login({
 }) {
   const { slug } = await params;
   const { e, m } = await searchParams;
-  const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { id: true, name: true, primaryColor: true, country: true, tier: true, demo: true } });
+  const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug), columns: { id: true, name: true, primaryColor: true, country: true, tier: true, demo: true, modules: true } });
   if (!tenant) notFound();
   const T = tr(getRegion(tenant.country).locale);
 
@@ -45,7 +46,7 @@ export default async function Login({
     if (username) {
       // Funcionário (GoInteligence)
       const s = await db.query.staff.findFirst({ where: and(eq(schema.staff.tenantId, t.id), eq(schema.staff.username, username)) });
-      if (!s || !s.active || t.tier !== "pro" || !verifyPassword(password, s.passwordHash)) return fail(`equipe: ${username.slice(0, 30)}`);
+      if (!s || !s.active || t.tier !== "pro" || !hasModule(t, "equipe") || !verifyPassword(password, s.passwordHash)) return fail(`equipe: ${username.slice(0, 30)}`);
       await clearLimit(lk);
       await setSession(staffSubject(s));
       await audit(t.id, `equipe: ${s.name}`, "login.ok");
@@ -69,7 +70,7 @@ export default async function Login({
   return (
     <AuthShell eyebrow={T("Panel", "Painel")} title={tenant.name}>
       <form action={login} className="space-y-3">
-        {tenant.tier === "pro" && (
+        {tenant.tier === "pro" && hasModule(tenant, "equipe") && (
           <>
             <label className="label" htmlFor="username">{T("Usuario (solo equipo)", "Usuário (só para equipe)")}</label>
             <input id="username" name="username" className="input" autoComplete="username" placeholder={T("Dueño: dejá vacío", "Dono: deixe vazio")} />

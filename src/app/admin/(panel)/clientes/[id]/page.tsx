@@ -5,11 +5,12 @@ import { db, schema } from "@/db";
 import { formatMinor } from "@/core/money";
 import { PLATFORM_LABELS } from "@/core/types";
 import { fmtDate } from "@/core/billing";
+import { MODULES, MODULE_INFO, modulesLabel, parseModules } from "@/core/modules";
 import { tenantPublicUrl } from "@/lib/urls";
 import { invoiceUrl, getSettings } from "@/services/billing";
 import { Flash } from "@/components/Flash";
 import { StatusPill } from "@/components/StatusPill";
-import { deleteCustomer, cancelCustomerAction, cancelInvoice, confirmInvoicePaid, deliver, saveDomain, setTier, suspendCustomer, toggleTask } from "../../actions";
+import { deleteCustomer, cancelCustomerAction, cancelInvoice, confirmInvoicePaid, deliver, saveDomain, setTier, suspendCustomer, toggleTask, saveCustomerModules } from "../../actions";
 
 export default async function CustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { id } = await params;
@@ -57,6 +58,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           <h2 className="mb-2 font-semibold">Contrato</h2>
           <Row k="Plano" v={`${c.plan.name} (${PLATFORM_LABELS.interval[c.plan.interval]})${c.tenant?.tier === "pro" ? " · GoInteligence ativo" : ""}`} />
           <Row k="Valor" v={`${formatMinor(c.plan.pricePyg, "PYG")} · ${formatMinor(c.plan.priceUsdMinor, "USD")} · ${formatMinor(c.plan.priceBrlMinor, "BRL")}`} />
+          {c.plan.isCustom && <Row k="Módulos" v={modulesLabel(parseModules(c.plan.modules), "pt")} />}
           <Row k="Moeda preferida" v={c.preferredCurrency} />
           <Row k="Próximo vencimento" v={c.nextBillingAt ? fmtDate(c.nextBillingAt) : "—"} />
           <Row k="Entregue em" v={c.deliveredAt ? fmtDate(c.deliveredAt) : "—"} />
@@ -189,6 +191,22 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           )}
           <form action={cancelCustomerAction.bind(null, c.id)}><button className="btn-ghost text-red-600">Cancelar contrato</button></form>
         </section>
+      )}
+
+      {c.plan.isCustom && (
+        <details className="card p-5 text-sm">
+          <summary className="cursor-pointer font-semibold">Módulos do plano personalizado</summary>
+          <form action={saveCustomerModules.bind(null, c.id)} className="mt-3 space-y-2">
+            {MODULES.map((m) => (
+              <label key={m} className="flex items-center gap-2">
+                <input type="checkbox" name="modules" value={m} defaultChecked={(parseModules(c.plan.modules) ?? []).includes(m)} />
+                <span><b>{MODULE_INFO[m].pt}</b>{MODULE_INFO[m].pro && " ✨"} <span className="text-muted">— {MODULE_INFO[m].descPt}</span></span>
+              </label>
+            ))}
+            <p className="text-xs text-muted">A mensalidade é recalculada com os preços atuais de Admin → Planos e vale a partir da próxima fatura.</p>
+            <button className="btn-primary">Salvar módulos</button>
+          </form>
+        </details>
       )}
 
       <details className="card border-red-200 p-5 text-sm">

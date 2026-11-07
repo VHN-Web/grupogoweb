@@ -113,6 +113,8 @@ export const tenants = pgTable("tenants", {
   sessionVersion: integer("session_version").notNull().default(1), // trocar a senha derruba as outras sessões
   // Crescimento (carteira de clientes, indicação, fidelidade, campanhas…) — JSON validado em core/growth.ts
   growthConfig: text("growth_config").notNull().default("{}"),
+  modules: text("modules"), // plano personalizado: JSON ModuleKey[]; null = tudo do plano liberado
+  demoNote: text("demo_note"), // demonstração criada pelo admin (para quem / observação); null nas demos do sistema
   loginEmail: text("login_email"), // e-mail Google do dono (além do e-mail do contrato) para "Entrar com Google"
   createdAt: createdAt(),
 });
@@ -253,6 +255,7 @@ export const orders = pgTable(
     status: text("status").$type<OrderStatus>().notNull().default("RECEIVED"),
     // Crescimento: cliente da loja, de onde veio e quem indicou
     shopperId: text("shopper_id"),
+    courierId: text("courier_id"), // motoboy que levou o pedido
     source: text("source"),
     referrerShopperId: text("referrer_shopper_id"),
     growthDone: boolean("growth_done").notNull().default(false), // recompensas já processadas (uma vez só)
@@ -314,6 +317,7 @@ export const fiscalDocuments = pgTable(
 export const platformSettings = pgTable("platform_settings", {
   id: text("id").primaryKey().default("default"), // linha única
   companyName: text("company_name").notNull().default("GoWeb"),
+  modulePrices: text("module_prices").notNull().default("{}"), // preços do plano personalizado (core/modules.ts)
   platformDomain: text("platform_domain"), // ex: goweboficial.com — habilita {slug}.goweboficial.com
   supportWhatsapp: text("support_whatsapp"),
   supportEmail: text("support_email"),
@@ -357,6 +361,8 @@ export const plans = pgTable("plans", {
   setupBrlMinor: integer("setup_brl_minor").notNull().default(0),
   includesDomain: boolean("includes_domain").notNull().default(false), // anual: domínio grátis
   intelligence: boolean("intelligence").notNull().default(false), // inclui GoInteligence (recursos pro)
+  modules: text("modules"), // plano personalizado: JSON ModuleKey[]; null = plano fechado (tudo)
+  isCustom: boolean("is_custom").notNull().default(false), // plano montado pelo cliente (1 por contratação; não aparece na lista)
   features: text("features"), // texto livre, 1 por linha (exibido ao cliente)
   active: boolean("active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -698,6 +704,45 @@ export const adminTasksRelations = relations(adminTasks, ({ one }) => ({
   customer: one(customers, { fields: [adminTasks.customerId], references: [customers.id] }),
 }));
 
+// =============================================================================
+// Administradores da plataforma (além da senha-mestra) e motoboys dos lojistas
+// =============================================================================
+export const platformAdmins = pgTable(
+  "platform_admins",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    email: text("email").notNull(), // minúsculo; também usado no login com Google
+    passwordHash: text("password_hash"), // null = só entra com Google
+    role: text("role").$type<"owner" | "admin">().notNull().default("admin"), // owner pode cadastrar admins
+    active: boolean("active").notNull().default(true),
+    sessionVersion: integer("session_version").notNull().default(1),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("platform_admins_email_uq").on(t.email)],
+);
+
+export const couriers = pgTable(
+  "couriers",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    phone: text("phone").notNull(), // E.164
+    vehicle: text("vehicle"), // "Moto Honda CG — placa ABC1D23"
+    pixKey: text("pix_key"), // para o lojista pagar as entregas
+    feePerDelivery: integer("fee_per_delivery").notNull().default(0), // valor combinado por entrega (unidade menor da moeda base)
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("couriers_tenant_phone_uq").on(t.tenantId, t.phone)],
+);
+
+export type PlatformAdmin = typeof platformAdmins.$inferSelect;
+export type Courier = typeof couriers.$inferSelect;
 export type Tenant = typeof tenants.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
 export type Customer = typeof customers.$inferSelect;

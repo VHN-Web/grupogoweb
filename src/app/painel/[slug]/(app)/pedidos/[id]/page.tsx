@@ -12,6 +12,10 @@ import { PayBadge } from "@/components/PayBadge";
 import { getOrderWithItems } from "@/services/orders";
 import { issueInvoiceForOrder, markOrderPaid, updateOrderStatus } from "../../actions";
 import { nextLabel, nextStatus } from "../../order-flow";
+import { assignCourier } from "../../courier-actions";
+import { deliveryMessage, listCouriers } from "@/services/couriers";
+import { hasModule } from "@/core/modules";
+import { waLink } from "@/core/intelligence";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +29,9 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
     where: and(eq(schema.fiscalDocuments.orderId, o.id), eq(schema.fiscalDocuments.tenantId, t.id)),
   });
   const next = nextStatus(o);
+  const showCouriers = o.type === "DELIVERY" && hasModule(t, "delivery");
+  const couriers = showCouriers ? await listCouriers(t.id) : [];
+  const courier = couriers.find((c) => c.id === o.courierId);
   const open = o.status !== "COMPLETED" && o.status !== "CANCELLED";
 
   return (
@@ -45,6 +52,30 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
           )}
           <p><span className="text-muted">{T("Pago:", "Pagamento:")}</span> {L.paymentMethod[o.paymentMethod]} · {o.paymentProvider} {o.paymentRef && `· ref ${o.paymentRef}`}</p>
         </div>
+
+        {showCouriers && (
+          <div className="card p-4 text-sm">
+            <h2 className="font-semibold">🛵 {T("Repartidor", "Motoboy")}</h2>
+            {couriers.length === 0 ? (
+              <p className="mt-1 text-muted">{T("Registrá tus repartidores para asignar la entrega.", "Cadastre seus motoboys para atribuir a entrega.")} <Link className="font-semibold underline" href={`/painel/${slug}/motoboys`}>{T("Registrar", "Cadastrar")}</Link></p>
+            ) : (
+              <>
+                <form action={assignCourier.bind(null, slug, o.id)} className="mt-2 flex flex-wrap gap-2">
+                  <select name="courierId" defaultValue={o.courierId ?? ""} className="input w-auto min-w-48">
+                    <option value="">{T("— sin repartidor —", "— sem motoboy —")}</option>
+                    {couriers.filter((c) => c.active || c.id === o.courierId).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <button className="btn-ghost">{T("Asignar", "Atribuir")}</button>
+                </form>
+                {courier && (
+                  <a target="_blank" rel="noopener noreferrer" href={waLink(courier.phone, deliveryMessage(t, o))} className="btn-brand mt-3 inline-block">
+                    {T(`Enviar ruta a ${courier.name.split(" ")[0]} por WhatsApp`, `Enviar rota para ${courier.name.split(" ")[0]} no WhatsApp`)}
+                  </a>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {next && (

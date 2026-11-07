@@ -4,12 +4,13 @@ import { redirect } from "next/navigation";
 import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { audit } from "@/lib/security";
 import { db, schema } from "@/db";
-import { clearSession, requirePlatformAdmin } from "@/lib/auth";
+import { adminActor, clearSession, requirePlatformAdmin } from "@/lib/auth";
 import { isValidE164, isValidName } from "@/core/region";
 import { CURRENCIES, type Currency } from "@/core/types";
 import { customerCurrency } from "@/services/documents";
 import { amountIn } from "@/core/billing";
 import { parseMajorToMinor } from "@/core/money";
+import { MODULES, parseModulePrices } from "@/core/modules";
 import {
   BillingError,
   cancelCustomer,
@@ -20,6 +21,7 @@ import {
   setCustomDomain,
   setCustomerSuspended,
   setCustomerTier,
+  setCustomerModules,
   getSettings,
 } from "@/services/billing";
 
@@ -162,6 +164,35 @@ export async function savePlan(f: FormData) {
   back("/admin/planos", "Plano salvo.");
 }
 
+export async function saveCustomerModules(customerId: string, f: FormData) {
+  await requirePlatformAdmin();
+  const path = `/admin/clientes/${customerId}`;
+  try {
+    const r = await setCustomerModules(customerId, f.getAll("modules").map(String) as never);
+    await audit(null, await adminActor(), "customer.modules", `${customerId}: ${r.mods.join(", ") || "só núcleo"}`);
+  } catch (e) {
+    back(path, e instanceof BillingError ? e.message : "Erro ao salvar módulos.", "err");
+  }
+  revalidatePath(path);
+  back(path, "Módulos atualizados. A nova mensalidade vale a partir da próxima fatura.");
+}
+
+// ---------------- plano personalizado (preço do núcleo, da implantação e de cada módulo, por moeda)
+export async function saveModulePrices(f: FormData) {
+  await requirePlatformAdmin();
+  await getSettings();
+  const trio = (prefix: string) => ({ BRL: money(f, `${prefix}_BRL`, "BRL"), PYG: money(f, `${prefix}_PYG`, "PYG"), USD: money(f, `${prefix}_USD`, "USD") });
+  const prices = {
+    enabled: bool(f, "enabled"),
+    core: trio("core"),
+    setup: trio("setup"),
+    modules: Object.fromEntries(MODULES.map((m) => [m, trio(`m_${m}`)])),
+  };
+  await db.update(schema.platformSettings).set({ modulePrices: JSON.stringify(parseModulePrices(JSON.stringify(prices))) }).where(eq(schema.platformSettings.id, "default"));
+  await audit(null, await adminActor(), "plans.modules", prices.enabled ? "ativo" : "desligado");
+  back("/admin/planos", "Preços do plano personalizado salvos (valem para novas contratações).");
+}
+
 // ---------------- configurações
 export async function saveSettings(f: FormData) {
   await requirePlatformAdmin();
@@ -212,7 +243,7 @@ async function removeCustomers(ids: string[], withStore: boolean) {
       await db.delete(schema.tenants).where(eq(schema.tenants.id, c.tenant.id));
       stores++;
     }
-    await audit(null, "admin GoWeb", "customer.delete", `${c.businessName}${withStore && c.tenant && !c.tenant.demo ? " + loja" : ""}`);
+    await audit(null, await adminActor(), "customer.delete", `${c.businessName}${withStore && c.tenant && !c.tenant.demo ? " + loja" : ""}`);
   }
   return { customers: list.length, stores };
 }
@@ -256,7 +287,7 @@ export async function deleteOrphanStores(f: FormData) {
   const valid = new Set((await orphanStores()).map((t) => t.id));
   const del = ids.filter((id) => valid.has(id));
   if (del.length) await db.delete(schema.tenants).where(inArray(schema.tenants.id, del));
-  await audit(null, "admin GoWeb", "store.delete", `${del.length} loja(s) sem cliente`);
+  await audit(null, await adminActor(), "store.delete", `${del.length} loja(s) sem cliente`);
   revalidatePath("/admin/clientes");
   back("/admin/clientes", `${del.length} loja(s) sem cliente apagada(s).`);
 }

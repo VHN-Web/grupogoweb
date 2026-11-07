@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { featureOn } from "@/core/growth";
+import { hasModule } from "@/core/modules";
 import { growthOf, referralBanner } from "@/services/growth";
 import { effectivePrice, parseBookingConfig, promoActive } from "@/core/intelligence";
 import { tenantSuggestions } from "@/services/intelligence";
@@ -101,8 +102,10 @@ export default async function StorePage({
   const region = getRegion(tenant.country);
   const growth = growthOf(tenant);
   const pro = tenant.tier === "pro";
+  const mkt = pro && hasModule(tenant, "marketing"); // ofertas relâmpago e sugestões
+  const agendaOn = pro && hasModule(tenant, "agenda");
   const booking = parseBookingConfig(tenant.bookingConfig);
-  const suggestions = pro
+  const suggestions = mkt
     ? await tenantSuggestions(
         tenant.id,
         prods.map((p) => ({ id: p.id, categoryId: p.categoryId, available: !(p.trackStock && p.stock <= 0), service: !!p.durationMin })),
@@ -142,9 +145,9 @@ export default async function StorePage({
       phoneOnTable: featureOn(growth.cfg, "loyalty", growth.pro) || featureOn(growth.cfg, "referral", growth.pro),
     },
     suggestions,
-    booking: pro && booking.enabled ? { daysAhead: booking.daysAhead } : null,
+    booking: agendaOn && booking.enabled ? { daysAhead: booking.daysAhead } : null,
     isOpen: tenant.isOpen,
-    accepts: { DINE_IN: tenant.acceptsDineIn, PICKUP: tenant.acceptsPickup, DELIVERY: tenant.acceptsDelivery },
+    accepts: { DINE_IN: tenant.acceptsDineIn && hasModule(tenant, "mesas"), PICKUP: tenant.acceptsPickup, DELIVERY: tenant.acceptsDelivery && hasModule(tenant, "delivery") },
     rates: tenantRates(tenant),
     delivery: { freeOverPyg: tenant.deliveryFreeOverPyg },
     table: table ? { code: table.code, label: table.label } : null,
@@ -159,10 +162,10 @@ export default async function StorePage({
         description: p.description,
         imageUrl: p.imageUrl,
         illustration: p.illustration,
-        pricePyg: pro ? effectivePrice(p) : p.pricePyg,
-        regularPricePyg: pro && promoActive(p) ? p.pricePyg : null,
-        promoEndsAt: pro && promoActive(p) ? p.promoEndsAt!.toISOString() : null,
-        durationMin: pro && booking.enabled ? p.durationMin : null,
+        pricePyg: mkt ? effectivePrice(p) : p.pricePyg,
+        regularPricePyg: mkt && promoActive(p) ? p.pricePyg : null,
+        promoEndsAt: mkt && promoActive(p) ? p.promoEndsAt!.toISOString() : null,
+        durationMin: agendaOn && booking.enabled ? p.durationMin : null,
         soldOut: p.trackStock && p.stock <= 0,
         maxQty: p.trackStock ? p.stock : 99,
       })),

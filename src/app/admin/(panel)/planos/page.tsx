@@ -1,14 +1,20 @@
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatMinor } from "@/core/money";
 import { PLATFORM_LABELS } from "@/core/types";
 import type { Plan } from "@/db/schema";
 import { Flash } from "@/components/Flash";
-import { savePlan } from "../actions";
+import { saveModulePrices, savePlan } from "../actions";
+import { CORE_INFO, MODULES, MODULE_INFO, customPrice, parseModulePrices } from "@/core/modules";
+import { minorToInput } from "@/core/money";
+import { getSettings } from "@/services/billing";
+import type { Amounts } from "@/core/billing";
 
 export default async function PlansPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const sp = await searchParams;
-  const plans = await db.query.plans.findMany({ orderBy: asc(schema.plans.sortOrder) });
+  const plans = await db.query.plans.findMany({ where: eq(schema.plans.isCustom, false), orderBy: asc(schema.plans.sortOrder) });
+  const mp = parseModulePrices((await getSettings()).modulePrices);
+  const all = customPrice(mp, [...MODULES]);
   return (
     <div className="space-y-5">
       <Flash {...sp} />
@@ -30,6 +36,31 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
             <PlanForm p={p} />
           </details>
         ))}
+        <details className="card p-4 md:col-span-2">
+          <summary className="cursor-pointer list-none">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold">Personalizado (o cliente monta) {!mp.enabled && <span className="text-xs text-muted">(desligado)</span>}</p>
+              <span className="rounded-full bg-paper px-2 py-0.5 text-xs font-semibold">Mensal</span>
+            </div>
+            <p className="mt-1 text-sm">A partir de {formatMinor(mp.core.BRL, "BRL")} · {formatMinor(mp.core.PYG, "PYG")} · {formatMinor(mp.core.USD, "USD")} — com todos os módulos: {formatMinor(all.BRL, "BRL")}</p>
+            <p className="text-xs text-muted">Implantação {formatMinor(mp.setup.BRL, "BRL")} · {formatMinor(mp.setup.PYG, "PYG")} · {formatMinor(mp.setup.USD, "USD")}</p>
+          </summary>
+          <form action={saveModulePrices} className="mt-4 space-y-3 text-sm">
+            <label className="flex items-center gap-2 font-semibold"><input type="checkbox" name="enabled" defaultChecked={mp.enabled} /> Mostrar o plano personalizado na página de vendas</label>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px]">
+                <thead className="text-left text-xs uppercase text-muted"><tr><th className="py-1">Item</th><th>R$</th><th>Gs.</th><th>US$</th></tr></thead>
+                <tbody className="divide-y divide-line">
+                  <PriceRow label="Implantação" hint="taxa única" prefix="setup" v={mp.setup} />
+                  <PriceRow label={CORE_INFO.pt} hint={CORE_INFO.descPt} prefix="core" v={mp.core} />
+                  {MODULES.map((m) => <PriceRow key={m} label={`${MODULE_INFO[m].pt}${MODULE_INFO[m].pro ? " ✨" : ""}`} hint={MODULE_INFO[m].descPt} prefix={`m_${m}`} v={mp.modules[m]} />)}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted">✨ = recurso do GoInteligence. Os valores são mensais. Mudanças valem para novas contratações; quem já contratou mantém o preço.</p>
+            <button className="btn-primary">Salvar preços</button>
+          </form>
+        </details>
         <details className="card p-4" open={plans.length === 0}>
           <summary className="cursor-pointer font-semibold">+ Novo plano</summary>
           <PlanForm />
@@ -64,5 +95,16 @@ function PlanForm({ p }: { p?: Plan }) {
       <input name="sortOrder" className="input" placeholder="Ordem" defaultValue={p?.sortOrder ?? 0} />
       <button className="btn-primary col-span-3 mt-1">{p ? "Salvar" : "Criar plano"}</button>
     </form>
+  );
+}
+
+function PriceRow({ label, hint, prefix, v }: { label: string; hint: string; prefix: string; v: Amounts }) {
+  return (
+    <tr>
+      <td className="py-2 pr-3"><b>{label}</b><br /><span className="text-xs text-muted">{hint}</span></td>
+      <td className="pr-2"><input name={`${prefix}_BRL`} defaultValue={minorToInput(v.BRL, "BRL")} className="input w-28" inputMode="decimal" /></td>
+      <td className="pr-2"><input name={`${prefix}_PYG`} defaultValue={minorToInput(v.PYG, "PYG")} className="input w-32" inputMode="numeric" /></td>
+      <td><input name={`${prefix}_USD`} defaultValue={minorToInput(v.USD, "USD")} className="input w-24" inputMode="decimal" /></td>
+    </tr>
   );
 }

@@ -1,3 +1,4 @@
+import { hasModule } from "@/core/modules";
 import { tooMany } from "@/lib/security";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
   const p = Body.safeParse(await req.json().catch(() => null));
   if (!p.success) return NextResponse.json({ ok: false }, { status: 400 });
   const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, p.data.slug) });
-  if (!t || !isPro(t)) return NextResponse.json({ ok: false });
+  if (!t || !isPro(t) || !hasModule(t, "marketing")) return NextResponse.json({ ok: false });
   const id = await saveCart(t, { cartId: p.data.cartId, name: p.data.name ? sanitizeName(p.data.name) : null, phone: p.data.phone, items: p.data.items });
   return NextResponse.json({ ok: !!id, cartId: id });
 }

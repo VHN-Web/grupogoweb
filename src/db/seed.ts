@@ -518,7 +518,7 @@ async function plansToPortuguese(db: DB) {
 
 /** Crescimento: base ganha carteira/origem/kit/SEO (+ avaliações e vitrine opcionais); GoInteligence ganha campanhas, indicação, fidelidade e aniversário. */
 async function growthPlanFeatures(db: DB) {
-  for (const p of await db.query.plans.findMany()) {
+  for (const p of await db.query.plans.findMany({ where: eq(schema.plans.isCustom, false) })) {
     const next = withGrowthFeatures(p.features, p.intelligence);
     if (next !== (p.features ?? "")) await db.update(schema.plans).set({ features: next }).where(eq(schema.plans.id, p.id));
   }

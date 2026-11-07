@@ -1,3 +1,4 @@
+import { CORE_INFO, MODULE_INFO } from "./modules";
 // Nome do plano no idioma do visitante (os nomes são cadastrados uma vez no admin).
 const PT: Record<string, string> = {
   mensual: "Mensal",
@@ -54,6 +55,9 @@ export function withGrowthFeatures(features: string | null, pro: boolean): strin
   const add = (pro ? GROWTH_PLAN_FEATURES.pro : GROWTH_PLAN_FEATURES.base).filter((f) => !has.has(f));
   return [...lines, ...add].join("\n");
 }
+// Plano personalizado: núcleo e módulos
+FEATURE_PT[CORE_INFO.es] = CORE_INFO.pt;
+for (const m of Object.values(MODULE_INFO)) FEATURE_PT[m.es] = m.pt;
 const FEATURE_ES: Record<string, string> = Object.fromEntries(Object.entries(FEATURE_PT).map(([es, pt]) => [pt, es]));
 
 /** Funciona nos dois sentidos: o plano pode estar cadastrado em espanhol ou em português. */

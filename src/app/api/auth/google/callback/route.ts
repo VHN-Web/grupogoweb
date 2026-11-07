@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { ownerSubject, readToken, setSession } from "@/lib/auth";
+import { adminSubject, ownerSubject, readToken, setSession } from "@/lib/auth";
 import { adminEmails, googleEmail, googleEnabled } from "@/lib/google";
 import { appUrl } from "@/lib/urls";
 import { audit, tooMany } from "@/lib/security";
@@ -29,11 +29,17 @@ export async function GET(req: Request) {
   if (!user) return fail(loginPath);
 
   if (to === "admin") {
-    if (!adminEmails().includes(user.email)) {
+    // e-mails do .env = administrador principal; e-mails cadastrados em Admin → Administradores = admin com o próprio nome
+    const listed = await db.query.platformAdmins.findFirst({ where: eq(schema.platformAdmins.email, user.email) });
+    if (adminEmails().includes(user.email)) {
+      await setSession("platform");
+    } else if (listed?.active) {
+      await db.update(schema.platformAdmins).set({ lastLoginAt: new Date() }).where(eq(schema.platformAdmins.id, listed.id));
+      await setSession(adminSubject(listed));
+    } else {
       await audit(null, `google: ${user.email}`, "login.fail", "admin via Google (e-mail não autorizado)");
       return fail("/admin/login?m=email");
     }
-    await setSession("platform");
     await audit(null, `admin (Google ${user.email})`, "login.ok");
     const r = NextResponse.redirect(`${appUrl()}/admin`);
     r.cookies.delete({ name: "g_nonce", path: "/api/auth/google" });
