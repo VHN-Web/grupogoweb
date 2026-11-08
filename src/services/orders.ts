@@ -434,6 +434,11 @@ export async function setOrderStatus(tenantId: string, orderId: string, status: 
     }
     if (status === "CANCELLED" && order.courierId) await ca.notifyCourier(order.courierId, `#${order.number} cancelado`, "A loja cancelou este pedido · La tienda canceló este pedido").catch(() => null);
   }
+  // Geovana: aviso automático ao cliente pelo WhatsApp da loja (se ligado)
+  if (order.status !== status) {
+    const gv = await import("@/services/geovana");
+    await gv.notifyOrderStatus(tenantId, orderId, status).catch(() => null);
+  }
   // recompensas (fidelidade, indicação, avaliação) só quando o pedido é concluído
   if (status === "COMPLETED") await onOrderCompleted(tenantId, orderId).catch((e) => console.error("[growth]", e));
 }

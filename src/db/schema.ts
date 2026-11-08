@@ -108,6 +108,7 @@ export const tenants = pgTable("tenants", {
   // Agenda (GoInteligence) — JSON validado em src/core/intelligence.ts
   bookingConfig: text("booking_config").notNull().default("{}"),
   dispatchConfig: text("dispatch_config").notNull().default("{}"), // entregas: atribuição automática (raio, limite por motoboy)
+  geovanaConfig: text("geovana_config").notNull().default("{}"), // Geovana (IA no WhatsApp): predefinições + canal (segredos selados) — core/geovana.ts
 
   // Segurança
   demo: boolean("demo").notNull().default(false), // loja de demonstração (único caso em que o pagamento simulado é aceito)
@@ -361,7 +362,8 @@ export const platformSettings = pgTable("platform_settings", {
   docsRetentionMonths: integer("docs_retention_months").notNull().default(12),
   affiliateConfig: text("affiliate_config").notNull().default("{}"), // programa de afiliados (core/affiliates.ts)
   crmConfig: text("crm_config").notNull().default("{}"), // CRM: busca de leads, metas, chave Gemini (selada), VAPID
-  asaasConfig: text("asaas_config").notNull().default("{}"), // Asaas: ambiente, chave da conta principal (selada), walletId, token do webhook, split padrão
+  asaasConfig: text("asaas_config").notNull().default("{}"),
+  whatsappConfig: text("whatsapp_config").notNull().default("{}"), // Geovana: servidor Evolution (chave selada) + IA (chave Gemini selada, modelo) // Asaas: ambiente, chave da conta principal (selada), walletId, token do webhook, split padrão
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -1147,3 +1149,39 @@ export const asaasEvents = pgTable("asaas_events", {
   event: text("event").notNull(),
   createdAt: createdAt(),
 });
+
+// Geovana: conversas do WhatsApp da loja (uma por número) e mensagens recentes (contexto da IA)
+export const waChats = pgTable(
+  "wa_chats",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(), // E.164
+    name: text("name"),
+    pausedUntil: timestamp("paused_until", { withTimezone: true }), // humano assumiu: IA quieta até
+    needsHuman: boolean("needs_human").notNull().default(false),
+    lastAt: timestamp("last_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("wa_chats_tenant_phone_uq").on(t.tenantId, t.phone), index("wa_chats_tenant_last_idx").on(t.tenantId, t.lastAt)],
+);
+
+export const waMessages = pgTable(
+  "wa_messages",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => waChats.id, { onDelete: "cascade" }),
+    role: text("role").$type<"user" | "ai" | "staff" | "system">().notNull(),
+    text: text("text").notNull(),
+    externalId: text("external_id"), // id da mensagem no WhatsApp (evita duplicar)
+    createdAt: createdAt(),
+  },
+  (t) => [index("wa_messages_chat_idx").on(t.chatId, t.createdAt), uniqueIndex("wa_messages_ext_uq").on(t.tenantId, t.externalId)],
+);

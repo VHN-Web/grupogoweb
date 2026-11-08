@@ -6,6 +6,8 @@ import { saveSettings, testStorage } from "../actions";
 import { blobConfigured } from "@/adapters/storage";
 import { asaasConfig, asaasWebhookUrl } from "@/services/asaas";
 import { connectAsaasAction, disconnectAsaasAction, saveAsaasRulesAction } from "../asaas-actions";
+import { whatsappPlatform } from "@/services/geovana";
+import { saveEvolutionAction, saveGeovanaAiAction } from "../whatsapp-actions";
 
 const CUR = { PYG: "Guarani (Gs.)", USD: "Dólar (US$)", BRL: "Real (R$)" } as const;
 
@@ -16,6 +18,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const providers = listBillingProviders();
   const az = await asaasConfig();
   const azOn = !!az.apiKeySealed;
+  const wa = await whatsappPlatform();
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -76,6 +79,24 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <button className="text-xs font-semibold text-red-600">Desconectar o Asaas</button>
           </form>
         )}
+      </section>
+
+      <section id="geovana" className="card scroll-mt-20 space-y-4 p-5 text-sm">
+        <div>
+          <h2 className="font-semibold">Geovana — IA no WhatsApp das lojas (GoInteligence)</h2>
+          <p className="text-muted">Cada loja conecta o próprio WhatsApp no painel (QR Code pelo seu servidor Evolution, ou a API oficial da Meta com as credenciais dela). A IA usa a chave do Gemini abaixo — ou a chave própria da loja, se ela cadastrar.</p>
+        </div>
+        <form action={saveEvolutionAction} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <F label="Servidor Evolution API (URL)"><input name="url" className="input" defaultValue={wa.evolutionUrl} placeholder="https://evo.goweboficial.com" /></F>
+          <F label={wa.evolutionKeySealed ? "Chave global (salva — cole outra para trocar)" : "Chave global (AUTHENTICATION_API_KEY)"}><input name="key" type="password" autoComplete="off" className="input" /></F>
+          <button className="btn-primary">{wa.evolutionKeySealed ? "Atualizar" : "Conectar"}</button>
+        </form>
+        <form action={saveGeovanaAiAction} className="grid gap-3 border-t border-line pt-4 sm:grid-cols-[1fr_200px_auto] sm:items-end">
+          <F label={wa.geminiKeySealed ? "Chave do Gemini (salva — cole outra para trocar)" : "Chave do Gemini (Google AI Studio)"}><input name="key" type="password" autoComplete="off" className="input" /></F>
+          <F label="Modelo"><input name="model" className="input" defaultValue={wa.model} /></F>
+          <button className="btn-primary">Salvar e testar</button>
+        </form>
+        <p className="text-xs text-muted">Status: {wa.evolutionKeySealed ? "Evolution ✓" : "Evolution não configurada (lojas só pela API oficial)"} · {wa.geminiKeySealed ? "IA ✓" : "IA sem chave (lojas precisam da chave própria)"}</p>
       </section>
 
       <form action={saveSettings} className="space-y-5">

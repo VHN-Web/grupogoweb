@@ -30,6 +30,7 @@ const ITEMS: Item[] = [
   { href: "/crescimento", es: "Crecimiento", pt: "Crescimento", area: "customers", icon: "growth", group: "customers" },
   { href: "/divulgacao", es: "Divulgación", pt: "Divulgação", area: "customers", icon: "megaphone", group: "customers" },
   { href: "/marketing", es: "Marketing", pt: "Marketing", area: "marketing", icon: "tag", group: "customers", pro: true },
+  { href: "/geovana", es: "Geovana (WhatsApp IA)", pt: "Geovana (WhatsApp IA)", area: "customers", icon: "chat", group: "customers", pro: true },
   { href: "/notas", es: "Facturas", pt: "Notas fiscais", area: "fiscal", icon: "receipt", group: "admin" },
   { href: "/equipe", es: "Equipo", pt: "Equipe", area: "team", icon: "team", group: "admin", pro: true, module: "equipe" },
   { href: "/recebimentos", es: "Cobros online", pt: "Recebimentos", area: "settings", icon: "wallet", group: "sales", brOnly: true },
