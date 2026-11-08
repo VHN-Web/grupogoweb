@@ -7,7 +7,7 @@ import { formatMoney } from "@/core/money";
 import type { Currency } from "@/core/types";
 import { courierEarnings, myActiveDeliveries, openDeliveries } from "@/services/courier-app";
 import { courierEarning } from "@/core/couriers";
-import { claimAction, deliverAction, pickupAction, toggleOnlineAction } from "./actions";
+import { claimAction, declineAction, deliverAction, pickupAction, toggleOnlineAction } from "./actions";
 import { courierCtx } from "./ctx";
 
 export const dynamic = "force-dynamic";
@@ -120,9 +120,17 @@ export default async function CourierHome({ searchParams }: { searchParams: Prom
               </div>
               <div className="mt-3 border-t border-[var(--s-line)] pt-3">
                 {!going ? (
-                  <form action={pickupAction.bind(null, o.id)}>
-                    <SubmitButton pending="" className="btn-brand w-full justify-center py-3 text-base">{T("Salí con el pedido", "Saí com o pedido")}</SubmitButton>
-                  </form>
+                  <div className="space-y-2">
+                    {o.autoAssigned && <p className="text-center text-xs text-[var(--s-muted)]">{T("Te la pasamos por estar cerca de la tienda.", "Passamos para você por estar perto da loja.")}</p>}
+                    <form action={pickupAction.bind(null, o.id)}>
+                      <SubmitButton pending="" className="btn-brand w-full justify-center py-3 text-base">{T("Salí con el pedido", "Saí com o pedido")}</SubmitButton>
+                    </form>
+                    {o.autoAssigned && (
+                      <form action={declineAction.bind(null, o.id)}>
+                        <SubmitButton pending="" className="w-full rounded-2xl border border-[var(--s-line)] py-2.5 text-sm font-semibold text-[var(--s-muted)]">{T("No puedo llevarla", "Não consigo levar")}</SubmitButton>
+                      </form>
+                    )}
+                  </div>
                 ) : (
                   <form action={deliverAction.bind(null, o.id)} className="space-y-2">
                     {!paid && (

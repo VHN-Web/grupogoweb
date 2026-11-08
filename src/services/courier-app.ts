@@ -2,10 +2,10 @@ import "server-only";
 // App do entregador (/entregador): acesso por link, online/offline, GPS ao vivo, entregas e ganhos.
 // O consumidor e a loja acompanham a posição pelo mapa (polling de /api/rastreio e /api/painel/[slug]/frota).
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, gte, inArray, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Courier, Tenant } from "@/db/schema";
-import { cleanPing, courierEarning, distanceKm, etaMinutes, isLive, periodStarts } from "@/core/couriers";
+import { cleanPing, courierEarning, distanceKm, etaMinutes, isLive, parseDispatch, periodStarts, pickCourier } from "@/core/couriers";
 import { appUrl } from "@/lib/urls";
 import { openSecret, sealSecret } from "@/lib/secrets";
 import { getRegion } from "@/core/region";
@@ -53,6 +53,8 @@ export async function recordPing(c: Courier, body: unknown) {
     .update(schema.couriers)
     .set({ lastLat: p.lat, lastLng: p.lng, lastAccuracy: p.accuracy, lastHeading: p.heading, lastSpeed: p.speed, lastSeenAt: new Date() })
     .where(eq(schema.couriers.id, c.id));
+  // entregas esperando motoboy? com a posição nova ele pode ser o mais perto
+  if (c.online) await autoAssign(c.tenantId).catch((e) => console.error("[autoAssign]", e));
   return { ok: true as const, online: c.online };
 }
 
@@ -220,4 +222,88 @@ export async function fleet(tenantId: string) {
     }),
     orders: orders.map((o) => ({ id: o.id, number: o.number, status: o.status, courierId: o.courierId, dest: pt(o.lat, o.lng), address: o.address, customer: o.customerName.split(" ")[0] })),
   };
+}
+
+// ---------------- atribuição automática ----------------
+
+const declined = (raw: string | null) => {
+  try {
+    const v = raw ? JSON.parse(raw) : [];
+    return Array.isArray(v) ? (v as string[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Passa as entregas sem motoboy (em preparo/prontas) para quem está online, com GPS ao vivo,
+ * mais perto da loja e com menos entregas. `onlyOrderId` = só aquele pedido.
+ * Atômico: só atribui se o pedido ainda estiver sem motoboy.
+ */
+export async function autoAssign(tenantId: string, onlyOrderId?: string) {
+  const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.id, tenantId), columns: { lat: true, lng: true, dispatchConfig: true, name: true, country: true } });
+  if (!t) return 0;
+  const cfg = parseDispatch(t.dispatchConfig);
+  if (!cfg.autoAssign) return 0;
+  const pending = await db.query.orders.findMany({
+    where: and(
+      eq(schema.orders.tenantId, tenantId),
+      eq(schema.orders.type, "DELIVERY"),
+      isNull(schema.orders.courierId),
+      inArray(schema.orders.status, ["PREPARING", "READY"]),
+      ...(onlyOrderId ? [eq(schema.orders.id, onlyOrderId)] : []),
+    ),
+    columns: { id: true, number: true, address: true, declinedCourierIds: true },
+    orderBy: [schema.orders.createdAt],
+    limit: 20,
+  });
+  if (!pending.length) return 0;
+  const [list, loads] = await Promise.all([
+    db.query.couriers.findMany({ where: and(eq(schema.couriers.tenantId, tenantId), eq(schema.couriers.active, true), eq(schema.couriers.online, true)) }),
+    db
+      .select({ id: schema.orders.courierId, n: sql<number>`count(*)` })
+      .from(schema.orders)
+      .where(and(eq(schema.orders.tenantId, tenantId), inArray(schema.orders.status, [...ACTIVE]), sql`${schema.orders.courierId} is not null`))
+      .groupBy(schema.orders.courierId),
+  ]);
+  if (!list.length) return 0;
+  const load = new Map(loads.map((l) => [l.id!, Number(l.n)]));
+  const store = t.lat != null && t.lng != null ? { lat: t.lat, lng: t.lng } : null;
+  const pt = t.country === "BR";
+  let n = 0;
+  for (const o of pending) {
+    const cand = list.map((c) => ({ id: c.id, online: c.online, lat: c.lastLat, lng: c.lastLng, seenAt: c.lastSeenAt, load: load.get(c.id) ?? 0 }));
+    const best = pickCourier(cand, store, cfg, declined(o.declinedCourierIds));
+    if (!best) continue;
+    const [ok] = await db
+      .update(schema.orders)
+      .set({ courierId: best.id, autoAssigned: true, updatedAt: new Date() })
+      .where(and(eq(schema.orders.id, o.id), isNull(schema.orders.courierId)))
+      .returning({ id: schema.orders.id });
+    if (!ok) continue;
+    load.set(best.id, (load.get(best.id) ?? 0) + 1);
+    n++;
+    await notifyCourier(best.id, pt ? `Nova entrega #${o.number}` : `Nueva entrega #${o.number}`, `${t.name}${o.address ? ` · ${o.address}` : ""}${best.km != null ? ` · ${best.km.toFixed(1)} km da loja` : ""}`).catch(() => null);
+  }
+  return n;
+}
+
+/** Entregador recusa uma entrega que o sistema passou para ele: vai para o próximo da fila. */
+export async function declineDelivery(c: Courier, orderId: string) {
+  const o = await myOrder(c, orderId);
+  if (o.courierId !== c.id) throw new CourierError("Essa entrega não é sua");
+  if (o.status === "OUT_FOR_DELIVERY" || o.status === "COMPLETED" || o.status === "CANCELLED") throw new CourierError("Não dá mais para recusar esta entrega");
+  const list = [...new Set([...declined(o.declinedCourierIds), c.id])];
+  await db
+    .update(schema.orders)
+    .set({ courierId: null, autoAssigned: false, declinedCourierIds: JSON.stringify(list), updatedAt: new Date() })
+    .where(and(eq(schema.orders.id, o.id), eq(schema.orders.courierId, c.id)));
+  const again = await autoAssign(c.tenantId, o.id);
+  if (!again) await notifyOnlineCouriers(c.tenantId, `Pedido #${o.number}`, "Entrega disponível · Entrega disponible").catch(() => null);
+}
+
+export async function saveDispatchConfig(tenantId: string, cfg: { autoAssign: boolean; maxKm: number; maxLoad: number }) {
+  const v = parseDispatch(JSON.stringify(cfg));
+  await db.update(schema.tenants).set({ dispatchConfig: JSON.stringify(v) }).where(eq(schema.tenants.id, tenantId));
+  if (v.autoAssign) await autoAssign(tenantId);
 }

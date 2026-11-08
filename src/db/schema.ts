@@ -107,6 +107,7 @@ export const tenants = pgTable("tenants", {
 
   // Agenda (GoInteligence) — JSON validado em src/core/intelligence.ts
   bookingConfig: text("booking_config").notNull().default("{}"),
+  dispatchConfig: text("dispatch_config").notNull().default("{}"), // entregas: atribuição automática (raio, limite por motoboy)
 
   // Segurança
   demo: boolean("demo").notNull().default(false), // loja de demonstração (único caso em que o pagamento simulado é aceito)
@@ -262,6 +263,8 @@ export const orders = pgTable(
     // Crescimento: cliente da loja, de onde veio e quem indicou
     shopperId: text("shopper_id"),
     courierId: text("courier_id"), // motoboy que levou o pedido
+    autoAssigned: boolean("auto_assigned").notNull().default(false), // motoboy escolhido pelo sistema (pode recusar)
+    declinedCourierIds: text("declined_courier_ids"), // JSON: quem recusou esta entrega
     pickedUpAt: timestamp("picked_up_at", { withTimezone: true }), // motoboy saiu com o pedido
     deliveredAt: timestamp("delivered_at", { withTimezone: true }), // motoboy confirmou a entrega
     // Asaas: split que abate a mensalidade (centavos) e ciclo a que pertence

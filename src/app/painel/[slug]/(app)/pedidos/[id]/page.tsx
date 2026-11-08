@@ -69,6 +69,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
                   </select>
                   <button className="btn-ghost">{T("Asignar", "Atribuir")}</button>
                 </form>
+                {courier && o.autoAssigned && <p className="mt-2 text-xs text-muted">{T("Asignado automáticamente (online y más cerca).", "Atribuído automaticamente (online e mais perto).")}</p>}
                 {courier && (
                   <a target="_blank" rel="noopener noreferrer" href={waLink(courier.phone, deliveryMessage(t, o))} className="btn-brand mt-3 inline-block">
                     {T(`Enviar ruta a ${courier.name.split(" ")[0]} por WhatsApp`, `Enviar rota para ${courier.name.split(" ")[0]} no WhatsApp`)}

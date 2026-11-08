@@ -56,3 +56,30 @@ describe("rastreamento do entregador", () => {
     expect(p.month.toISOString()).toBe("2026-11-01T03:00:00.000Z");
   });
 });
+
+import { parseDispatch, pickCourier } from "./couriers";
+
+describe("atribuição automática", () => {
+  const now = Date.now();
+  const store = { lat: -8.05, lng: -34.9 };
+  const live = new Date(now - 30_000);
+  const cfg = parseDispatch(null);
+  it("escolhe o online mais perto e equilibra pela carga", () => {
+    const list = [
+      { id: "longe", online: true, lat: -8.07, lng: -34.9, seenAt: live, load: 0 }, // ~2,2 km
+      { id: "perto", online: true, lat: -8.051, lng: -34.9, seenAt: live, load: 0 }, // ~0,1 km
+      { id: "offline", online: false, lat: -8.05, lng: -34.9, seenAt: live, load: 0 },
+    ];
+    expect(pickCourier(list, store, cfg, [], now)?.id).toBe("perto");
+    // o mais perto já leva 1 entrega (+1,5 km): o outro (2,2 km) ainda perde
+    expect(pickCourier([{ ...list[0] }, { ...list[1], load: 1 }], store, cfg, [], now)?.id).toBe("perto");
+    // recusou: vai para o próximo
+    expect(pickCourier(list, store, cfg, ["perto"], now)?.id).toBe("longe");
+  });
+  it("respeita raio, limite de entregas e GPS ao vivo", () => {
+    expect(pickCourier([{ id: "a", online: true, lat: -8.2, lng: -34.9, seenAt: live, load: 0 }], store, cfg, [], now)).toBeNull(); // 16 km
+    expect(pickCourier([{ id: "a", online: true, lat: -8.05, lng: -34.9, seenAt: live, load: 2 }], store, cfg, [], now)).toBeNull();
+    expect(pickCourier([{ id: "a", online: true, lat: -8.05, lng: -34.9, seenAt: new Date(now - 600_000), load: 0 }], store, cfg, [], now)).toBeNull();
+    expect(parseDispatch('{"autoAssign":false,"maxKm":8,"maxLoad":3}')).toEqual({ autoAssign: false, maxKm: 8, maxLoad: 3 });
+  });
+});

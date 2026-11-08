@@ -95,3 +95,40 @@ export function periodStarts(now: Date, offsetMin: number) {
   const month = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), 1) - offsetMin * 60_000;
   return { day: new Date(day), week: new Date(week), month: new Date(month) };
 }
+
+// ---------------- Atribuição automática: online, perto da loja e com menos entregas ----------------
+
+export type DispatchConfig = { autoAssign: boolean; maxKm: number; maxLoad: number };
+export const DEFAULT_DISPATCH: DispatchConfig = { autoAssign: true, maxKm: 5, maxLoad: 2 };
+
+export function parseDispatch(raw: string | null | undefined): DispatchConfig {
+  let o: Record<string, unknown> = {};
+  try {
+    o = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+  } catch {}
+  const n = (v: unknown, d: number, min: number, max: number) => (typeof v === "number" && Number.isFinite(v) && v >= min && v <= max ? v : d);
+  return {
+    autoAssign: typeof o.autoAssign === "boolean" ? o.autoAssign : DEFAULT_DISPATCH.autoAssign,
+    maxKm: n(o.maxKm, DEFAULT_DISPATCH.maxKm, 0.5, 50),
+    maxLoad: Math.round(n(o.maxLoad, DEFAULT_DISPATCH.maxLoad, 1, 10)),
+  };
+}
+
+export type DispatchCandidate = { id: string; online: boolean; lat: number | null; lng: number | null; seenAt: Date | null; load: number };
+
+/**
+ * Escolhe o entregador: só online com GPS ao vivo, dentro do raio da loja e abaixo do limite de entregas.
+ * Nota = distância até a loja + 1,5 km por entrega que ele já está levando (equilibra a fila).
+ * Sem localização da loja, vale só a carga. Devolve null se ninguém servir.
+ */
+export function pickCourier(list: DispatchCandidate[], store: { lat: number; lng: number } | null, cfg: DispatchConfig, exclude: string[] = [], now = Date.now()) {
+  let best: { id: string; score: number; km: number | null } | null = null;
+  for (const c of list) {
+    if (!c.online || exclude.includes(c.id) || c.load >= cfg.maxLoad || !isLive(c.seenAt, now) || c.lat == null || c.lng == null) continue;
+    const km = store ? distanceKm(store, { lat: c.lat, lng: c.lng }) : null;
+    if (km != null && km > cfg.maxKm) continue;
+    const score = (km ?? 0) + c.load * 1.5;
+    if (!best || score < best.score) best = { id: c.id, score, km };
+  }
+  return best;
+}

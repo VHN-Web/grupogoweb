@@ -10,7 +10,7 @@ import { getRegion, isValidE164, isValidName, tr } from "@/core/region";
 import { parseMajorToMinor } from "@/core/money";
 import { hasModule } from "@/core/modules";
 import type { Currency } from "@/core/types";
-import { courierAccessLink, notifyCourier } from "@/services/courier-app";
+import { courierAccessLink, notifyCourier, saveDispatchConfig } from "@/services/courier-app";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const page = (slug: string) => `/painel/${slug}/motoboys`;
@@ -67,7 +67,7 @@ export async function assignCourier(slug: string, orderId: string, f: FormData) 
     const c = await db.query.couriers.findFirst({ where: and(eq(schema.couriers.id, courierId), eq(schema.couriers.tenantId, t.id), eq(schema.couriers.active, true)) });
     if (!c) back(path, "err", "—");
   }
-  await db.update(schema.orders).set({ courierId }).where(and(eq(schema.orders.id, orderId), eq(schema.orders.tenantId, t.id)));
+  await db.update(schema.orders).set({ courierId, autoAssigned: false }).where(and(eq(schema.orders.id, orderId), eq(schema.orders.tenantId, t.id)));
   await audit(t.id, await actorName(slug), "order.courier", `#${o!.number}`);
   if (courierId && courierId !== o!.courierId) {
     const T = tr(getRegion(t.country).locale);
@@ -87,4 +87,18 @@ export async function courierAccessAction(slug: string, id: string, renew: boole
   await audit(t.id, await actorName(slug), renew ? "courier.access.renew" : "courier.access", c!.name);
   revalidatePath(page(slug));
   back(page(slug), "ok", renew ? T("Enlace nuevo creado: el anterior dejó de funcionar. Envialo por WhatsApp.", "Novo link criado: o anterior parou de funcionar. Envie pelo WhatsApp.") : T("Acceso creado. Envialo por WhatsApp.", "Acesso criado. Envie pelo WhatsApp."));
+}
+
+/** Atribuição automática das entregas (raio da loja e limite por motoboy). */
+export async function dispatchAction(slug: string, f: FormData) {
+  const t = await requireTenantAdmin(slug, "couriers");
+  const T = tr(getRegion(t.country).locale);
+  const num = (k: string, d: number) => {
+    const v = Number(String(f.get(k) ?? "").replace(",", "."));
+    return Number.isFinite(v) && v > 0 ? v : d;
+  };
+  await saveDispatchConfig(t.id, { autoAssign: f.get("autoAssign") === "on", maxKm: num("maxKm", 5), maxLoad: Math.round(num("maxLoad", 2)) });
+  await audit(t.id, await actorName(slug), "courier.dispatch", f.get("autoAssign") === "on" ? "automática" : "manual");
+  revalidatePath(page(slug));
+  back(page(slug), "ok", T("Guardado ✓", "Salvo ✓"));
 }

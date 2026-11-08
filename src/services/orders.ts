@@ -427,7 +427,11 @@ export async function setOrderStatus(tenantId: string, orderId: string, status: 
   // App do entregador: avisa sobre entrega livre (pronta, sem motoboy) ou cancelada
   if (order.type === "DELIVERY" && order.status !== status) {
     const ca = await import("@/services/courier-app");
-    if (status === "READY" && !order.courierId) await ca.notifyOnlineCouriers(tenantId, `Pedido #${order.number}`, "Entrega disponível · Entrega disponible").catch(() => null);
+    // em preparo/pronto sem motoboy: passa para o online mais perto; ninguém disponível → avisa todos (pronto)
+    if ((status === "PREPARING" || status === "READY") && !order.courierId) {
+      const n = await ca.autoAssign(tenantId, orderId).catch(() => 0);
+      if (!n && status === "READY") await ca.notifyOnlineCouriers(tenantId, `Pedido #${order.number}`, "Entrega disponível · Entrega disponible").catch(() => null);
+    }
     if (status === "CANCELLED" && order.courierId) await ca.notifyCourier(order.courierId, `#${order.number} cancelado`, "A loja cancelou este pedido · La tienda canceló este pedido").catch(() => null);
   }
   // recompensas (fidelidade, indicação, avaliação) só quando o pedido é concluído

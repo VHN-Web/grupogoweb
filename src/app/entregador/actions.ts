@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireCourier, clearCourierSession } from "@/lib/courier-auth";
-import { claimDelivery, completeDelivery, CourierError, pickUpDelivery, setCourierOnline } from "@/services/courier-app";
+import { claimDelivery, completeDelivery, CourierError, declineDelivery, pickUpDelivery, setCourierOnline } from "@/services/courier-app";
 import { audit } from "@/lib/security";
 import { getRegion, tr } from "@/core/region";
 
@@ -53,4 +53,10 @@ export async function courierLogout() {
   await setCourierOnline(s.courier, false);
   await clearCourierSession();
   redirect("/entregador/entrar?saiu=1");
+}
+
+export async function declineAction(orderId: string) {
+  const { courier, tenant } = await requireCourier();
+  const T = tr(getRegion(tenant.country).locale);
+  await run(() => declineDelivery(courier, orderId), T("Entrega rechazada. Pasó al siguiente repartidor.", "Entrega recusada. Ela foi para o próximo entregador."));
 }

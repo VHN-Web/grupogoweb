@@ -8,7 +8,8 @@ import { PhoneInput } from "@/components/forms/PhoneInput";
 import { NameInput } from "@/components/forms/NameInput";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import type { Currency } from "@/core/types";
-import { courierAccessAction, deleteCourier, saveCourier } from "../courier-actions";
+import { courierAccessAction, deleteCourier, dispatchAction, saveCourier } from "../courier-actions";
+import { parseDispatch } from "@/core/couriers";
 import { courierAccessLink } from "@/services/courier-app";
 import { isLive } from "@/core/couriers";
 import { FleetMap } from "@/components/maps/FleetMap";
@@ -27,6 +28,7 @@ export default async function MotoboysPage({ params, searchParams }: { params: P
   since.setDate(since.getDate() - (days - 1));
   const rows = await courierReport(t.id, since);
   const total = rows.reduce((a, r) => a + r.payout, 0);
+  const dispatch = parseDispatch(t.dispatchConfig);
   const links = new Map(await Promise.all(rows.filter((r) => r.courier.accessSealed).map(async (r) => [r.courier.id, await courierAccessLink(r.courier)] as const)));
 
   return (
@@ -58,6 +60,16 @@ export default async function MotoboysPage({ params, searchParams }: { params: P
             }}
           />
         </div>
+        <form action={dispatchAction.bind(null, slug)} className="mt-4 grid gap-3 rounded-xl border border-line p-3 text-sm sm:grid-cols-[1fr_auto_auto_auto] sm:items-end">
+          <label className="flex items-start gap-2">
+            <input type="checkbox" name="autoAssign" defaultChecked={dispatch.autoAssign} className="mt-1" />
+            <span><b>{T("Asignar entregas automáticamente", "Atribuir entregas automaticamente")}</b><span className="block text-xs text-muted">{T("Cuando el pedido entra en preparación, va al repartidor online más cerca de la tienda y con menos entregas. Él puede rechazar y pasa al siguiente.", "Quando o pedido entra em preparo, vai para o motoboy online mais perto da loja e com menos entregas. Ele pode recusar e passa para o próximo.")}</span></span>
+          </label>
+          <label>{T("Radio (km)", "Raio (km)")}<input name="maxKm" className="input mt-1 !w-24" inputMode="decimal" defaultValue={String(dispatch.maxKm).replace(".", ",")} /></label>
+          <label>{T("Máx. por repartidor", "Máx. por motoboy")}<input name="maxLoad" type="number" min={1} max={10} className="input mt-1 !w-24" defaultValue={dispatch.maxLoad} /></label>
+          <button className="btn-primary">{T("Guardar", "Salvar")}</button>
+          {t.lat == null && <p className="text-xs text-amber-700 sm:col-span-4">{T("La tienda no tiene ubicación en Configuración: se elige solo por la cantidad de entregas.", "A loja não tem localização em Configurações: a escolha fica só pela quantidade de entregas.")}</p>}
+        </form>
         <p className="mt-3 text-xs text-muted">{T("Cada repartidor instala la app desde el navegador (sin tienda de apps) con el enlace de acceso. Él se pone online, recibe y toma entregas, marca “salí” y “entregado”, y el cliente lo sigue en el mapa del pedido.", "Cada motoboy instala o app pelo navegador (sem loja de apps) com o link de acesso. Ele fica online, recebe e pega entregas, marca “saí” e “entreguei”, e o cliente acompanha no mapa do pedido.")}</p>
       </section>
 
