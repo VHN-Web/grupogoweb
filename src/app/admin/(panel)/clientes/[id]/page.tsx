@@ -11,6 +11,8 @@ import { invoiceUrl, getSettings } from "@/services/billing";
 import { Flash } from "@/components/Flash";
 import { setCustomerAffiliateAction } from "../../affiliate-actions";
 import { StatusPill } from "@/components/StatusPill";
+import { asaasConfig, cycleSummary } from "@/services/asaas";
+import { setSplitPctAction } from "../../asaas-actions";
 import { deleteCustomer, cancelCustomerAction, cancelInvoice, confirmInvoicePaid, deliver, saveDomain, setTier, suspendCustomer, toggleTask, saveCustomerModules } from "../../actions";
 
 export default async function CustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
@@ -27,6 +29,9 @@ export default async function CustomerPage({ params, searchParams }: { params: P
     getSettings(),
   ]);
   const openTasks = tasks.filter((t) => !t.done).length;
+  const az = c.country === "BR" ? await asaasConfig() : null;
+  const cycles = az?.apiKeySealed ? await cycleSummary(c.id) : null;
+  const brl = (v: number) => formatMinor(v, "BRL");
 
   return (
     <div className="space-y-5">
@@ -87,6 +92,28 @@ export default async function CustomerPage({ params, searchParams }: { params: P
             </div>
           )}
         </section>
+        {az?.apiKeySealed && c.tenant && (
+          <section className="card space-y-2 p-4 text-sm">
+            <h2 className="font-semibold">Asaas · mensalidade abatida nas vendas</h2>
+            <p className="text-muted">
+              Subconta: {c.tenant.asaasWalletId ? <b className="text-ink">criada</b> : "ainda não criada (o lojista ativa em Recebimentos)"} · Cobrança do saldo: {c.preferredBilling === "CREDIT_CARD" ? `cartão ${c.cardLabel ?? ""}` : "link Pix/boleto/cartão"}
+              {!az.hybridEnabled && " · billing híbrido desligado nas Configurações"}
+              {c.plan.interval !== "MONTHLY" && " · plano anual (não usa o híbrido)"}
+            </p>
+            {cycles?.current && (
+              <p>Ciclo atual: <b>{brl(cycles.current.amortizedMinor)}</b> de {brl(cycles.current.targetMinor)} abatidos · fecha em {fmtDate(cycles.current.endAt)}</p>
+            )}
+            {cycles && cycles.history.filter((h) => h.status !== "ACCUMULATING").slice(0, 4).map((h) => (
+              <p key={h.id} className="text-xs text-muted">{fmtDate(h.startAt)}–{fmtDate(h.endAt)}: abatido {brl(h.amortizedMinor)}{h.residualMinor ? ` · saldo ${brl(h.residualMinor)}` : ""} · {h.status}</p>
+            ))}
+            <form action={setSplitPctAction.bind(null, c.id)} className="flex flex-wrap items-center gap-2 pt-1">
+              <span>% por venda</span>
+              <input name="splitPct" className="input w-24 py-2" inputMode="decimal" defaultValue={c.tenant.splitPct != null ? String(c.tenant.splitPct).replace(".", ",") : ""} placeholder={String(az.defaultSplitPct).replace(".", ",")} />
+              <button className="btn-ghost px-3">Salvar</button>
+              <span className="text-xs text-muted">vazio = padrão ({String(az.defaultSplitPct).replace(".", ",")}%)</span>
+            </form>
+          </section>
+        )}
         <section className="card space-y-2 p-4 text-sm">
           <h2 className="font-semibold">Sistema</h2>
           {c.tenant ? (

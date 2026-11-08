@@ -70,7 +70,9 @@ export function parseFiscalConfig(raw: string | null | undefined): FiscalConfig 
 export function publicPaymentConfig(cfg: PaymentConfig) {
   return {
     // Gateway online sem credencial não aparece para o cliente (evita pedido que não consegue pagar)
-    options: cfg.options.filter((o) => o.enabled && (o.provider !== "mercadopago" || !!cfg.credentials.mercadopago?.accessToken)),
+    options: cfg.options.filter(
+      (o) => o.enabled && (o.provider !== "mercadopago" || !!cfg.credentials.mercadopago?.accessToken) && (o.provider !== "asaas" || !!cfg.credentials.asaas?.enabled),
+    ),
     pixKey: cfg.pixKey,
     pixHolder: cfg.pixHolder,
     bankInfo: cfg.bankInfo,

@@ -13,6 +13,7 @@ import { getRegion, tr } from "@/core/region";
 import { contractSummary, previewContract } from "@/services/documents";
 import { ContractBody } from "@/components/ContractBody";
 import { AcceptStep } from "./AcceptStep";
+import { isValidDoc } from "@/core/asaas";
 
 export const dynamic = "force-dynamic";
 
@@ -116,7 +117,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       {inv.status === "OPEN" ? (
         <AcceptStep invoiceId={inv.id} accepted={inv.kind !== "SETUP" || !!inv.acceptedAt} locale={locale}>
-          <PayInvoice invoiceId={inv.id} options={options} defaultCurrency={inv.customer.preferredCurrency} locale={locale} />
+          <PayInvoice invoiceId={inv.id} options={options} defaultCurrency={inv.customer.preferredCurrency} locale={locale} needsDoc={locale === "pt" && gw.BRL === "asaas" && !isValidDoc(inv.customer.ruc ?? "")} />
         </AcceptStep>
       ) : inv.status === "PAID" ? (
         <p className="mt-6 rounded-xl bg-emerald-50 px-4 py-3 text-center text-sm font-semibold text-emerald-800">{T("¡Gracias! Pago confirmado.", "Obrigado! Pagamento confirmado.")}</p>

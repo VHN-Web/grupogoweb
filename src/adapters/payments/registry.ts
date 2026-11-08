@@ -4,6 +4,7 @@ import { mockOnlineProvider } from "./mock-online";
 import { bancardProvider } from "./bancard";
 import { pagoparProvider } from "./pagopar";
 import { mercadoPagoPaymentProvider } from "./mercadopago";
+import { asaasPaymentProvider } from "./asaas";
 
 // Registre aqui novos gateways. A ordem define a ordem de exibição no painel.
 const providers: PaymentProvider[] = [
@@ -12,6 +13,7 @@ const providers: PaymentProvider[] = [
   pixManualProvider,
   transferManualProvider,
   mercadoPagoPaymentProvider,
+  asaasPaymentProvider,
   mockOnlineProvider,
   bancardProvider,
   pagoparProvider,

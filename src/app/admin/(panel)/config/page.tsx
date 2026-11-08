@@ -4,6 +4,8 @@ import { gatewayMap, getSettings } from "@/services/billing";
 import { Flash } from "@/components/Flash";
 import { saveSettings, testStorage } from "../actions";
 import { blobConfigured } from "@/adapters/storage";
+import { asaasConfig, asaasWebhookUrl } from "@/services/asaas";
+import { connectAsaasAction, disconnectAsaasAction, saveAsaasRulesAction } from "../asaas-actions";
 
 const CUR = { PYG: "Guarani (Gs.)", USD: "Dólar (US$)", BRL: "Real (R$)" } as const;
 
@@ -12,6 +14,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const s = await getSettings();
   const gw = gatewayMap(s.gatewayByCurrency);
   const providers = listBillingProviders();
+  const az = await asaasConfig();
+  const azOn = !!az.apiKeySealed;
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -24,6 +28,56 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
         <form action={testStorage}><button className="btn-ghost">Testar envio de imagem</button></form>
       </section>
+      <section id="asaas" className="card scroll-mt-20 space-y-4 p-5 text-sm">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-48 flex-1">
+            <h2 className="font-semibold">Asaas — recebimentos e mensalidade abatida nas vendas (Brasil)</h2>
+            <p className="text-muted">
+              Conta principal da GoWeb (CNPJ). Com ela: cada lojista ganha uma subconta para receber Pix e cartão no site dele; uma % de cada venda abate a mensalidade (split, com teto no valor do plano); no 30º dia cobra-se só o saldo (cartão salvo ou link de Pix/boleto); sem pagar na carência, o site é suspenso.
+            </p>
+          </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-bold ${azOn ? "bg-emerald-100 text-emerald-800" : "bg-black/5 text-muted"}`}>
+            {azOn ? `Conectado · ${az.env === "production" ? "produção" : "sandbox"}` : "Não conectado"}
+          </span>
+        </div>
+        {azOn && (
+          <div className="grid gap-2 rounded-xl bg-black/[.03] p-3 text-xs sm:grid-cols-2">
+            <p>Conta: <b>{az.accountName || "—"}</b></p>
+            <p className="truncate">Carteira (walletId): <code>{az.walletId}</code></p>
+            <p className="sm:col-span-2">Webhook: <code>{asaasWebhookUrl()}</code> {az.webhookId ? "· criado automaticamente ✓" : ""}</p>
+          </div>
+        )}
+        <form action={connectAsaasAction} className="grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end">
+          <F label="Ambiente">
+            <select name="env" defaultValue={az.env} className="input">
+              <option value="sandbox">Sandbox (testes)</option>
+              <option value="production">Produção</option>
+            </select>
+          </F>
+          <F label={azOn ? "Trocar a chave de API (fica criptografada, nunca é exibida)" : "Chave de API da conta principal"}>
+            <input name="apiKey" type="password" autoComplete="off" className="input" placeholder="$aact_…" required />
+          </F>
+          <button className="btn-primary">{azOn ? "Reconectar" : "Conectar"}</button>
+        </form>
+        <p className="text-xs text-muted">No Asaas: Integrações → Chaves de API → Gerar chave. Ao conectar, a GoWeb confere a chave, pega a carteira e cria o webhook sozinha.</p>
+        {azOn && (
+          <form action={saveAsaasRulesAction} className="grid gap-3 border-t border-line pt-4 sm:grid-cols-3 sm:items-end">
+            <label className="flex items-start gap-2 sm:col-span-3">
+              <input type="checkbox" name="hybridEnabled" className="mt-1" defaultChecked={az.hybridEnabled} /> <span><b>Abater a mensalidade com as vendas (billing híbrido)</b> — planos mensais de lojas do Brasil com subconta criada</span>
+            </label>
+            <F label="% de cada venda (padrão)"><input name="defaultSplitPct" className="input" inputMode="decimal" defaultValue={String(az.defaultSplitPct).replace(".", ",")} /></F>
+            <F label="Dias para pagar o saldo (carência)"><input name="graceDays" type="number" min={1} max={30} className="input" defaultValue={az.graceDays} /></F>
+            <button className="btn-primary">Salvar regras</button>
+            <p className="text-xs text-muted sm:col-span-3">Para cobrar implantação e saldos pelo Asaas, escolha “Asaas” em Real (R$) no Gateway por moeda abaixo. A % pode ser ajustada por cliente na ficha dele.</p>
+          </form>
+        )}
+        {azOn && (
+          <form action={disconnectAsaasAction}>
+            <button className="text-xs font-semibold text-red-600">Desconectar o Asaas</button>
+          </form>
+        )}
+      </section>
+
       <form action={saveSettings} className="space-y-5">
         <Section title="Sua empresa">
           <div className="grid gap-3 sm:grid-cols-2">

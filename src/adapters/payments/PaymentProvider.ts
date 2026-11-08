@@ -23,6 +23,8 @@ export type PaymentContext = {
   currency: Currency;
   customerName: string;
   customerPhone?: string | null;
+  /** CPF/CNPJ do cliente final (Brasil; obrigatório em gateways que exigem, ex. Asaas) */
+  customerDoc?: string | null;
   /** URL para onde o gateway deve devolver o cliente */
   returnUrl: string;
   /** URL do webhook deste provider */
@@ -39,6 +41,8 @@ export type CreatePaymentResult = {
   redirectUrl?: string;
   /** Instruções mostradas ao cliente (ex: chave Pix, "pague no caixa") */
   instructions?: string;
+  /** Pix copia e cola gerado pelo gateway (mostrado com QR na página do pedido) */
+  pixPayload?: string;
 };
 
 export type WebhookResult = {

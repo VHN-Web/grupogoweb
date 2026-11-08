@@ -10,6 +10,7 @@ import { couponError, findCoupon, markCartRecovered } from "./intelligence";
 import { getRegion, isValidCpf, isValidE164, isValidName, tr } from "@/core/region";
 import { parsePaymentConfig } from "@/core/tenant-config";
 import { CURRENCIES, ORDER_TYPES, PAYMENT_METHODS, type Currency, type OrderStatus, type PaymentStatus } from "@/core/types";
+import { asaasCheckoutCredentials } from "@/services/asaas";
 import { getPaymentProvider } from "@/adapters/payments/registry";
 import { getDistanceProvider } from "@/adapters/distance";
 import { getExchangeRateProvider } from "@/adapters/exchange-rates";
@@ -208,6 +209,11 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   if (!option.currencies.includes(input.payCurrency)) throw new OrderError("PAYMENT", T("Moneda no aceptada para este medio", "Moeda não aceita para esta forma de pagamento"));
   const provider = getPaymentProvider(option.provider);
   if (!provider.available || (provider.id === "mock_online" && !tenant.demo)) throw new OrderError("PAYMENT", T("Medio de pago no disponible", "Forma de pagamento indisponível"));
+  // Asaas (subconta do lojista): exige CPF do comprador e a conta de recebimentos criada
+  if (provider.id === "asaas") {
+    if (!tenant.asaasApiKeySealed) throw new OrderError("PAYMENT", T("Medio de pago no disponible", "Forma de pagamento indisponível"));
+    if (!customerDoc) throw new OrderError("DOC", T("Informá tu CPF para pagar online", "Informe seu CPF para pagar online"));
+  }
 
   const rates: Rates = await getExchangeRateProvider().getRates(tenant);
   const exchangeRate = input.payCurrency === base ? 1 : rates[input.payCurrency];
@@ -329,6 +335,17 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   // ---- Inicia pagamento no adapter (fora da transação: pode chamar API externa)
   const returnUrl = `${appUrl()}/${tenant.slug}/pedido/${order.id}`;
   let result;
+  // Asaas: chave da subconta + split que abate a mensalidade (calculado aqui no servidor)
+  let asaasSplit: { splitMinor: number; cycleId: string | null } | null = null;
+  let extraCreds: Record<string, string> = {};
+  if (provider.id === "asaas") {
+    const a = await asaasCheckoutCredentials(tenant, payAmountMinor);
+    extraCreds = a.creds;
+    asaasSplit = a.split;
+    if (asaasSplit.splitMinor > 0) {
+      await db.update(schema.orders).set({ billingCycleId: asaasSplit.cycleId, platformSplitMinor: asaasSplit.splitMinor, splitStatus: "PENDING" }).where(eq(schema.orders.id, order.id));
+    }
+  }
   try {
     result = await provider.createPayment({
     tenantId: tenant.id,
@@ -341,17 +358,20 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
     currency: input.payCurrency,
     customerName: input.customerName,
     customerPhone: input.customerPhone,
+    customerDoc,
     returnUrl,
     webhookUrl: `${appUrl()}/api/payments/${provider.id}/webhook?t=${tenant.slug}`,
     credentials: {
       ...openCredentials(payCfg.credentials[provider.id]),
       ...(payCfg.pixKey ? { pixKey: payCfg.pixKey } : {}),
       ...(payCfg.bankInfo ? { bankInfo: payCfg.bankInfo } : {}),
+      ...extraCreds,
     },
   });
   } catch (e) {
     // gateway fora/mal configurado: cancela o pedido (devolve o estoque) e avisa o cliente
-    console.error("[createPayment]", provider.id, e);
+    console.error("[createPayment]", provider.id, e instanceof Error ? e.message : e);
+    if (asaasSplit?.splitMinor) await db.update(schema.orders).set({ splitStatus: "CANCELLED" }).where(eq(schema.orders.id, order.id));
     await setOrderStatus(tenant.id, order.id, "CANCELLED").catch(() => {});
     throw new OrderError(
       "PAYMENT",
@@ -361,7 +381,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   if (result.providerRef || result.status !== "PENDING") {
     await db
       .update(schema.orders)
-      .set({ paymentRef: result.providerRef ?? null, paymentStatus: result.status })
+      .set({ paymentRef: result.providerRef ?? null, paymentStatus: result.status, ...(result.pixPayload ? { pixPayload: result.pixPayload } : {}) })
       .where(eq(schema.orders.id, order.id));
   }
 

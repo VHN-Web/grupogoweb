@@ -1068,7 +1068,8 @@ function Checkout({
   const change = tenderedBase != null ? tenderedBase - total : null;
   const nameOk = isValidName(name);
   const phoneRequired = type === "DELIVERY";
-  const cpfOk = !cpf || isValidCpf(cpf);
+  const cpfRequired = option?.provider === "asaas"; // pagamento online pelo Asaas exige CPF
+  const cpfOk = cpfRequired ? isValidCpf(cpf) : !cpf || isValidCpf(cpf);
 
   const canSubmit =
     nameOk &&
@@ -1141,7 +1142,7 @@ function Checkout({
         </div>
         {data.country === "BR" && (
           <div>
-            <label className="label" htmlFor="cpf">CPF na nota (opcional)</label>
+            <label className="label" htmlFor="cpf">{cpfRequired ? "CPF (obrigatório para pagar online)" : "CPF na nota (opcional)"}</label>
             <input
               id="cpf"
               className="input"
@@ -1151,9 +1152,10 @@ function Checkout({
               placeholder="000.000.000-00"
               onChange={(e) => setCpf(formatCpf(e.target.value))}
             />
+            {cpfRequired && !cpf && <p className="mt-1 text-[12px] opacity-70">Pix e cartão online pedem o CPF de quem paga.</p>}
             {cpf && !cpfOk && (
               <p className="mt-1 text-[12px] text-red-500">
-                {cpf.replace(/\D/g, "").length < 11 ? "Digite os 11 números do CPF ou deixe em branco" : "CPF inválido — confira os números"}
+                {cpf.replace(/\D/g, "").length < 11 ? (cpfRequired ? "Digite os 11 números do CPF" : "Digite os 11 números do CPF ou deixe em branco") : "CPF inválido — confira os números"}
               </p>
             )}
           </div>

@@ -14,7 +14,7 @@ export type BillingCheckoutInput = {
   description: string;
   currency: Currency;
   amountMinor: number;
-  customer: { name: string; email: string; businessName: string };
+  customer: { name: string; email: string; businessName: string; id?: string; doc?: string | null; phone?: string | null };
   /** Página da fatura (o cliente volta para cá depois de pagar) */
   returnUrl: string;
   /** URL pública do webhook deste provider */

@@ -40,12 +40,19 @@ import { onInvoicePaidDocuments } from "./documents";
 import { appUrl, tenantPublicUrl } from "@/lib/urls";
 import type { Customer, Plan } from "@/db/schema";
 
+import { ensureHybridCycle, hybridInvoiceIds, onHybridInvoicePaid, primeFrom, runHybridBilling } from "@/services/asaas";
+import { parseAsaasConfig } from "@/core/asaas";
+import { AsaasBillingDocError } from "@/adapters/billing/asaas";
+
 export class BillingError extends Error {}
 
 // ---------------------------------------------------------------- settings
 export async function getSettings() {
   const s = await db.query.platformSettings.findFirst();
-  if (s) return s;
+  if (s) {
+    primeFrom(parseAsaasConfig(s.asaasConfig)); // deixa o Asaas pronto para os adapters síncronos
+    return s;
+  }
   const [created] = await db.insert(schema.platformSettings).values({ id: "default" }).onConflictDoNothing().returning();
   return created ?? (await db.query.platformSettings.findFirst())!;
 }
@@ -254,15 +261,21 @@ export async function startCheckout(invoiceId: string, currency: Currency): Prom
 
   await db.update(schema.customers).set({ preferredCurrency: currency }).where(eq(schema.customers.id, inv.customerId));
 
-  const result = await provider.createCheckout({
-    invoiceId: inv.id,
-    description: inv.description,
-    currency,
-    amountMinor: amount,
-    customer: { name: inv.customer.contactName, email: inv.customer.email, businessName: inv.customer.businessName },
-    returnUrl: invoiceUrl(inv.id),
-    notificationUrl: `${appUrl()}/api/billing/webhook/${provider.id}`,
-  });
+  let result;
+  try {
+    result = await provider.createCheckout({
+      invoiceId: inv.id,
+      description: inv.description,
+      currency,
+      amountMinor: amount,
+      customer: { name: inv.customer.contactName, email: inv.customer.email, businessName: inv.customer.businessName, id: inv.customer.id, doc: inv.customer.ruc, phone: inv.customer.whatsapp },
+      returnUrl: invoiceUrl(inv.id),
+      notificationUrl: `${appUrl()}/api/billing/webhook/${provider.id}`,
+    });
+  } catch (e) {
+    if (e instanceof AsaasBillingDocError) throw new BillingError(T(e.message, "Informe o CPF ou CNPJ de quem paga (campo abaixo) e tente de novo."));
+    throw e;
+  }
 
   if (result.kind === "instructions") {
     await db.update(schema.invoices).set({ provider: provider.id }).where(eq(schema.invoices.id, inv.id));
@@ -300,7 +313,10 @@ export async function markInvoicePaid(
   if (!inv) return null;
 
   if (inv.kind === "SETUP") await onSetupPaid(inv.customerId);
-  else await onSubscriptionPaid(inv.customerId);
+  else {
+    await onHybridInvoicePaid(inv.id).catch((e) => console.error("[asaas]", e));
+    await onSubscriptionPaid(inv.customerId);
+  }
 
   // Comissão do afiliado: gerada na hora em que a fatura é paga
   await onInvoicePaidAffiliate(inv).catch((e) => console.error("[afiliados]", e));
@@ -432,6 +448,8 @@ export async function deliverCustomer(customerId: string) {
     .update(schema.customers)
     .set({ status: "ACTIVE", deliveredAt: now, nextBillingAt: now })
     .where(eq(schema.customers.id, c.id));
+  // Billing híbrido (Asaas): o 1º ciclo começa já na entrega, e as vendas passam a abater a mensalidade
+  await ensureHybridCycle(c.id, now).catch((e) => console.error("[asaas]", e));
 
   const site = tenantPublicUrl(c.tenant);
   const T = Tc(c);
@@ -486,7 +504,15 @@ async function createSubscriptionInvoice(c: Customer, plan: Plan, periodStart: D
 // ---------------------------------------------------------------- ciclo automático (cron diário)
 export async function runBillingCycle(now = new Date()) {
   const settings = await getSettings();
-  const out = { invoicesCreated: 0, pastDue: 0, suspended: 0 };
+  const out = { invoicesCreated: 0, pastDue: 0, suspended: 0, hybrid: { opened: 0, closedBySplit: 0, residuals: 0, cardCharged: 0, suspended: 0 } };
+
+  // 0) Billing híbrido (Asaas): ciclos com abatimento por split — esses clientes não entram no ciclo normal
+  const hy = await runHybridBilling(now, { notify: notifyCustomer, invoiceUrl, companyName: settings.companyName }).catch((e) => {
+    console.error("[asaas] ciclo híbrido", e);
+    return null;
+  });
+  const hybridIds = hy?.hybridIds ?? new Set<string>();
+  if (hy) out.hybrid = { opened: hy.opened, closedBySplit: hy.closedBySplit, residuals: hy.residuals, cardCharged: hy.cardCharged, suspended: hy.suspended };
 
   // 1) Gera faturas X dias antes do vencimento
   const billable = await db.query.customers.findMany({
@@ -494,6 +520,7 @@ export async function runBillingCycle(now = new Date()) {
     with: { plan: true },
   });
   for (const c of billable) {
+    if (hybridIds.has(c.id)) continue;
     let next = c.nextBillingAt;
     let guard = 0;
     // nextBillingAt = início do próximo período ainda sem fatura; a fatura vence 30 dias depois do início
@@ -524,7 +551,9 @@ export async function runBillingCycle(now = new Date()) {
     orderBy: asc(schema.invoices.dueAt),
   });
   const oldestByCustomer = new Map<string, (typeof openOverdue)[number]>();
-  for (const i of openOverdue) if (!oldestByCustomer.has(i.customerId)) oldestByCustomer.set(i.customerId, i);
+  // faturas de saldo residual seguem a carência própria do híbrido (runHybridBilling)
+  const residualIds = await hybridInvoiceIds(openOverdue.map((i) => i.id));
+  for (const i of openOverdue) if (!residualIds.has(i.id) && !oldestByCustomer.has(i.customerId)) oldestByCustomer.set(i.customerId, i);
 
   for (const [customerId, inv] of oldestByCustomer) {
     const c = await db.query.customers.findFirst({ where: eq(schema.customers.id, customerId) });

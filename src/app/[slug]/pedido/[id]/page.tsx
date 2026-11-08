@@ -12,6 +12,7 @@ import { getTheme, themeVars } from "@/core/themes";
 import { orderGrowthView } from "@/services/growth";
 import { CopyLink } from "@/components/storefront/CopyLink";
 import { OrderTracker } from "@/components/maps/OrderTracker";
+import { qrSvg } from "@/lib/qr";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,17 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
           </div>
         )}
 
-        {order.paymentStatus === "PENDING" && !cancelled && (
+        {order.paymentStatus === "PENDING" && !cancelled && order.pixPayload && (
+          <div className="th-surface th-line mt-6 rounded-2xl border p-4 text-center text-sm">
+            <p className="font-semibold">{T("Pagá con Pix", "Pague com Pix")}</p>
+            <p className="th-muted mt-1">{T("Escaneá el QR o copiá el código. La confirmación es automática.", "Escaneie o QR Code ou copie o código. A confirmação é automática.")}</p>
+            <div className="keep-light mx-auto mt-3 w-52 rounded-xl bg-white p-2 [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: await qrSvg(order.pixPayload) }} />
+            <div className="mt-3 flex justify-center">
+              <CopyLink text={order.pixPayload} label={T("Copiar código Pix", "Copiar código Pix (copia e cola)")} done={T("¡Copiado!", "Copiado!")} />
+            </div>
+          </div>
+        )}
+        {order.paymentStatus === "PENDING" && !cancelled && !order.pixPayload && (
           <div className="th-surface th-line mt-6 rounded-2xl border p-4 text-sm">
             <p className="font-semibold">{T("Pago pendiente", "Pagamento pendente")} · {LABELS.paymentMethod[order.paymentMethod]}</p>
             <p className="th-muted mt-1">

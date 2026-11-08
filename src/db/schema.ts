@@ -111,6 +111,12 @@ export const tenants = pgTable("tenants", {
   // Segurança
   demo: boolean("demo").notNull().default(false), // loja de demonstração (único caso em que o pagamento simulado é aceito)
   sessionVersion: integer("session_version").notNull().default(1), // trocar a senha derruba as outras sessões
+  // Asaas (Brasil): subconta white-label do lojista para receber as vendas online com split
+  asaasAccountId: text("asaas_account_id"),
+  asaasWalletId: text("asaas_wallet_id"),
+  asaasApiKeySealed: text("asaas_api_key_sealed"), // chave da subconta (selada com lib/secrets; o Asaas mostra uma vez só)
+  asaasInfo: text("asaas_info"), // JSON: dados enviados na criação (sem chave), chave Pix p/ repasse, status cadastral
+  splitPct: doublePrecision("split_pct"), // % de cada venda que abate a mensalidade (null = padrão da plataforma)
   // Crescimento (carteira de clientes, indicação, fidelidade, campanhas…) — JSON validado em core/growth.ts
   growthConfig: text("growth_config").notNull().default("{}"),
   modules: text("modules"), // plano personalizado: JSON ModuleKey[]; null = tudo do plano liberado
@@ -258,6 +264,11 @@ export const orders = pgTable(
     courierId: text("courier_id"), // motoboy que levou o pedido
     pickedUpAt: timestamp("picked_up_at", { withTimezone: true }), // motoboy saiu com o pedido
     deliveredAt: timestamp("delivered_at", { withTimezone: true }), // motoboy confirmou a entrega
+    // Asaas: split que abate a mensalidade (centavos) e ciclo a que pertence
+    billingCycleId: text("billing_cycle_id"),
+    platformSplitMinor: integer("platform_split_minor").notNull().default(0),
+    splitStatus: text("split_status").$type<"PENDING" | "CONFIRMED" | "REFUNDED" | "CANCELLED">(),
+    pixPayload: text("pix_payload"), // Pix copia e cola gerado pelo gateway
     source: text("source"),
     referrerShopperId: text("referrer_shopper_id"),
     growthDone: boolean("growth_done").notNull().default(false), // recompensas já processadas (uma vez só)
@@ -347,6 +358,7 @@ export const platformSettings = pgTable("platform_settings", {
   docsRetentionMonths: integer("docs_retention_months").notNull().default(12),
   affiliateConfig: text("affiliate_config").notNull().default("{}"), // programa de afiliados (core/affiliates.ts)
   crmConfig: text("crm_config").notNull().default("{}"), // CRM: busca de leads, metas, chave Gemini (selada), VAPID
+  asaasConfig: text("asaas_config").notNull().default("{}"), // Asaas: ambiente, chave da conta principal (selada), walletId, token do webhook, split padrão
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -400,6 +412,11 @@ export const customers = pgTable(
     notes: text("notes"),
     affiliateId: text("affiliate_id"), // afiliado que trouxe o cliente (só Brasil)
     affiliateLeadId: text("affiliate_lead_id"),
+    // Asaas: o lojista como cliente da conta principal (implantação + saldo residual) e cartão salvo
+    asaasCustomerId: text("asaas_customer_id"),
+    cardTokenSealed: text("card_token_sealed"),
+    cardLabel: text("card_label"), // "VISA •••• 1234"
+    preferredBilling: text("preferred_billing").$type<"PIX" | "CREDIT_CARD">().notNull().default("PIX"),
     createdAt: createdAt(),
   },
   (t) => [index("customers_status_idx").on(t.status), index("customers_affiliate_idx").on(t.affiliateId)],
@@ -1095,3 +1112,35 @@ export const crmLeadsRelations = relations(crmLeads, ({ many, one }) => ({
   customer: one(customers, { fields: [crmLeads.customerId], references: [customers.id] }),
 }));
 export const crmActivitiesRelations = relations(crmActivities, ({ one }) => ({ lead: one(crmLeads, { fields: [crmActivities.leadId], references: [crmLeads.id] }) }));
+
+// Billing híbrido (Asaas): ciclo de 30 dias em que o split das vendas abate a mensalidade;
+// no fim, cobra só o saldo residual (cartão salvo ou Pix); 7 dias sem pagar = suspensão.
+export const billingCycles = pgTable(
+  "billing_cycles",
+  {
+    id: id(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").references(() => tenants.id, { onDelete: "set null" }),
+    startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+    graceEndAt: timestamp("grace_end_at", { withTimezone: true }).notNull(),
+    targetMinor: integer("target_minor").notNull(), // mensalidade do ciclo em centavos
+    amortizedMinor: integer("amortized_minor").notNull().default(0), // split confirmado nas vendas
+    residualMinor: integer("residual_minor"), // calculado no fechamento
+    invoiceId: text("invoice_id"), // fatura do saldo residual (tabela invoices)
+    residualPaymentId: text("residual_payment_id"), // cobrança no Asaas
+    status: text("status").$type<"ACCUMULATING" | "PAID_BY_SPLIT" | "AWAITING_RESIDUAL" | "PAID_RESIDUAL" | "OVERDUE_SUSPENDED">().notNull().default("ACCUMULATING"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("billing_cycles_customer_idx").on(t.customerId, t.startAt), index("billing_cycles_status_idx").on(t.status)],
+);
+export type BillingCycle = typeof billingCycles.$inferSelect;
+
+// Eventos de webhook do Asaas já processados (idempotência)
+export const asaasEvents = pgTable("asaas_events", {
+  id: text("id").primaryKey(),
+  event: text("event").notNull(),
+  createdAt: createdAt(),
+});

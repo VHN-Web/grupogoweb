@@ -3,13 +3,16 @@ import { useState } from "react";
 
 type Opt = { currency: "PYG" | "USD" | "BRL"; label: string; amount: string; available: boolean; via: string };
 
-export function PayInvoice({ invoiceId, options, defaultCurrency, locale = "es" }: { invoiceId: string; options: Opt[]; defaultCurrency: Opt["currency"]; locale?: "es" | "pt" }) {
+export function PayInvoice({ invoiceId, options, defaultCurrency, locale = "es", needsDoc = false }: { invoiceId: string; options: Opt[]; defaultCurrency: Opt["currency"]; locale?: "es" | "pt"; needsDoc?: boolean }) {
   const T = (es: string, pt: string) => (locale === "pt" ? pt : es);
   const first = options.find((o) => o.available && o.currency === defaultCurrency) ?? options.find((o) => o.available);
   const [cur, setCur] = useState(first?.currency);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState<{ text: string; amount: string } | null>(null);
+  const [doc, setDoc] = useState("");
+  const docDigits = doc.replace(/\D/g, "");
+  const docOk = !needsDoc || docDigits.length === 11 || docDigits.length === 14;
 
   const pay = async () => {
     setBusy(true);
@@ -17,7 +20,7 @@ export function PayInvoice({ invoiceId, options, defaultCurrency, locale = "es" 
     const r = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ invoiceId, currency: cur }),
+      body: JSON.stringify({ invoiceId, currency: cur, doc: needsDoc ? docDigits : undefined }),
     });
     const j = await r.json();
     if (!r.ok) {
@@ -54,6 +57,12 @@ export function PayInvoice({ invoiceId, options, defaultCurrency, locale = "es" 
           <span className="text-lg font-bold">{o.amount}</span>
         </button>
       ))}
+      {needsDoc && (
+        <label className="block text-sm">
+          <span className="label">CPF ou CNPJ de quem paga</span>
+          <input className="input" inputMode="numeric" value={doc} onChange={(e) => setDoc(e.target.value.replace(/[^\d./-]/g, "").slice(0, 18))} placeholder="000.000.000-00" />
+        </label>
+      )}
       {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       {manual ? (
         <div className="card whitespace-pre-line p-4 text-sm">
@@ -62,7 +71,7 @@ export function PayInvoice({ invoiceId, options, defaultCurrency, locale = "es" 
           <p className="mt-2 text-xs text-muted">{T("Confirmamos manualmente y esta página se actualiza sola.", "Confirmamos manualmente e esta página se atualiza sozinha.")}</p>
         </div>
       ) : (
-        <button onClick={pay} disabled={!cur || busy} className="btn-primary w-full py-4 text-[15px]">
+        <button onClick={pay} disabled={!cur || busy || !docOk} className="btn-primary w-full py-4 text-[15px]">
           {busy ? T("Abriendo pago…", "Abrindo pagamento…") : T("Pagar ahora", "Pagar agora")}
         </button>
       )}
