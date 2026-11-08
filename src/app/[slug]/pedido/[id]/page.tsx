@@ -11,6 +11,7 @@ import { PrintButton } from "@/components/PrintButton";
 import { getTheme, themeVars } from "@/core/themes";
 import { orderGrowthView } from "@/services/growth";
 import { CopyLink } from "@/components/storefront/CopyLink";
+import { OrderTracker } from "@/components/maps/OrderTracker";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,23 @@ export default async function OrderPage({ params }: { params: Promise<{ slug: st
               </li>
             ))}
           </ol>
+        )}
+
+        {order.type === "DELIVERY" && order.courierId && !done && (
+          <div className="th-surface th-line mt-6 rounded-2xl border p-3">
+            <p className="mb-2 px-1 text-sm font-semibold">{T("Seguí tu pedido", "Acompanhe seu pedido")}</p>
+            <OrderTracker
+              orderId={order.id}
+              t={{
+                waiting: T("Esperando repartidor.", "Aguardando entregador."),
+                preparing: T("{nome} va a llevar tu pedido. Apenas salga, lo ves en el mapa.", "{nome} vai levar seu pedido. Assim que sair, você acompanha no mapa."),
+                live: T("{nome} está en camino", "{nome} está a caminho"),
+                eta: T("llega en ~{min} min", "chega em ~{min} min"),
+                noGps: T("{nome} está en camino", "{nome} está a caminho"),
+                done: T("¡Pedido entregado!", "Pedido entregue!"),
+              }}
+            />
+          </div>
         )}
 
         {order.paymentStatus === "PENDING" && !cancelled && (

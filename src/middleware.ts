@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // Pré-requisito de infraestrutura (🧑): apontar o DNS e adicionar o domínio no provedor
 // de hospedagem (ex.: Vercel > Domains, ou via API da Vercel para automatizar).
 
-const PASS = /^\/(_next|api|pay|fatura|contrato|recibo|contratar|painel|admin|uploads|icon\.svg|favicon\.ico|robots\.txt|sitemap\.xml|vitrine|shopping|planos|a|afiliados|crm|crm-sw\.js)(\/|$)/;
+const PASS = /^\/(_next|api|pay|fatura|contrato|recibo|contratar|painel|admin|uploads|icon\.svg|favicon\.ico|robots\.txt|sitemap\.xml|vitrine|shopping|planos|a|afiliados|crm|crm-sw\.js|entregador|entregador-sw\.js)(\/|$)/;
 const cache = new Map<string, { slug: string | null; at: number }>();
 const TTL = 60_000;
 

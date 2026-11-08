@@ -1,8 +1,8 @@
 import "server-only";
-// Notificações (Web Push) do app CRM dos sócios. As chaves VAPID são criadas sozinhas no 1º uso
+// Notificações (Web Push) do app CRM dos sócios e do app do entregador. As chaves VAPID são criadas sozinhas no 1º uso
 // e ficam em platform_settings.crmConfig (a privada criptografada com lib/secrets).
 import webpush from "web-push";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, notLike } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { parseCrmConfig } from "@/core/crm";
 import { openSecret, sealSecret } from "@/lib/secrets";
@@ -39,16 +39,17 @@ export async function removePushSub(endpoint: string) {
   await db.delete(schema.crmPushSubs).where(eq(schema.crmPushSubs.endpoint, endpoint));
 }
 
-export type PushPayload = { title: string; body: string; url?: string; tag?: string };
+export type PushPayload = { title: string; body: string; url?: string; tag?: string; icon?: string };
 
 /** Envia para alguns sócios (ids) ou para todos ("all"). Nunca lança erro. */
 export async function sendPush(to: string[] | "all", p: PushPayload) {
   try {
-    const subs = to === "all" ? await db.query.crmPushSubs.findMany() : to.length ? await db.query.crmPushSubs.findMany({ where: inArray(schema.crmPushSubs.actorId, to) }) : [];
+    // "all" = todos os sócios do CRM (aparelhos de entregadores usam actorId "courier:<id>")
+    const subs = to === "all" ? await db.query.crmPushSubs.findMany({ where: notLike(schema.crmPushSubs.actorId, "courier:%") }) : to.length ? await db.query.crmPushSubs.findMany({ where: inArray(schema.crmPushSubs.actorId, to) }) : [];
     if (!subs.length) return 0;
     const k = await vapidKeys();
     webpush.setVapidDetails("mailto:suporte@goweboficial.com", k.pub, k.priv);
-    const payload = JSON.stringify({ title: p.title, body: p.body, url: p.url ?? "/crm", tag: p.tag });
+    const payload = JSON.stringify({ title: p.title, body: p.body, url: p.url ?? "/crm", tag: p.tag, icon: p.icon });
     let ok = 0;
     await Promise.all(
       subs.map(async (s) => {

@@ -10,6 +10,7 @@ import { getRegion, isValidE164, isValidName, tr } from "@/core/region";
 import { parseMajorToMinor } from "@/core/money";
 import { hasModule } from "@/core/modules";
 import type { Currency } from "@/core/types";
+import { courierAccessLink, notifyCourier } from "@/services/courier-app";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const page = (slug: string) => `/painel/${slug}/motoboys`;
@@ -68,6 +69,22 @@ export async function assignCourier(slug: string, orderId: string, f: FormData) 
   }
   await db.update(schema.orders).set({ courierId }).where(and(eq(schema.orders.id, orderId), eq(schema.orders.tenantId, t.id)));
   await audit(t.id, await actorName(slug), "order.courier", `#${o!.number}`);
+  if (courierId && courierId !== o!.courierId) {
+    const T = tr(getRegion(t.country).locale);
+    await notifyCourier(courierId, T(`Nueva entrega #${o!.number}`, `Nova entrega #${o!.number}`), `${t.name}${o!.address ? ` · ${o!.address}` : ""}`);
+  }
   revalidatePath(path);
   redirect(path);
+}
+
+/** Cria (ou renova) o link de acesso do motoboy ao app /entregador e abre o WhatsApp com ele. */
+export async function courierAccessAction(slug: string, id: string, renew: boolean) {
+  const t = await requireTenantAdmin(slug, "couriers");
+  const T = tr(getRegion(t.country).locale);
+  const c = await db.query.couriers.findFirst({ where: and(eq(schema.couriers.id, id), eq(schema.couriers.tenantId, t.id)) });
+  if (!c) back(page(slug), "err", "—");
+  await courierAccessLink(c!, renew);
+  await audit(t.id, await actorName(slug), renew ? "courier.access.renew" : "courier.access", c!.name);
+  revalidatePath(page(slug));
+  back(page(slug), "ok", renew ? T("Enlace nuevo creado: el anterior dejó de funcionar. Envialo por WhatsApp.", "Novo link criado: o anterior parou de funcionar. Envie pelo WhatsApp.") : T("Acceso creado. Envialo por WhatsApp.", "Acesso criado. Envie pelo WhatsApp."));
 }

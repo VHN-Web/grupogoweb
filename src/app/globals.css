@@ -380,3 +380,10 @@ html.a11y-motion .aff-confetti { display: none; }
 @keyframes gwSkel { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .page-in, .skel { animation: none; } }
 html.a11y-motion .page-in, html.a11y-motion .skel { animation: none; }
+
+/* Mapa ao vivo (components/maps/LiveMap) */
+.gw-mk { background: none; border: 0; }
+@keyframes gw-pulse { 0% { transform: scale(.8); opacity: .45 } 100% { transform: scale(1.9); opacity: 0 } }
+.gw-pulse { animation: gw-pulse 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .gw-pulse { animation: none; } }
+.leaflet-container { font: inherit; }

@@ -1,0 +1,223 @@
+import "server-only";
+// App do entregador (/entregador): acesso por link, online/offline, GPS ao vivo, entregas e ganhos.
+// O consumidor e a loja acompanham a posição pelo mapa (polling de /api/rastreio e /api/painel/[slug]/frota).
+import { createHash, randomBytes } from "node:crypto";
+import { and, desc, eq, gte, inArray, isNull, ne } from "drizzle-orm";
+import { db, schema } from "@/db";
+import type { Courier, Tenant } from "@/db/schema";
+import { cleanPing, courierEarning, distanceKm, etaMinutes, isLive, periodStarts } from "@/core/couriers";
+import { appUrl } from "@/lib/urls";
+import { openSecret, sealSecret } from "@/lib/secrets";
+import { getRegion } from "@/core/region";
+import { setOrderStatus, setPaymentStatus } from "@/services/orders";
+import { sendPush } from "@/services/push";
+
+export const courierActor = (id: string) => `courier:${id}`;
+const hash = (token: string) => createHash("sha256").update(token).digest("hex");
+
+/** Link de acesso do entregador (cria na 1ª vez; `renew` invalida o anterior). */
+export async function courierAccessLink(c: Courier, renew = false) {
+  let token = !renew && c.accessSealed ? openSecret(c.accessSealed) : "";
+  if (!token) {
+    token = randomBytes(24).toString("base64url");
+    await db.update(schema.couriers).set({ accessHash: hash(token), accessSealed: sealSecret(token) }).where(eq(schema.couriers.id, c.id));
+    if (renew) await db.delete(schema.crmPushSubs).where(eq(schema.crmPushSubs.actorId, courierActor(c.id)));
+  }
+  return `${appUrl()}/entregador/acesso/${token}`;
+}
+
+/** Entregador dono do token (ativo), com a loja. */
+export async function courierByToken(token: string | undefined | null) {
+  if (!token || !/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
+  const c = await db.query.couriers.findFirst({ where: eq(schema.couriers.accessHash, hash(token)) });
+  if (!c || !c.active) return null;
+  const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.id, c.tenantId) });
+  if (!tenant) return null;
+  return { courier: c, tenant };
+}
+
+export async function setCourierOnline(c: Courier, online: boolean) {
+  await db
+    .update(schema.couriers)
+    .set(online ? { online: true, onlineSince: c.online && c.onlineSince ? c.onlineSince : new Date() } : { online: false, onlineSince: null })
+    .where(eq(schema.couriers.id, c.id));
+}
+
+/** Ponto do GPS do celular do entregador. Devolve se ainda deve continuar enviando. */
+export async function recordPing(c: Courier, body: unknown) {
+  const p = cleanPing(body);
+  if (!p) return { ok: false as const };
+  // ponto com precisão muito ruim (>1,5 km) não substitui um bom recente
+  if (p.accuracy != null && p.accuracy > 1500 && isLive(c.lastSeenAt)) return { ok: true as const, online: c.online };
+  await db
+    .update(schema.couriers)
+    .set({ lastLat: p.lat, lastLng: p.lng, lastAccuracy: p.accuracy, lastHeading: p.heading, lastSpeed: p.speed, lastSeenAt: new Date() })
+    .where(eq(schema.couriers.id, c.id));
+  return { ok: true as const, online: c.online };
+}
+
+const ACTIVE = ["RECEIVED", "PREPARING", "READY", "OUT_FOR_DELIVERY"] as const;
+
+/** Entregas atribuídas ao entregador ainda em andamento. */
+export function myActiveDeliveries(c: Courier) {
+  return db.query.orders.findMany({
+    where: and(eq(schema.orders.tenantId, c.tenantId), eq(schema.orders.courierId, c.id), eq(schema.orders.type, "DELIVERY"), inArray(schema.orders.status, [...ACTIVE])),
+    with: { items: true },
+    orderBy: [schema.orders.createdAt],
+  });
+}
+
+/** Deliveries da loja sem entregador (em preparo ou prontos) — o entregador online pode pegar. */
+export function openDeliveries(c: Courier) {
+  return db.query.orders.findMany({
+    where: and(eq(schema.orders.tenantId, c.tenantId), isNull(schema.orders.courierId), eq(schema.orders.type, "DELIVERY"), inArray(schema.orders.status, ["PREPARING", "READY"])),
+    columns: { id: true, number: true, address: true, lat: true, lng: true, distanceKm: true, deliveryFeePyg: true, status: true, createdAt: true },
+    orderBy: [schema.orders.createdAt],
+    limit: 20,
+  });
+}
+
+export class CourierError extends Error {}
+
+async function myOrder(c: Courier, orderId: string) {
+  const o = await db.query.orders.findFirst({ where: and(eq(schema.orders.id, orderId), eq(schema.orders.tenantId, c.tenantId)) });
+  if (!o || o.type !== "DELIVERY") throw new CourierError("Pedido não encontrado");
+  return o;
+}
+
+/** Pega uma entrega livre (só online; quem clicar primeiro leva). */
+export async function claimDelivery(c: Courier, orderId: string) {
+  if (!c.online) throw new CourierError("Fique online para pegar entregas");
+  const [o] = await db
+    .update(schema.orders)
+    .set({ courierId: c.id, updatedAt: new Date() })
+    .where(and(eq(schema.orders.id, orderId), eq(schema.orders.tenantId, c.tenantId), isNull(schema.orders.courierId), eq(schema.orders.type, "DELIVERY"), inArray(schema.orders.status, ["PREPARING", "READY"])))
+    .returning({ id: schema.orders.id });
+  if (!o) throw new CourierError("Outro entregador já pegou essa entrega");
+}
+
+/** Saiu com o pedido: status "saiu para entrega" — o cliente passa a ver o mapa. */
+export async function pickUpDelivery(c: Courier, orderId: string) {
+  const o = await myOrder(c, orderId);
+  if (o.courierId !== c.id) throw new CourierError("Essa entrega não é sua");
+  if (o.status === "CANCELLED" || o.status === "COMPLETED") throw new CourierError("Pedido já encerrado");
+  if (o.status !== "OUT_FOR_DELIVERY") await setOrderStatus(c.tenantId, o.id, "OUT_FOR_DELIVERY");
+  await db.update(schema.orders).set({ pickedUpAt: o.pickedUpAt ?? new Date() }).where(eq(schema.orders.id, o.id));
+  if (!c.online) await setCourierOnline(c, true);
+}
+
+/** Entregue: conclui o pedido (e marca pago, se ele recebeu na entrega). */
+export async function completeDelivery(c: Courier, orderId: string, collected: boolean) {
+  const o = await myOrder(c, orderId);
+  if (o.courierId !== c.id) throw new CourierError("Essa entrega não é sua");
+  if (o.status === "CANCELLED") throw new CourierError("Pedido cancelado pela loja");
+  if (collected && o.paymentStatus !== "PAID") await setPaymentStatus(c.tenantId, o.id, "PAID", `entregador:${c.name}`.slice(0, 60));
+  if (o.status !== "COMPLETED") await setOrderStatus(c.tenantId, o.id, "COMPLETED");
+  await db.update(schema.orders).set({ deliveredAt: new Date(), pickedUpAt: o.pickedUpAt ?? new Date() }).where(eq(schema.orders.id, o.id));
+}
+
+/** Diferença do fuso da loja para UTC, em minutos (ex.: -180). */
+function tzOffsetMin(timeZone: string, at = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(at);
+  const g = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const asUtc = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute"));
+  return Math.round((asUtc - at.getTime()) / 60_000);
+}
+
+/** Ganhos e histórico: hoje, semana, mês + últimas entregas. */
+export async function courierEarnings(c: Courier, tenant: Tenant) {
+  const tz = getRegion(tenant.country).timeZone;
+  const p = periodStarts(new Date(), tzOffsetMin(tz));
+  const done = await db.query.orders.findMany({
+    where: and(eq(schema.orders.tenantId, c.tenantId), eq(schema.orders.courierId, c.id), eq(schema.orders.status, "COMPLETED"), gte(schema.orders.createdAt, new Date(Math.min(p.month.getTime(), p.week.getTime())))),
+    columns: { id: true, number: true, deliveryFeePyg: true, address: true, createdAt: true, deliveredAt: true, distanceKm: true },
+    orderBy: desc(schema.orders.createdAt),
+  });
+  const at = (o: (typeof done)[number]) => (o.deliveredAt ?? o.createdAt).getTime();
+  const sum = (from: Date) => {
+    const list = done.filter((o) => at(o) >= from.getTime());
+    return { count: list.length, total: list.reduce((a, o) => a + courierEarning(o.deliveryFeePyg, c.feePerDelivery), 0), km: Math.round(list.reduce((a, o) => a + (o.distanceKm ?? 0), 0) * 10) / 10 };
+  };
+  return {
+    today: sum(p.day),
+    week: sum(p.week),
+    month: sum(p.month),
+    recent: done.slice(0, 30).map((o) => ({ ...o, earning: courierEarning(o.deliveryFeePyg, c.feePerDelivery) })),
+  };
+}
+
+/** Avisa o entregador no celular (app instalado com notificações). */
+export function notifyCourier(courierId: string, title: string, body: string) {
+  return sendPush([courierActor(courierId)], { title, body, url: "/entregador", tag: `entrega-${courierId}`, icon: "/entregador/icon-192.png" });
+}
+
+/** Avisa todos os entregadores online da loja que há entrega livre. */
+export async function notifyOnlineCouriers(tenantId: string, title: string, body: string) {
+  const list = await db.query.couriers.findMany({ where: and(eq(schema.couriers.tenantId, tenantId), eq(schema.couriers.online, true), eq(schema.couriers.active, true)), columns: { id: true } });
+  if (list.length) await sendPush(list.map((c) => courierActor(c.id)), { title, body, url: "/entregador", tag: `livres-${tenantId}`, icon: "/entregador/icon-192.png" });
+}
+
+// ---------------- mapas (consumidor e loja) ----------------
+
+type Pt = { lat: number; lng: number };
+const pt = (lat: number | null, lng: number | null): Pt | null => (lat != null && lng != null ? { lat, lng } : null);
+
+/** O que o consumidor vê no mapa do pedido (sem telefone/dados do entregador além do 1º nome). */
+export async function trackOrder(orderId: string) {
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(orderId)) return null;
+  const o = await db.query.orders.findFirst({
+    where: eq(schema.orders.id, orderId),
+    columns: { id: true, tenantId: true, type: true, status: true, courierId: true, lat: true, lng: true, pickedUpAt: true },
+  });
+  if (!o || o.type !== "DELIVERY") return null;
+  const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.id, o.tenantId), columns: { lat: true, lng: true, name: true } });
+  const c = o.courierId ? await db.query.couriers.findFirst({ where: eq(schema.couriers.id, o.courierId) }) : null;
+  const dest = pt(o.lat, o.lng);
+  const onTheWay = o.status === "OUT_FOR_DELIVERY";
+  const live = !!c && onTheWay && isLive(c.lastSeenAt);
+  const courier = live && c ? pt(c.lastLat, c.lastLng) : null;
+  const km = courier && dest ? distanceKm(courier, dest) : null;
+  return {
+    status: o.status,
+    store: t ? pt(t.lat, t.lng) : null,
+    storeName: t?.name ?? "",
+    dest,
+    courier: courier && c ? { ...courier, heading: c.lastHeading, name: c.name.split(" ")[0], seenAt: c.lastSeenAt?.toISOString() ?? null } : null,
+    courierName: c ? c.name.split(" ")[0] : null,
+    km: km != null ? Math.round(km * 10) / 10 : null,
+    eta: km != null ? etaMinutes(km, c?.lastSpeed) : null,
+    done: o.status === "COMPLETED" || o.status === "CANCELLED",
+  };
+}
+
+/** Frota ao vivo para o painel da loja: entregadores e entregas em andamento. */
+export async function fleet(tenantId: string) {
+  const [list, orders, t] = await Promise.all([
+    db.query.couriers.findMany({ where: and(eq(schema.couriers.tenantId, tenantId), eq(schema.couriers.active, true)) }),
+    db.query.orders.findMany({
+      where: and(eq(schema.orders.tenantId, tenantId), eq(schema.orders.type, "DELIVERY"), inArray(schema.orders.status, [...ACTIVE]), ne(schema.orders.status, "RECEIVED")),
+      columns: { id: true, number: true, status: true, courierId: true, lat: true, lng: true, address: true, customerName: true },
+      orderBy: [schema.orders.createdAt],
+      limit: 60,
+    }),
+    db.query.tenants.findFirst({ where: eq(schema.tenants.id, tenantId), columns: { lat: true, lng: true } }),
+  ]);
+  return {
+    store: t ? pt(t.lat, t.lng) : null,
+    couriers: list.map((c) => {
+      const live = isLive(c.lastSeenAt);
+      const mine = orders.filter((o) => o.courierId === c.id);
+      return {
+        id: c.id,
+        name: c.name,
+        online: c.online,
+        live,
+        pos: live ? pt(c.lastLat, c.lastLng) : null,
+        heading: c.lastHeading,
+        seenAt: c.lastSeenAt?.toISOString() ?? null,
+        deliveries: mine.map((o) => o.number),
+      };
+    }),
+    orders: orders.map((o) => ({ id: o.id, number: o.number, status: o.status, courierId: o.courierId, dest: pt(o.lat, o.lng), address: o.address, customer: o.customerName.split(" ")[0] })),
+  };
+}

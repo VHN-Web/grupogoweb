@@ -8,7 +8,10 @@ import { PhoneInput } from "@/components/forms/PhoneInput";
 import { NameInput } from "@/components/forms/NameInput";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import type { Currency } from "@/core/types";
-import { deleteCourier, saveCourier } from "../courier-actions";
+import { courierAccessAction, deleteCourier, saveCourier } from "../courier-actions";
+import { courierAccessLink } from "@/services/courier-app";
+import { isLive } from "@/core/couriers";
+import { FleetMap } from "@/components/maps/FleetMap";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +27,7 @@ export default async function MotoboysPage({ params, searchParams }: { params: P
   since.setDate(since.getDate() - (days - 1));
   const rows = await courierReport(t.id, since);
   const total = rows.reduce((a, r) => a + r.payout, 0);
+  const links = new Map(await Promise.all(rows.filter((r) => r.courier.accessSealed).map(async (r) => [r.courier.id, await courierAccessLink(r.courier)] as const)));
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -34,6 +38,28 @@ export default async function MotoboysPage({ params, searchParams }: { params: P
       {!t.acceptsDelivery && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">{T("El delivery está apagado en Configuración.", "O delivery está desligado em Configurações.")} <Link className="font-semibold underline" href={`/painel/${slug}/config`}>{T("Activar", "Ativar")}</Link></p>}
       {sp.ok && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{sp.ok}</p>}
       {sp.err && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{sp.err}</p>}
+
+      <section className="card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">{T("Mapa en vivo", "Mapa ao vivo")}</h2>
+          <span className="text-xs text-muted">{T("Se actualiza solo · ubicación enviada por la app del repartidor", "Atualiza sozinho · localização enviada pelo app do motoboy")}</span>
+        </div>
+        <div className="mt-3">
+          <FleetMap
+            slug={slug}
+            t={{
+              online: "online",
+              offline: "offline",
+              noGps: T("online sin GPS", "online sem GPS"),
+              free: T("libre", "livre"),
+              carrying: T("llevando {n}", "levando {n}"),
+              none: T("Registrá repartidores y enviales el acceso a la app.", "Cadastre motoboys e envie o acesso ao app."),
+              waiting: T("Sin repartidor: {n}", "Sem motoboy: {n}"),
+            }}
+          />
+        </div>
+        <p className="mt-3 text-xs text-muted">{T("Cada repartidor instala la app desde el navegador (sin tienda de apps) con el enlace de acceso. Él se pone online, recibe y toma entregas, marca “salí” y “entregado”, y el cliente lo sigue en el mapa del pedido.", "Cada motoboy instala o app pelo navegador (sem loja de apps) com o link de acesso. Ele fica online, recebe e pega entregas, marca “saí” e “entreguei”, e o cliente acompanha no mapa do pedido.")}</p>
+      </section>
 
       <section className="card p-5">
         <h2 className="font-semibold">{T("Nuevo repartidor", "Novo motoboy")}</h2>
@@ -65,6 +91,7 @@ export default async function MotoboysPage({ params, searchParams }: { params: P
               <summary className="flex cursor-pointer flex-wrap items-center gap-3">
                 <span className="min-w-40 flex-1">
                   <b>{c.name}</b> {!c.active && <span className="rounded-full bg-black/10 px-2 py-0.5 text-xs">{T("inactivo", "inativo")}</span>}
+                  {c.active && c.accessSealed && (c.online ? <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">online{!isLive(c.lastSeenAt) && ` · ${T("sin GPS", "sem GPS")}`}</span> : <span className="ml-1 rounded-full bg-black/5 px-2 py-0.5 text-xs text-muted">offline</span>)}
                   <br />
                   <span className="text-xs text-muted">{formatPhone(c.phone)}{c.vehicle && ` · ${c.vehicle}`}{c.feePerDelivery > 0 && ` · ${fm(c.feePerDelivery)}/${T("entrega", "entrega")}`}</span>
                 </span>
@@ -74,6 +101,18 @@ export default async function MotoboysPage({ params, searchParams }: { params: P
                 <div className="flex flex-wrap gap-2">
                   <a target="_blank" rel="noopener noreferrer" className="btn-brand rounded-lg px-3 py-1.5 text-xs font-semibold" href={waLink(c.phone, T(`Hola ${c.name.split(" ")[0]}! Resumen de ${t.name}: ${count} entregas en el período, total ${fm(payout)}.`, `Oi ${c.name.split(" ")[0]}! Resumo da ${t.name}: ${count} entregas no período, total ${fm(payout)}.`))}>{T("Enviar resumen", "Enviar resumo")}</a>
                   {c.pixKey && <span className="rounded-lg bg-white px-3 py-1.5 text-xs">Pix: <b>{c.pixKey}</b></span>}
+                </div>
+                <div className="rounded-xl border border-line bg-white p-3 keep-light">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted">{T("App del repartidor", "App do motoboy")}</p>
+                  {links.get(c.id) ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <a target="_blank" rel="noopener noreferrer" className="btn-brand rounded-lg px-3 py-1.5 text-xs font-semibold" href={waLink(c.phone, T(`Hola ${c.name.split(" ")[0]}! Este es tu acceso a la app de entregas de ${t.name}. Abrilo en el celular, instalalo (Agregar a pantalla de inicio) y ponete online: ${links.get(c.id)}`, `Oi ${c.name.split(" ")[0]}! Este é seu acesso ao app de entregas da ${t.name}. Abra no celular, instale (Adicionar à tela inicial) e fique online: ${links.get(c.id)}`))}>{T("Enviar acceso por WhatsApp", "Enviar acesso pelo WhatsApp")}</a>
+                      <form action={courierAccessAction.bind(null, slug, c.id, true)}><button className="btn-ghost rounded-lg px-3 py-1.5 text-xs">{T("Generar enlace nuevo", "Gerar novo link")}</button></form>
+                      <span className="w-full text-xs text-muted">{c.lastSeenAt ? `${T("Última ubicación", "Última localização")}: ${fmtDate(c.lastSeenAt)}` : T("Todavía no abrió la app.", "Ainda não abriu o app.")} · {T("Enlace nuevo = el celular anterior queda desconectado.", "Novo link = o celular anterior é desconectado.")}</span>
+                    </div>
+                  ) : (
+                    <form action={courierAccessAction.bind(null, slug, c.id, false)} className="mt-2"><button className="btn-brand rounded-lg px-3 py-1.5 text-xs font-semibold">{T("Crear acceso a la app", "Criar acesso ao app")}</button></form>
+                  )}
                 </div>
                 {orders.length > 0 && (
                   <p className="text-xs text-muted">{orders.slice(0, 40).map((o) => `#${o.number} (${fmtDate(o.createdAt, { dateStyle: "short" })})`).join(" · ")}</p>

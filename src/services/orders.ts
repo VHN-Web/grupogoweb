@@ -404,6 +404,12 @@ export async function setOrderStatus(tenantId: string, orderId: string, status: 
     }
     await tx.update(schema.orders).set({ status, updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
   });
+  // App do entregador: avisa sobre entrega livre (pronta, sem motoboy) ou cancelada
+  if (order.type === "DELIVERY" && order.status !== status) {
+    const ca = await import("@/services/courier-app");
+    if (status === "READY" && !order.courierId) await ca.notifyOnlineCouriers(tenantId, `Pedido #${order.number}`, "Entrega disponível · Entrega disponible").catch(() => null);
+    if (status === "CANCELLED" && order.courierId) await ca.notifyCourier(order.courierId, `#${order.number} cancelado`, "A loja cancelou este pedido · La tienda canceló este pedido").catch(() => null);
+  }
   // recompensas (fidelidade, indicação, avaliação) só quando o pedido é concluído
   if (status === "COMPLETED") await onOrderCompleted(tenantId, orderId).catch((e) => console.error("[growth]", e));
 }

@@ -27,7 +27,7 @@ export class UploadError extends Error {
 
 export const blobConfigured = () => !!(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 
-/** Salva a imagem e devolve a URL pública. `folder` = ex. "tenants/{id}/products". */
+/** Salva a imagem e devolve a URL (absoluta do Blob público ou /uploads/... servida por nós). `folder` = ex. "tenants/{id}/products". */
 export async function saveImage(file: File, folder: string): Promise<string> {
   if (!file || file.size === 0) throw new UploadError("Arquivo vazio", "Archivo vacío");
   if (file.size > MAX_BYTES) throw new UploadError("Imagem maior que 4 MB", "Imagen mayor a 4 MB");
@@ -44,8 +44,17 @@ export async function saveImage(file: File, folder: string): Promise<string> {
   try {
     if (blobConfigured()) {
       const { put } = await import("@vercel/blob");
-      const blob = await put(name, bytes, { access: "public", contentType, cacheControlMaxAge: 60 * 60 * 24 * 365 });
-      return blob.url;
+      const opts = { contentType, cacheControlMaxAge: 60 * 60 * 24 * 365 };
+      // A loja Blob da produção é PRIVADA: grava privado e serve pelo nosso /uploads/... (rota faz o get).
+      // Se a loja for pública, a Vercel recusa "private" -> grava público e usa a URL direta.
+      try {
+        await put(name, bytes, { ...opts, access: "private" });
+        return `/uploads/${name}`;
+      } catch (e) {
+        if (!/public/i.test(String((e as Error)?.message))) throw e;
+        const blob = await put(name, bytes, { ...opts, access: "public" });
+        return blob.url;
+      }
     }
     // Na Vercel o disco é somente leitura: sem Blob configurado, avisa em vez de "funcionar" e sumir
     if (process.env.VERCEL) throw new UploadError("Armazenamento de imagens não configurado. Avise o suporte GoWeb.", "Almacenamiento de imágenes no configurado. Avisá al soporte GoWeb.");

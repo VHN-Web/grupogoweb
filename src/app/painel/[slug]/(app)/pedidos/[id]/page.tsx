@@ -14,6 +14,7 @@ import { getOrderWithItems } from "@/services/orders";
 import { issueInvoiceForOrder, markOrderPaid, updateOrderStatus } from "../../actions";
 import { nextLabel, nextStatus } from "../../order-flow";
 import { assignCourier } from "../../courier-actions";
+import { OrderTracker } from "@/components/maps/OrderTracker";
 import { deliveryMessage, listCouriers } from "@/services/couriers";
 import { hasModule } from "@/core/modules";
 import { waLink } from "@/core/intelligence";
@@ -64,7 +65,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
                 <form action={assignCourier.bind(null, slug, o.id)} className="mt-2 flex flex-wrap gap-2">
                   <select name="courierId" defaultValue={o.courierId ?? ""} className="input w-auto min-w-48">
                     <option value="">{T("— sin repartidor —", "— sem motoboy —")}</option>
-                    {couriers.filter((c) => c.active || c.id === o.courierId).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {couriers.filter((c) => c.active || c.id === o.courierId).sort((a, b) => Number(b.online) - Number(a.online)).map((c) => <option key={c.id} value={c.id}>{c.name}{c.online ? " · online" : ""}</option>)}
                   </select>
                   <button className="btn-ghost">{T("Asignar", "Atribuir")}</button>
                 </form>
@@ -72,6 +73,20 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
                   <a target="_blank" rel="noopener noreferrer" href={waLink(courier.phone, deliveryMessage(t, o))} className="btn-brand mt-3 inline-block">
                     {T(`Enviar ruta a ${courier.name.split(" ")[0]} por WhatsApp`, `Enviar rota para ${courier.name.split(" ")[0]} no WhatsApp`)}
                   </a>
+                )}
+                {courier && open && (
+                  <OrderTracker
+                    className="mt-4"
+                    orderId={o.id}
+                    t={{
+                      waiting: T("Esperando repartidor.", "Aguardando motoboy."),
+                      preparing: T("{nome} va a retirar el pedido.", "{nome} vai retirar o pedido."),
+                      live: T("{nome} en camino", "{nome} a caminho"),
+                      eta: T("~{min} min ({km} km)", "~{min} min ({km} km)"),
+                      noGps: T("{nome} en camino · sin ubicación reciente (app cerrada)", "{nome} a caminho · sem localização recente (app fechado)"),
+                      done: T("Entrega concluida.", "Entrega concluída."),
+                    }}
+                  />
                 )}
               </>
             )}

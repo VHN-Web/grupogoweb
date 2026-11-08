@@ -256,6 +256,8 @@ export const orders = pgTable(
     // Crescimento: cliente da loja, de onde veio e quem indicou
     shopperId: text("shopper_id"),
     courierId: text("courier_id"), // motoboy que levou o pedido
+    pickedUpAt: timestamp("picked_up_at", { withTimezone: true }), // motoboy saiu com o pedido
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }), // motoboy confirmou a entrega
     source: text("source"),
     referrerShopperId: text("referrer_shopper_id"),
     growthDone: boolean("growth_done").notNull().default(false), // recompensas já processadas (uma vez só)
@@ -740,9 +742,20 @@ export const couriers = pgTable(
     pixKey: text("pix_key"), // para o lojista pagar as entregas
     feePerDelivery: integer("fee_per_delivery").notNull().default(0), // valor combinado por entrega (unidade menor da moeda base)
     active: boolean("active").notNull().default(true),
+    // App do entregador (/entregador): link de acesso (hash p/ busca + selado p/ reenviar), online e última posição
+    accessHash: text("access_hash"),
+    accessSealed: text("access_sealed"),
+    online: boolean("online").notNull().default(false),
+    onlineSince: timestamp("online_since", { withTimezone: true }),
+    lastLat: doublePrecision("last_lat"),
+    lastLng: doublePrecision("last_lng"),
+    lastAccuracy: doublePrecision("last_accuracy"),
+    lastHeading: doublePrecision("last_heading"),
+    lastSpeed: doublePrecision("last_speed"), // m/s
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("couriers_tenant_phone_uq").on(t.tenantId, t.phone)],
+  (t) => [uniqueIndex("couriers_tenant_phone_uq").on(t.tenantId, t.phone), uniqueIndex("couriers_access_uq").on(t.accessHash)],
 );
 
 // Chamados de suporte do lojista para a GoWeb (protocolo + SLA)

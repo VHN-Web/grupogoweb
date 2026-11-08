@@ -23,3 +23,36 @@ describe("motoboys", () => {
     expect(courierPayout([{ deliveryFee: 500 }, { deliveryFee: 700 }], 800)).toEqual({ count: 2, fees: 1200, payout: 1600 });
   });
 });
+
+import { cleanPing, courierEarning, distanceKm, etaMinutes, isLive, periodStarts } from "./couriers";
+
+describe("rastreamento do entregador", () => {
+  it("distância e tempo estimado", () => {
+    const km = distanceKm({ lat: -8.05, lng: -34.9 }, { lat: -8.06, lng: -34.9 });
+    expect(km).toBeGreaterThan(1.0);
+    expect(km).toBeLessThan(1.2);
+    expect(etaMinutes(km)).toBe(4);
+    expect(etaMinutes(0.01)).toBe(1);
+  });
+  it("valida o ponto do GPS", () => {
+    expect(cleanPing({ lat: 0, lng: 0 })).toBeNull();
+    expect(cleanPing({ lat: 91, lng: 1 })).toBeNull();
+    expect(cleanPing({ lat: "x", lng: 1 })).toBeNull();
+    expect(cleanPing({ lat: -8.1234567, lng: -34.9, speed: 5, heading: 400 })).toEqual({ lat: -8.123457, lng: -34.9, accuracy: null, heading: null, speed: 5 });
+  });
+  it("ao vivo só com posição recente", () => {
+    const now = Date.now();
+    expect(isLive(new Date(now - 60_000), now)).toBe(true);
+    expect(isLive(new Date(now - 10 * 60_000), now)).toBe(false);
+    expect(isLive(null, now)).toBe(false);
+  });
+  it("ganho por entrega e períodos no fuso local", () => {
+    expect(courierEarning(800, 0)).toBe(800);
+    expect(courierEarning(800, 600)).toBe(600);
+    // quarta 2026-11-04 01:00 UTC = terça 22:00 em BRT
+    const p = periodStarts(new Date("2026-11-04T01:00:00Z"), -180);
+    expect(p.day.toISOString()).toBe("2026-11-03T03:00:00.000Z");
+    expect(p.week.toISOString()).toBe("2026-11-02T03:00:00.000Z");
+    expect(p.month.toISOString()).toBe("2026-11-01T03:00:00.000Z");
+  });
+});
