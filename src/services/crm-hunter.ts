@@ -70,9 +70,10 @@ function extractJsonArray(text: string): Found[] {
   }
 }
 
-function prompt(city: string, category: string, n: number, skip: string[]) {
+function prompt(city: string, categories: string[], n: number, skip: string[]) {
+  const cats = categories.map((c) => `"${c}"`).join(", ");
   return `Você é um pesquisador de prospecção da GoWeb (sistema de cardápio digital, pedidos, agenda e caixa para pequenos negócios).
-Pesquise no Google e no Google Maps negócios REAIS e em funcionamento da categoria "${category}" em ${city}, Brasil.
+Pesquise no Google e no Google Maps negócios REAIS e em funcionamento ${categories.length > 1 ? `destas categorias: ${cats}` : `da categoria ${cats}`} em ${city}, Brasil.${categories.length > 1 ? " Distribua os resultados entre as categorias e use exatamente um desses nomes no campo category." : ""}
 Prefira negócios com 30 a 500 avaliações no Google e que NÃO tenham site próprio (atendem só por WhatsApp, Instagram, Linktree ou iFood).
 Não inclua estes, que já estão na nossa base: ${skip.slice(0, 60).join("; ") || "nenhum"}.
 
@@ -81,28 +82,29 @@ Devolva SOMENTE um array JSON (sem texto antes ou depois) com até ${n} itens, c
 Use só dados que você encontrou; deixe vazio o que não souber. Não invente telefones.`;
 }
 
-/** Uma rodada de busca (cron 3x por dia ou botão "Buscar agora"). */
-export async function runHunt(trigger: "cron" | "manual", only?: { city: string; category: string }) {
+/** Uma rodada de busca (cron 3x por dia ou botão "Buscar agora"). Cada busca = 1 cidade + 1 grupo de categorias. */
+export async function runHunt(trigger: "cron" | "manual", only?: { city: string; categories: string[] }) {
   const cfg = await crmConfig();
   if (trigger === "cron" && !cfg.huntEnabled) return { skipped: true as const };
-  const { targets, cursor } = only ? { targets: [only], cursor: cfg.cursor } : nextHuntTargets(cfg, 2);
+  const { targets, cursor } = only ? { targets: [only], cursor: cfg.cursor } : nextHuntTargets(cfg, cfg.callsPerRun);
   if (!only) await saveCrmConfig({ cursor });
-  const per = Math.max(1, Math.ceil(cfg.perRun / targets.length));
+  const started = Date.now();
   let found = 0;
   let added = 0;
   const addedNames: string[] = [];
   const errors: string[] = [];
   for (const t of targets) {
-    const [run] = await db.insert(schema.crmHuntRuns).values({ trigger, query: `${t.category} · ${t.city}` }).returning();
+    if (Date.now() - started > 200_000) break; // não estoura o tempo da função
+    const [run] = await db.insert(schema.crmHuntRuns).values({ trigger, query: `${t.categories.join(", ")} · ${t.city}` }).returning();
     try {
       const known = await db.query.crmLeads.findMany({ where: eq(schema.crmLeads.city, t.city), columns: { name: true }, orderBy: desc(schema.crmLeads.createdAt), limit: 80 });
-      const items = extractJsonArray(await gemini(prompt(t.city, t.category, per, known.map((k) => k.name)), { search: true }));
+      const items = extractJsonArray(await gemini(prompt(t.city, t.categories, cfg.perRun, known.map((k) => k.name)), { search: true }));
       let a = 0;
       for (const it of items) {
         const { created } = await upsertLead(
           {
             name: it.name,
-            category: it.category || t.category,
+            category: it.category || t.categories[0],
             neighborhood: it.neighborhood,
             city: t.city,
             address: it.address,
@@ -129,6 +131,7 @@ export async function runHunt(trigger: "cron" | "manual", only?: { city: string;
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(msg);
       await db.update(schema.crmHuntRuns).set({ finishedAt: new Date(), error: msg.slice(0, 300) }).where(eq(schema.crmHuntRuns.id, run.id));
+      if (/limite|chave|Cadastre/i.test(msg)) break; // sem cota ou sem chave: tenta no próximo horário
     }
   }
   if (added > 0) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { notifyDueFollowUps } from "@/services/crm";
 import { runHunt } from "@/services/crm-hunter";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 // CRM dos sócios — roda 3x por dia (vercel.json): busca leads com o Gemini e avisa os retornos do dia.
 export async function GET(req: Request) {

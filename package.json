@@ -18,6 +18,7 @@
     "@electric-sql/pglite": "^0.5.15",
     "@vercel/blob": "^2.8.2",
     "drizzle-orm": "^0.45.4",
+    "estados-cidades": "^4.1.0",
     "next": "^15.5.29",
     "pg": "^8.23.1",
     "qrcode": "^1.5.4",

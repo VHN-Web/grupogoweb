@@ -4,12 +4,15 @@ import { db, schema } from "@/db";
 import { Icon } from "@/components/ui/Icon";
 import { ScoreBadge } from "@/components/crm/LeadBadges";
 import { SubmitButton } from "@/components/crm/SubmitButton";
+import { CheckGroup } from "@/components/crm/HuntPickers";
+import { ALL_CATEGORIES, CATEGORY_GROUPS, TOTAL_CITIES, UFS } from "@/core/br-geo";
+import { DEFAULT_UF_ORDER, huntPlan, nextHuntTargets } from "@/core/crm";
 import { crmConfig, fmtBr, requireCrm } from "@/services/crm";
 import { huntNowAction, saveGeminiAction, saveHuntAction } from "../actions";
 
 export const metadata = { title: "Busca de leads" };
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export default async function Hunt({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   await requireCrm();
@@ -21,13 +24,15 @@ export default async function Hunt({ searchParams }: { searchParams: Promise<{ o
   ]);
   const hasKey = !!cfg.geminiKeySealed || !!process.env.GEMINI_API_KEY;
   const card = "rounded-3xl border border-[var(--s-line)] bg-[var(--s-card)] p-5";
-  const combos = cfg.cities.length * cfg.categories.length;
+  const plan = huntPlan(cfg);
+  const current = nextHuntTargets(cfg, 1).targets[0];
+  const perDay = cfg.callsPerRun * 3;
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Busca automática de leads</h1>
-        <p className="text-sm text-[var(--s-muted)]">3 vezes por dia (8h, 12h e 17h) o Gemini procura negócios reais nas cidades e categorias abaixo, calcula o score e avisa no app.</p>
+        <p className="text-sm text-[var(--s-muted)]">3 vezes por dia (8h, 12h e 17h) o Gemini procura negócios reais, cidade por cidade, em todas as categorias marcadas — calcula o score e avisa no app.</p>
       </div>
       {sp.ok && <p className="rounded-2xl bg-[var(--s-good-bg)] px-4 py-3 text-sm font-semibold text-[var(--s-good-fg)]">{sp.ok}</p>}
       {sp.err && <p className="rounded-2xl bg-red-500/15 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-300">{sp.err}</p>}
@@ -61,38 +66,74 @@ export default async function Hunt({ searchParams }: { searchParams: Promise<{ o
         )}
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section className={card}>
-          <h2 className="font-bold">Buscar agora</h2>
-          <p className="text-sm text-[var(--s-muted)]">Leva de 20 a 60 segundos. Escolha uma combinação ou deixe em branco para seguir a fila automática.</p>
-          <form action={huntNowAction} className="mt-4 grid gap-2 sm:grid-cols-2">
-            <select name="city" className="input" aria-label="Cidade" defaultValue="">
-              <option value="">Próxima cidade da fila</option>
-              {cfg.cities.map((c) => <option key={c}>{c}</option>)}
-            </select>
-            <select name="category" className="input" aria-label="Categoria" defaultValue="">
-              <option value="">Próxima categoria da fila</option>
-              {cfg.categories.map((c) => <option key={c}>{c}</option>)}
-            </select>
-            <SubmitButton className="btn-brand sm:col-span-2" pending="Buscando com o Gemini… (até 1 min)" disabled={!hasKey}>
-              <Icon name="search" size={16} /> Buscar leads agora
-            </SubmitButton>
-          </form>
-        </section>
+      <section className={card}>
+        <h2 className="font-bold">Buscar agora</h2>
+        <p className="text-sm text-[var(--s-muted)]">Leva de 20 a 60 segundos. Deixe em branco para seguir a fila.</p>
+        <form action={huntNowAction} className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+          <input name="city" list="hunt-cities" placeholder="Cidade - UF (ex.: Caruaru - PE)" className="input" aria-label="Cidade" />
+          <datalist id="hunt-cities">{plan.cities.slice(0, 400).map((c) => <option key={c} value={c} />)}</datalist>
+          <select name="group" className="input" aria-label="Categorias" defaultValue="">
+            <option value="">Categorias: próximo grupo</option>
+            {cfg.categories.map((c) => <option key={c} value={`cat:${c}`}>{c}</option>)}
+          </select>
+          <SubmitButton className="btn-brand" pending="Buscando… (até 1 min)" disabled={!hasKey}>
+            <Icon name="search" size={16} /> Buscar
+          </SubmitButton>
+        </form>
+      </section>
 
-        <section className={card}>
-          <h2 className="font-bold">Onde procurar</h2>
-          <p className="text-sm text-[var(--s-muted)]">{combos} combinações · cada busca automática faz 2 delas e segue para as próximas.</p>
-          <form action={saveHuntAction} className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div><label className="label" htmlFor="cities">Cidades (uma por linha)</label><textarea id="cities" name="cities" rows={6} defaultValue={cfg.cities.join("\n")} className="input text-sm" /></div>
-            <div><label className="label" htmlFor="cats">Categorias (uma por linha)</label><textarea id="cats" name="categories" rows={6} defaultValue={cfg.categories.join("\n")} className="input text-sm" /></div>
+      <section className={card}>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="font-bold">Onde procurar</h2>
+            <p className="text-sm text-[var(--s-muted)]">
+              {plan.cities.length.toLocaleString("pt-BR")} cidades × {cfg.categories.length} categorias ({plan.groups.length} grupos de {cfg.groupSize}) = {plan.total.toLocaleString("pt-BR")} buscas na fila.
+            </p>
+          </div>
+          <div className="min-w-[220px]">
+            <p className="text-xs text-[var(--s-muted)]">Andamento: busca {(cfg.cursor + 1).toLocaleString("pt-BR")} de {plan.total.toLocaleString("pt-BR")} · {perDay} por dia</p>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--s-soft)]"><div className="h-full rounded-full bg-[#3CC46B]" style={{ width: `${Math.max(1, (cfg.cursor / Math.max(1, plan.total)) * 100)}%` }} /></div>
+            <p className="mt-1 text-xs text-[var(--s-muted)]">Agora: <b>{current?.city ?? "—"}</b></p>
+          </div>
+        </div>
+        <form action={saveHuntAction} className="mt-5 space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="priority">Cidades prioritárias (buscadas primeiro, uma por linha)</label>
+              <textarea id="priority" name="priority" rows={6} defaultValue={cfg.priorityCities.join("\n")} className="input text-sm" placeholder="Abreu e Lima - PE" />
+            </div>
+            <div className="space-y-2 text-sm">
+              <p className="font-semibold">Ordem da fila</p>
+              <ol className="list-decimal space-y-1 pl-5 text-[var(--s-muted)]">
+                <li>Cidades prioritárias</li>
+                <li>Capitais dos estados marcados</li>
+                <li>Grandes cidades desses estados</li>
+                <li>Todos os outros municípios (se ligado abaixo), alternando entre os estados</li>
+              </ol>
+              <label className="flex items-center gap-2 pt-2"><input type="checkbox" name="allCities" defaultChecked={cfg.allCities} /> Incluir <b>todos os {TOTAL_CITIES.toLocaleString("pt-BR")} municípios</b> dos estados marcados</label>
+            </div>
+          </div>
+          <CheckGroup name="ufs" title="Estados" options={DEFAULT_UF_ORDER.map((u) => ({ value: u, label: `${u} · ${UFS.find((x) => x.uf === u)!.name}` }))} initial={cfg.ufs} cols="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" />
+          <div className="space-y-3">
+            {CATEGORY_GROUPS.map((g) => (
+              <CheckGroup key={g.group} name="categories" title={g.group} options={g.items.map((c) => ({ value: c, label: c }))} initial={cfg.categories} cols="grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" />
+            ))}
+            <div><label className="label" htmlFor="extra">Outras categorias (uma por linha)</label><textarea id="extra" name="extraCategories" rows={2} defaultValue={cfg.categories.filter((c) => !ALL_CATEGORIES.includes(c)).join("\n")} className="input text-sm" /></div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div><label className="label" htmlFor="callsPerRun">Buscas por horário (8h, 12h, 17h)</label><input id="callsPerRun" name="callsPerRun" type="number" min={1} max={8} defaultValue={cfg.callsPerRun} className="input" /></div>
             <div><label className="label" htmlFor="perRun">Leads por busca</label><input id="perRun" name="perRun" type="number" min={1} max={20} defaultValue={cfg.perRun} className="input" /></div>
+            <div><label className="label" htmlFor="groupSize">Categorias por busca</label><input id="groupSize" name="groupSize" type="number" min={1} max={8} defaultValue={cfg.groupSize} className="input" /></div>
             <div><label className="label" htmlFor="model">Modelo do Gemini</label><input id="model" name="model" defaultValue={cfg.model} className="input" /></div>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" name="huntEnabled" defaultChecked={cfg.huntEnabled} /> Busca automática 3x por dia ligada</label>
-            <button className="btn-primary sm:col-span-2">Salvar</button>
-          </form>
-        </section>
-      </div>
+          </div>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2"><input type="checkbox" name="huntEnabled" defaultChecked={cfg.huntEnabled} /> Busca automática 3x por dia ligada</label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="restart" /> Recomeçar a fila do início</label>
+          </div>
+          <button className="btn-brand">Salvar configuração da busca</button>
+          <p className="text-xs text-[var(--s-muted)]">O plano grátis do Gemini aguenta bem até ~8 buscas por horário. Se passar do limite, a busca para e continua no horário seguinte de onde parou.</p>
+        </form>
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section className={card}>

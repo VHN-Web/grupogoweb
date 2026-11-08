@@ -54,7 +54,8 @@ export async function crmConfig() {
 export async function saveCrmConfig(patch: Partial<CrmConfig> & { geminiKey?: string | null }) {
   const cur = await crmConfig();
   const { geminiKey, ...rest } = patch;
-  const next: CrmConfig = { ...cur, ...rest };
+  const clean = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) as Partial<CrmConfig>;
+  const next: CrmConfig = { ...cur, ...clean };
   if (geminiKey !== undefined) next.geminiKeySealed = geminiKey ? sealSecret(geminiKey.trim()) : null;
   const json = JSON.stringify(parseCrmConfig(JSON.stringify(next)));
   await db

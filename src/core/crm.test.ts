@@ -8,6 +8,7 @@ import {
   dedupeKey,
   detectLink,
   journeySeconds,
+  huntPlan,
   nextHuntTargets,
   nicheOf,
   normalizeBrPhone,
@@ -60,15 +61,19 @@ describe("crm — dados", () => {
 
 describe("crm — config, datas e scripts", () => {
   it("config com padrões e limites", () => {
-    const c = parseCrmConfig(JSON.stringify({ perRun: 999, cities: ["Recife - PE", " "] }));
+    const c = parseCrmConfig(JSON.stringify({ perRun: 999, cities: ["Recife - PE", " "], categories: ["Hamburgueria", "Pizzaria", "Açaiteria", "Lanchonete", "Marmitaria", "Barbearia", "Pet shop", "Confeitaria"] }));
     expect(c.perRun).toBe(20);
-    expect(c.cities).toEqual(["Recife - PE"]);
+    expect(c.priorityCities).toEqual(["Recife - PE"]); // migração da versão antiga
+    expect(c.categories.length).toBeGreaterThan(60); // virou "todas"
+    expect(c.ufs.length).toBe(27);
     expect(parseCrmConfig("x").goals.contacts).toBe(30);
   });
-  it("gira as combinações da busca", () => {
-    const a = nextHuntTargets({ cities: ["A", "B"], categories: ["x", "y"], cursor: 3 }, 2);
-    expect(a.targets).toEqual([{ city: "B", category: "y" }, { city: "A", category: "x" }]);
-    expect(a.cursor).toBe(1);
+  it("fila da busca: cidade por cidade, todos os grupos de categorias", () => {
+    const cfg = { priorityCities: ["Abreu e Lima - PE"], ufs: ["PE"], allCities: false, categories: ["a", "b", "c"], groupSize: 2, cursor: 1 };
+    const a = nextHuntTargets(cfg, 2);
+    expect(a.targets[0]).toEqual({ city: "Abreu e Lima - PE", categories: ["c"] });
+    expect(a.targets[1]).toEqual({ city: "Recife - PE", categories: ["a", "b"] });
+    expect(huntPlan({ ...cfg, ufs: ["PE", "PB"], allCities: true }).cities.length).toBe(185 + 223);
   });
   it("dia em Brasília", () => {
     const d = brDayStart(new Date("2026-11-08T02:00:00Z")); // 23h do dia 7 em Brasília

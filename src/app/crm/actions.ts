@@ -3,7 +3,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { CHANNELS, CRM_STATUSES, SCORES, brDateTime, csvToRecords, type Channel, type CrmStatus, type Score } from "@/core/crm";
+import { CHANNELS, CRM_STATUSES, DEFAULT_UF_ORDER, SCORES, brDateTime, csvToRecords, huntPlan, type Channel, type CrmStatus, type Score } from "@/core/crm";
+import { ALL_CATEGORIES, normalizeCity } from "@/core/br-geo";
 import {
   CrmError,
   addNote,
@@ -184,9 +185,18 @@ export async function syncSheetAction() {
 // ---------------------------------------------------------------- busca automática
 export async function huntNowAction(f: FormData) {
   await requireCrm();
-  const city = s(f, "city");
-  const category = s(f, "category");
-  const r = await guard(() => runHunt("manual", city && category ? { city, category } : undefined), "/crm/busca");
+  const cityIn = s(f, "city");
+  const group = s(f, "group");
+  let only: { city: string; categories: string[] } | undefined;
+  if (cityIn || group) {
+    const cfg = await crmConfig();
+    const city = cityIn ? normalizeCity(cityIn) : null;
+    if (cityIn && !city) go("/crm/busca", "err", "Cidade não encontrada. Escreva no formato “Cidade - UF”, ex.: Caruaru - PE.");
+    const plan = huntPlan(cfg);
+    const cats = group === "" ? plan.groups[0] : group.startsWith("cat:") ? [group.slice(4)] : plan.groups[Number(group)] ?? plan.groups[0];
+    only = { city: city ?? plan.cities[0], categories: cats ?? [] };
+  }
+  const r = await guard(() => runHunt("manual", only), "/crm/busca");
   if (r.skipped) return go("/crm/busca", "err", "Busca desligada.");
   if (r.errors.length && !r.added) go("/crm/busca", "err", r.errors[0]);
   go("/crm/busca", "ok", `Busca concluída: ${r.found} encontrados, ${r.added} novos no CRM.`);
@@ -195,8 +205,26 @@ export async function huntNowAction(f: FormData) {
 export async function saveHuntAction(f: FormData) {
   await requireCrm();
   const lines = (k: string) => s(f, k).split(/\n|;/).map((x) => x.trim()).filter(Boolean);
-  await saveCrmConfig({ cities: lines("cities"), categories: lines("categories"), perRun: Number(s(f, "perRun")) || 8, huntEnabled: f.get("huntEnabled") === "on", model: s(f, "model") || undefined });
-  go("/crm/busca", "ok", "Configuração da busca salva.");
+  const priority = lines("priority");
+  const bad = priority.filter((c) => !normalizeCity(c));
+  const ufs = f.getAll("ufs").map(String);
+  const categories = f.getAll("categories").map(String).filter((c) => ALL_CATEGORIES.includes(c)).concat(lines("extraCategories").map((c) => c.slice(0, 60)));
+  if (!ufs.length && !priority.length) go("/crm/busca", "err", "Escolha pelo menos um estado ou uma cidade prioritária.");
+  if (!categories.length) go("/crm/busca", "err", "Escolha pelo menos uma categoria.");
+  const ordered = DEFAULT_UF_ORDER.filter((u) => ufs.includes(u));
+  await saveCrmConfig({
+    priorityCities: priority.map((c) => normalizeCity(c)).filter((c): c is string => !!c),
+    ufs: ordered,
+    allCities: f.get("allCities") === "on",
+    categories: [...new Set(categories)],
+    callsPerRun: Number(s(f, "callsPerRun")) || 4,
+    perRun: Number(s(f, "perRun")) || 6,
+    groupSize: Number(s(f, "groupSize")) || 4,
+    huntEnabled: f.get("huntEnabled") === "on",
+    model: s(f, "model") || undefined,
+    cursor: f.get("restart") === "on" ? 0 : undefined,
+  });
+  go("/crm/busca", "ok", bad.length ? `Salvo. Não encontrei estas cidades: ${bad.join(", ")} (use “Cidade - UF”).` : "Configuração da busca salva.");
 }
 
 export async function saveGeminiAction(f: FormData) {

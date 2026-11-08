@@ -1,4 +1,5 @@
 // CRM de prospecção da GoWeb (uso dos sócios). Regras puras — testadas em crm.test.ts.
+import { ALL_CATEGORIES, UF_CODES, chunk, huntCityOrder } from "./br-geo";
 
 export const CRM_STATUSES = ["NEW", "CONTACT", "DEMO", "PROPOSAL", "WON", "LOST"] as const;
 export type CrmStatus = (typeof CRM_STATUSES)[number];
@@ -183,9 +184,13 @@ export function toCsv(rows: (string | number | null | undefined)[][]) {
 
 // ---------------------------------------------------------------- config
 export type CrmConfig = {
-  cities: string[];
-  categories: string[];
-  perRun: number; // leads por busca
+  priorityCities: string[]; // buscadas primeiro ("Cidade - UF")
+  ufs: string[]; // estados incluídos (ordem = ordem das capitais)
+  allCities: boolean; // além de capitais e grandes cidades, todos os municípios dos estados
+  categories: string[]; // categorias incluídas
+  groupSize: number; // categorias por busca no Gemini
+  callsPerRun: number; // buscas por horário (cron 3x/dia)
+  perRun: number; // leads pedidos por busca
   goals: { contacts: number; demos: number };
   model: string;
   sheetId: string | null;
@@ -193,12 +198,19 @@ export type CrmConfig = {
   vapidPublic: string | null;
   vapidPrivateSealed: string | null;
   huntEnabled: boolean;
-  cursor: number; // próxima combinação cidade×categoria
+  cursor: number; // posição na fila cidade × grupo de categorias
 };
+// Nordeste primeiro (região da equipe), depois o resto do país
+export const DEFAULT_UF_ORDER = ["PE", "PB", "AL", "RN", "CE", "BA", "SE", "PI", "MA", "SP", "RJ", "MG", "ES", "PR", "SC", "RS", "DF", "GO", "MT", "MS", "PA", "AM", "TO", "RO", "AC", "AP", "RR"];
+const OLD_DEFAULT_CATEGORIES = ["Hamburgueria", "Pizzaria", "Açaiteria", "Lanchonete", "Marmitaria", "Barbearia", "Pet shop", "Confeitaria"];
 export const DEFAULT_CRM: CrmConfig = {
-  cities: ["Recife - PE", "Olinda - PE", "Abreu e Lima - PE", "João Pessoa - PB"],
-  categories: ["Hamburgueria", "Pizzaria", "Açaiteria", "Lanchonete", "Marmitaria", "Barbearia", "Pet shop", "Confeitaria"],
-  perRun: 8,
+  priorityCities: ["Abreu e Lima - PE", "Recife - PE", "Olinda - PE", "Paulista - PE", "Igarassu - PE", "João Pessoa - PB"],
+  ufs: DEFAULT_UF_ORDER,
+  allCities: true,
+  categories: ALL_CATEGORIES,
+  groupSize: 4,
+  callsPerRun: 4,
+  perRun: 6,
   goals: { contacts: 30, demos: 2 },
   model: "gemini-2.5-flash",
   sheetId: "1KYqdv5IsGc61K5s86K-Y1I21jtJvvwwIzzQzLgMy2tg",
@@ -209,18 +221,27 @@ export const DEFAULT_CRM: CrmConfig = {
   cursor: 0,
 };
 export function parseCrmConfig(raw: string | null | undefined): CrmConfig {
-  let j: Partial<CrmConfig> = {};
+  let j: Partial<CrmConfig> & { cities?: unknown } = {};
   try {
     j = JSON.parse(raw || "{}") ?? {};
   } catch {}
-  const list = (v: unknown, d: string[]) => (Array.isArray(v) ? v.map(String).map((s) => s.trim()).filter(Boolean).slice(0, 50) : d);
+  const list = (v: unknown, d: string[], max = 200) => (Array.isArray(v) ? v.map(String).map((s) => s.trim()).filter(Boolean).slice(0, max) : d);
   const n = (v: unknown, d: number, min: number, max: number) => {
     const x = Math.round(Number(v));
     return Number.isFinite(x) ? Math.min(max, Math.max(min, x)) : d;
   };
+  // migração: versão antiga guardava "cities" (vira prioritárias) e 8 categorias padrão (vira todas)
+  const priority = j.priorityCities ?? (Array.isArray(j.cities) ? (j.cities as string[]) : undefined);
+  let cats = list(j.categories, DEFAULT_CRM.categories);
+  if (cats.length === OLD_DEFAULT_CATEGORIES.length && cats.every((c, i) => c === OLD_DEFAULT_CATEGORIES[i])) cats = ALL_CATEGORIES;
+  const ufs = list(j.ufs, DEFAULT_CRM.ufs, 27).map((u) => u.toUpperCase()).filter((u) => UF_CODES.includes(u));
   return {
-    cities: list(j.cities, DEFAULT_CRM.cities),
-    categories: list(j.categories, DEFAULT_CRM.categories),
+    priorityCities: list(priority, DEFAULT_CRM.priorityCities, 100),
+    ufs: ufs.length || Array.isArray(j.ufs) ? ufs : DEFAULT_CRM.ufs,
+    allCities: j.allCities ?? true,
+    categories: cats,
+    groupSize: n(j.groupSize, DEFAULT_CRM.groupSize, 1, 8),
+    callsPerRun: n(j.callsPerRun, DEFAULT_CRM.callsPerRun, 1, 8),
     perRun: n(j.perRun, DEFAULT_CRM.perRun, 1, 20),
     goals: { contacts: n(j.goals?.contacts, DEFAULT_CRM.goals.contacts, 1, 500), demos: n(j.goals?.demos, DEFAULT_CRM.goals.demos, 0, 50) },
     model: typeof j.model === "string" && /^[a-z0-9.\-]+$/i.test(j.model) ? j.model : DEFAULT_CRM.model,
@@ -229,16 +250,26 @@ export function parseCrmConfig(raw: string | null | undefined): CrmConfig {
     vapidPublic: j.vapidPublic ?? null,
     vapidPrivateSealed: j.vapidPrivateSealed ?? null,
     huntEnabled: j.huntEnabled ?? true,
-    cursor: n(j.cursor, 0, 0, 1_000_000),
+    cursor: n(j.cursor, 0, 0, 100_000_000),
   };
 }
 
-/** Próximas combinações cidade × categoria para a busca (gira a cada execução). */
-export function nextHuntTargets(cfg: Pick<CrmConfig, "cities" | "categories" | "cursor">, count = 2) {
-  const combos = cfg.cities.flatMap((c) => cfg.categories.map((k) => ({ city: c, category: k })));
-  if (!combos.length) return { targets: [], cursor: 0 };
-  const targets = Array.from({ length: Math.min(count, combos.length) }, (_, i) => combos[(cfg.cursor + i) % combos.length]);
-  return { targets, cursor: (cfg.cursor + targets.length) % combos.length };
+/** Fila completa da busca: cidades (prioritárias → capitais → grandes → demais) × grupos de categorias. */
+export function huntPlan(cfg: Pick<CrmConfig, "priorityCities" | "ufs" | "allCities" | "categories" | "groupSize">) {
+  const cities = huntCityOrder({ priority: cfg.priorityCities, ufs: cfg.ufs, allCities: cfg.allCities });
+  const groups = chunk(cfg.categories, cfg.groupSize);
+  return { cities, groups, total: cities.length * groups.length };
+}
+
+/** Próximas buscas da fila (cada cidade passa por todos os grupos de categorias antes da próxima). */
+export function nextHuntTargets(cfg: Pick<CrmConfig, "priorityCities" | "ufs" | "allCities" | "categories" | "groupSize" | "cursor">, count = 2) {
+  const p = huntPlan(cfg);
+  if (!p.total) return { targets: [] as { city: string; categories: string[] }[], cursor: 0, total: 0 };
+  const targets = Array.from({ length: Math.min(count, p.total) }, (_, i) => {
+    const idx = (cfg.cursor + i) % p.total;
+    return { city: p.cities[Math.floor(idx / p.groups.length)], categories: p.groups[idx % p.groups.length] };
+  });
+  return { targets, cursor: (cfg.cursor + targets.length) % p.total, total: p.total };
 }
 
 // ---------------------------------------------------------------- datas (horário de Brasília)
