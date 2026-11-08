@@ -1,3 +1,4 @@
+import { sendPush } from "./push";
 // Chamados de suporte do lojista → GoWeb. Abertura com protocolo e prazos (SLA), conversa e avisos.
 import "server-only";
 import { and, desc, eq } from "drizzle-orm";
@@ -50,6 +51,7 @@ export async function openTicket(input: { tenantId: string; openedBy: string; ca
   const s = await getSettings();
   // aviso para a equipe GoWeb
   const adminText = `Novo chamado ${ticket.protocol} — ${tenant.name}\nPrioridade: ${SLA[input.priority].label.pt} · ${CATEGORY_LABELS[input.category].pt}\nAssunto: ${input.subject}\n\n${input.body}\n\nResponder: ${appUrl()}/admin/suporte/${ticket.id}`;
+  if (!tenant.demo) await sendPush("all", { title: `Chamado ${ticket.protocol}`, body: `${tenant.name}: ${input.subject}`, url: `/admin/suporte/${ticket.id}`, tag: `ticket-${ticket.id}` });
   if (!tenant.demo) {
     if (s.supportEmail) await sendEmail(s.supportEmail, `[${ticket.protocol}] ${SLA[input.priority].label.pt}: ${input.subject}`, adminText).catch(() => null);
     if (s.supportWhatsapp && (input.priority === "urgente" || input.priority === "alta")) await sendWhatsApp(s.supportWhatsapp, adminText).catch(() => null);

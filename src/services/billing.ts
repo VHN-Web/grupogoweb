@@ -28,6 +28,7 @@ import { getTheme } from "@/core/themes";
 import { CURRENCIES, type Currency } from "@/core/types";
 import { getBillingProvider } from "@/adapters/billing/registry";
 import { attributeCustomer, onInvoicePaidAffiliate } from "./affiliates";
+import { onCustomerCreated, onSetupPaid as crmOnSetupPaid } from "./crm";
 import { sendEmail, sendWhatsApp } from "@/adapters/notify";
 import { provisionTenant, RESERVED_SLUGS } from "./provision";
 import { getRegion, tr } from "@/core/region";
@@ -184,6 +185,8 @@ export async function createCustomer(input: NewCustomerInput) {
 
   // Programa de afiliados: liga o cliente a quem indicou (antes de qualquer pagamento)
   await attributeCustomer(customer, input.affiliateRef ?? null).catch((e) => console.error("[afiliados]", e));
+  // CRM dos sócios: liga ao lead (se houver) e avisa no app
+  await onCustomerCreated(customer);
 
   const amounts = setupAmounts(plan, input.wantsDomain, settings);
   const TT = Tc(customer);
@@ -301,6 +304,7 @@ export async function markInvoicePaid(
 
   // Comissão do afiliado: gerada na hora em que a fatura é paga
   await onInvoicePaidAffiliate(inv).catch((e) => console.error("[afiliados]", e));
+  if (inv.kind === "SETUP") await crmOnSetupPaid(inv.customerId);
 
   // Contrato (implantação) + recibo/NFS-e, enviados por e-mail ao cliente contratante
   const docs = await onInvoicePaidDocuments(inv);

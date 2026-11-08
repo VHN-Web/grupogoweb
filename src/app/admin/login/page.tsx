@@ -14,13 +14,17 @@ async function login(f: FormData) {
   "use server";
   const email = String(f.get("email") ?? "").trim().toLowerCase();
   const got = String(f.get("password") ?? "");
+  // depois do login, volta para o app do CRM se veio de lá
+  const nx = String(f.get("next") ?? "");
+  const dest = nx === "/crm" || nx.startsWith("/crm/") ? nx : "/admin";
+  const q = dest === "/admin" ? "" : `&next=${encodeURIComponent(dest)}`;
   // Bloqueio contra força bruta: 5 erros em 30 min por IP
   const lk = `admin-login:${await clientIp()}`;
-  if (await isLimited(lk, 5)) redirect("/admin/login?e=bloq");
+  if (await isLimited(lk, 5)) redirect(`/admin/login?e=bloq${q}`);
   const fail = async (who: string): Promise<never> => {
     await rateLimit(lk, 5, 30 * 60);
     await audit(null, who, "login.fail");
-    redirect("/admin/login?e=1");
+    redirect(`/admin/login?e=1${q}`);
   };
   if (email) {
     // Admin cadastrado (e-mail + senha)
@@ -30,7 +34,7 @@ async function login(f: FormData) {
     await db.update(schema.platformAdmins).set({ lastLoginAt: new Date() }).where(eq(schema.platformAdmins.id, a.id));
     await audit(null, `admin: ${a.name}`, "login.ok");
     await setSession(adminSubject(a));
-    redirect("/admin");
+    redirect(dest);
   }
   // Senha-mestra (administrador principal)
   const expected = process.env.PLATFORM_ADMIN_PASSWORD ?? "";
@@ -39,14 +43,16 @@ async function login(f: FormData) {
   await clearLimit(lk);
   await audit(null, "admin", "login.ok");
   await setSession("platform");
-  redirect("/admin");
+  redirect(dest);
 }
 
-export default async function AdminLogin({ searchParams }: { searchParams: Promise<{ e?: string; m?: string }> }) {
-  const { e, m } = await searchParams;
+export default async function AdminLogin({ searchParams }: { searchParams: Promise<{ e?: string; m?: string; next?: string }> }) {
+  const { e, m, next } = await searchParams;
+  const crm = !!next && (next === "/crm" || next.startsWith("/crm/"));
   return (
-    <AuthShell eyebrow="Plataforma" title="Admin">
+    <AuthShell eyebrow={crm ? "App dos sócios" : "Plataforma"} title={crm ? "CRM GoWeb" : "Admin"}>
       <form action={login} className="space-y-3">
+        {crm && <input type="hidden" name="next" value={next} />}
         <label className="label" htmlFor="email">E-mail</label>
         <input id="email" name="email" type="email" className="input" autoComplete="username" placeholder="Administrador principal: deixe vazio" />
         <label className="label" htmlFor="password">Senha</label>

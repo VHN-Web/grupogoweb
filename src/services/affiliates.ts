@@ -31,6 +31,7 @@ import { sendEmail, sendWhatsApp } from "@/adapters/notify";
 import { hashPassword } from "@/lib/password";
 import { sealSecret } from "@/lib/secrets";
 import { appUrl } from "@/lib/urls";
+import { onAffiliateLead } from "./crm";
 
 export class AffiliateError extends Error {}
 
@@ -189,6 +190,9 @@ export async function createLead(affiliateId: string, i: LeadInput, source: "lin
       scheduledAt: i.scheduledAt ?? null,
     })
     .returning();
+  // CRM dos sócios: a indicação entra no funil e todos são avisados no app
+  const aff = await db.query.affiliates.findFirst({ where: eq(schema.affiliates.id, affiliateId), columns: { name: true } });
+  await onAffiliateLead(l, aff?.name ?? "afiliado");
   return l;
 }
 

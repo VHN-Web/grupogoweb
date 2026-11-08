@@ -36,6 +36,16 @@ const P: Record<string, React.ReactNode> = {
   clock: (<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>),
   store: (<><path d="M4 9 5.5 4h13L20 9" /><path d="M4 9h16v2a3 3 0 0 1-5.3 1.9A3 3 0 0 1 12 14a3 3 0 0 1-2.7-1.1A3 3 0 0 1 4 11z" /><path d="M5 13v7h14v-7" /></>),
   download: (<><path d="M12 4v11M7 10l5 5 5-5" /><path d="M5 20h14" /></>),
+  home: (<><path d="M4 11 12 4l8 7" /><path d="M6 10v10h12V10" /><path d="M10 20v-5h4v5" /></>),
+  funnel: (<><path d="M3 5h18l-7 8v6l-4 2v-8z" /></>),
+  play: (<><path d="M7 5v14l11-7z" /></>),
+  pause: (<><path d="M8 5v14M16 5v14" /></>),
+  stop: (<><rect x="6" y="6" width="12" height="12" rx="2" /></>),
+  search: (<><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>),
+  mail: (<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>),
+  bell: (<><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z" /><path d="M10 20a2 2 0 0 0 4 0" /></>),
+  trash: (<><path d="M4 7h16M10 11v6M14 11v6" /><path d="M6 7l1 13h10l1-13M9 7V4h6v3" /></>),
+  instagram: (<><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><path d="M17.5 6.5v.01" /></>),
 };
 
 export type IconName = keyof typeof P;

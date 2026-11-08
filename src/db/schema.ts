@@ -344,6 +344,7 @@ export const platformSettings = pgTable("platform_settings", {
   // Retenção de contratos e notas/recibos no sistema (meses)
   docsRetentionMonths: integer("docs_retention_months").notNull().default(12),
   affiliateConfig: text("affiliate_config").notNull().default("{}"), // programa de afiliados (core/affiliates.ts)
+  crmConfig: text("crm_config").notNull().default("{}"), // CRM: busca de leads, metas, chave Gemini (selada), VAPID
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -967,3 +968,117 @@ export const affiliateCommissionsRelations = relations(affiliateCommissions, ({ 
   customer: one(customers, { fields: [affiliateCommissions.customerId], references: [customers.id] }),
   invoice: one(invoices, { fields: [affiliateCommissions.invoiceId], references: [invoices.id] }),
 }));
+
+// ---------------------------------------------------------------- CRM de prospecção (sócios/admins da plataforma)
+// actorId = id do platform_admin, ou "platform" para a senha-mestra.
+export const crmLeads = pgTable(
+  "crm_leads",
+  {
+    id: id(),
+    code: text("code").notNull(), // LEAD-001
+    name: text("name").notNull(),
+    category: text("category"),
+    neighborhood: text("neighborhood"),
+    city: text("city"), // "João Pessoa - PB"
+    address: text("address"),
+    phone: text("phone"), // E.164 (+55…)
+    instagram: text("instagram"),
+    email: text("email"),
+    website: text("website"),
+    rating: integer("rating_x10"), // 4.8 → 48
+    reviews: integer("reviews"),
+    pain: text("pain"),
+    pitch: text("pitch"),
+    score: text("score").$type<"OURO" | "PRATA" | "BRONZE" | "DESQ">().notNull().default("BRONZE"),
+    scoreNotes: text("score_notes"), // motivos do score (JSON)
+    linkKind: text("link_kind"), // competitor | ifood | manual | own_site | none
+    competitor: text("competitor"),
+    status: text("status").$type<"NEW" | "CONTACT" | "DEMO" | "PROPOSAL" | "WON" | "LOST">().notNull().default("NEW"),
+    ownerId: text("owner_id"),
+    source: text("source").$type<"hunter" | "import" | "manual" | "affiliate" | "site">().notNull().default("manual"),
+    dedupeKey: text("dedupe_key").notNull(),
+    contactAt: timestamp("contact_at", { withTimezone: true }), // 1º contato
+    lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
+    followUpAt: timestamp("follow_up_at", { withTimezone: true }),
+    followUpNotifiedAt: timestamp("follow_up_notified_at", { withTimezone: true }),
+    demoAt: timestamp("demo_at", { withTimezone: true }),
+    lostReason: text("lost_reason"),
+    customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    affiliateLeadId: text("affiliate_lead_id"),
+    notes: text("notes"),
+    position: integer("position").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("crm_leads_dedupe_uq").on(t.dedupeKey),
+    uniqueIndex("crm_leads_code_uq").on(t.code),
+    index("crm_leads_status_idx").on(t.status),
+    index("crm_leads_owner_idx").on(t.ownerId),
+    index("crm_leads_follow_idx").on(t.followUpAt),
+  ],
+);
+
+export const crmActivities = pgTable(
+  "crm_activities",
+  {
+    id: id(),
+    leadId: text("lead_id").references(() => crmLeads.id, { onDelete: "cascade" }),
+    actorId: text("actor_id").notNull(),
+    // contact = contato feito (conta na meta) · note · status · followup · demo · won · lost · system
+    kind: text("kind").$type<"contact" | "note" | "status" | "followup" | "demo" | "won" | "lost" | "system" | "implant">().notNull(),
+    channel: text("channel").$type<"whatsapp" | "call" | "instagram" | "visit" | "email" | null>(),
+    body: text("body"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("crm_act_actor_idx").on(t.actorId, t.createdAt), index("crm_act_lead_idx").on(t.leadId, t.createdAt)],
+);
+
+export const crmJourneys = pgTable(
+  "crm_journeys",
+  {
+    id: id(),
+    actorId: text("actor_id").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    pauseStartedAt: timestamp("pause_started_at", { withTimezone: true }),
+    pausedSeconds: integer("paused_seconds").notNull().default(0),
+    summary: text("summary"), // JSON do resumo ao encerrar
+  },
+  (t) => [index("crm_journeys_actor_idx").on(t.actorId, t.startedAt)],
+);
+
+export const crmPushSubs = pgTable(
+  "crm_push_subs",
+  {
+    id: id(),
+    actorId: text("actor_id").notNull(),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    device: text("device"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("crm_push_endpoint_uq").on(t.endpoint)],
+);
+
+export const crmHuntRuns = pgTable("crm_hunt_runs", {
+  id: id(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  trigger: text("trigger").notNull().default("cron"), // cron | manual
+  query: text("query"),
+  found: integer("found").notNull().default(0),
+  added: integer("added").notNull().default(0),
+  error: text("error"),
+});
+
+export type CrmLead = typeof crmLeads.$inferSelect;
+export type CrmActivity = typeof crmActivities.$inferSelect;
+export type CrmJourney = typeof crmJourneys.$inferSelect;
+
+export const crmLeadsRelations = relations(crmLeads, ({ many, one }) => ({
+  activities: many(crmActivities),
+  customer: one(customers, { fields: [crmLeads.customerId], references: [customers.id] }),
+}));
+export const crmActivitiesRelations = relations(crmActivities, ({ one }) => ({ lead: one(crmLeads, { fields: [crmActivities.leadId], references: [crmLeads.id] }) }));

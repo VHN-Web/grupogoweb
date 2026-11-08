@@ -10,6 +10,7 @@ const ITEMS = [
   { href: "/admin/notas", label: "Notas e recibos" },
   { href: "/admin/suporte", label: "Suporte" },
   { href: "/admin/afiliados", label: "Afiliados" },
+  { href: "/crm", label: "CRM (app)" },
   { href: "/admin/demos", label: "Demonstrações" },
   { href: "/admin/admins", label: "Administradores" },
   { href: "/admin/config", label: "Configurações" },
