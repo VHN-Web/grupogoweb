@@ -7,7 +7,8 @@ import { clientIp, rateLimit } from "@/lib/security";
 
 export async function joinWaitlist(f: FormData) {
   const lang = f.get("lang") === "es" ? "es" : "pt";
-  const back = (k: string) => redirect(`/?lang=${lang}&lista=${k}#lista`);
+  const v = String(f.get("v") ?? "").replace(/[^a-z0-9-]/g, "").slice(0, 20);
+  const back = (k: string) => redirect(v ? `/escaneou?v=${v}&lista=${k}#lista` : `/?lang=${lang}&lista=${k}#lista`);
   if (String(f.get("website") ?? "")) back("ok"); // armadilha para robôs
   if (!(await rateLimit(`waitlist:${await clientIp().catch(() => "x")}`, 5, 3600))) back("limite");
   const name = String(f.get("name") ?? "").trim().slice(0, 80);
@@ -16,7 +17,7 @@ export async function joinWaitlist(f: FormData) {
   const city = String(f.get("city") ?? "").trim().slice(0, 60);
   if (!business || phone.length < 10) back("erro");
   try {
-    await upsertLead({ name: business, phone, city: city || null, notes: `Lista de espera do lançamento — contato: ${name || "—"}`, pain: "Pediu aviso do lançamento (12/11)" }, "site");
+    await upsertLead({ name: business, phone, city: city || null, notes: `Lista de espera do lançamento${v ? ` (panfleto: ${v})` : ""} — contato: ${name || "—"}`, pain: "Pediu aviso do lançamento (12/11)" }, "site");
     await sendPush("all", { title: "Novo lead na lista de espera 🚀", body: `${business}${city ? ` · ${city}` : ""}`, url: "/crm/leads", tag: "waitlist" }).catch(() => null);
   } catch {
     back("erro");
