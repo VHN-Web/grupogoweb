@@ -150,7 +150,7 @@ async function GeneralQr({ url, T, slug }: { url: string; T: (es: string, pt: st
   const href = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   return (
     <div className="card grid gap-5 p-5 sm:grid-cols-[200px_1fr]">
-      <div className="rounded-2xl bg-white p-2 ring-1 ring-line [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+      <div className="keep-light rounded-2xl bg-white p-2 ring-1 ring-line [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
       <div className="space-y-3">
         <div>
           <p className="font-semibold">{T("QR general del menú", "QR geral do cardápio")}</p>

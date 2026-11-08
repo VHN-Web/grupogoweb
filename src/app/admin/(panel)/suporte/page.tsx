@@ -48,7 +48,7 @@ export default async function SupportQueue({ searchParams }: { searchParams: Pro
       </div>
       <nav className="flex gap-1 text-sm">
         {[["abertos", "Abertos"], ["finalizados", "Finalizados"], ["todos", "Todos"]].map(([k, l]) => (
-          <Link key={k} href={`?f=${k}`} className={`rounded-lg px-3 py-1.5 font-semibold ${filter === k ? "bg-ink text-white" : "btn-ghost"}`}>{l}</Link>
+          <Link key={k} href={`?f=${k}`} className={`${filter === k ? "btn border border-transparent bg-ink text-white" : "btn-ghost"}`}>{l}</Link>
         ))}
       </nav>
       <div className="card overflow-x-auto">

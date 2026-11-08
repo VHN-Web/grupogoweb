@@ -40,29 +40,29 @@ const toDay = (x: Date) => new Date(x.getTime() - 3 * 3600_000).toISOString().sl
 const toTime = (x: Date) => new Date(x.getTime() - 3 * 3600_000).toISOString().slice(11, 16);
 
 export default async function AdminAffiliates({ searchParams }: { searchParams: Promise<{ aba?: string; ok?: string; err?: string; q?: string; s?: string }> }) {
-  await requirePlatformAdmin();
-  const sp = await searchParams;
+  const [, sp, cfg] = await Promise.all([requirePlatformAdmin(), searchParams, affiliateConfig()]);
   const tab = TABS.some(([k]) => k === sp.aba) ? sp.aba! : "visao";
-  const cfg = await affiliateConfig();
 
-  const [counts] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      pending: sql<number>`count(*) filter (where ${schema.affiliates.status} = 'PENDING')::int`,
-      active: sql<number>`count(*) filter (where ${schema.affiliates.status} = 'ACTIVE')::int`,
-    })
-    .from(schema.affiliates);
-  const [money] = await db
-    .select({
-      toPay: sql<number>`coalesce(sum(${schema.affiliateCommissions.amountMinor}) filter (where ${schema.affiliateCommissions.status} = 'PENDING'), 0)::int`,
-      paid: sql<number>`coalesce(sum(${schema.affiliateCommissions.amountMinor}) filter (where ${schema.affiliateCommissions.status} = 'PAID'), 0)::int`,
-      sales: sql<number>`count(*) filter (where ${schema.affiliateCommissions.level} = 1 and ${schema.affiliateCommissions.kind} = 'SETUP' and ${schema.affiliateCommissions.status} <> 'CANCELLED')::int`,
-      revenue: sql<number>`coalesce(sum(${schema.affiliateCommissions.baseMinor}) filter (where ${schema.affiliateCommissions.level} = 1 and ${schema.affiliateCommissions.kind} = 'SETUP' and ${schema.affiliateCommissions.status} <> 'CANCELLED'), 0)::int`,
-    })
-    .from(schema.affiliateCommissions);
-  const [leadCounts] = await db
-    .select({ total: sql<number>`count(*)::int`, scheduled: sql<number>`count(*) filter (where ${schema.affiliateLeads.status} = 'SCHEDULED')::int`, clicks: sql<number>`(select count(*) from affiliate_clicks)::int` })
-    .from(schema.affiliateLeads);
+  const [[counts], [money], [leadCounts]] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        pending: sql<number>`count(*) filter (where ${schema.affiliates.status} = 'PENDING')::int`,
+        active: sql<number>`count(*) filter (where ${schema.affiliates.status} = 'ACTIVE')::int`,
+      })
+      .from(schema.affiliates),
+    db
+      .select({
+        toPay: sql<number>`coalesce(sum(${schema.affiliateCommissions.amountMinor}) filter (where ${schema.affiliateCommissions.status} = 'PENDING'), 0)::int`,
+        paid: sql<number>`coalesce(sum(${schema.affiliateCommissions.amountMinor}) filter (where ${schema.affiliateCommissions.status} = 'PAID'), 0)::int`,
+        sales: sql<number>`count(*) filter (where ${schema.affiliateCommissions.level} = 1 and ${schema.affiliateCommissions.kind} = 'SETUP' and ${schema.affiliateCommissions.status} <> 'CANCELLED')::int`,
+        revenue: sql<number>`coalesce(sum(${schema.affiliateCommissions.baseMinor}) filter (where ${schema.affiliateCommissions.level} = 1 and ${schema.affiliateCommissions.kind} = 'SETUP' and ${schema.affiliateCommissions.status} <> 'CANCELLED'), 0)::int`,
+      })
+      .from(schema.affiliateCommissions),
+    db
+      .select({ total: sql<number>`count(*)::int`, scheduled: sql<number>`count(*) filter (where ${schema.affiliateLeads.status} = 'SCHEDULED')::int`, clicks: sql<number>`(select count(*) from affiliate_clicks)::int` })
+      .from(schema.affiliateLeads),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -76,7 +76,7 @@ export default async function AdminAffiliates({ searchParams }: { searchParams: 
       {sp.err && <p className="rounded-xl bg-red-100 px-4 py-2.5 text-sm font-semibold text-red-900">{sp.err}</p>}
       <nav className="no-scrollbar flex gap-1 overflow-x-auto text-sm">
         {TABS.map(([k, l]) => (
-          <Link key={k} href={`?aba=${k}`} className={`shrink-0 rounded-lg px-3 py-1.5 font-semibold ${tab === k ? "bg-ink text-white" : "btn-ghost"}`}>
+          <Link key={k} href={`?aba=${k}`} className={`shrink-0 ${tab === k ? "btn border border-transparent bg-ink text-white" : "btn-ghost"}`}>
             {l}
             {k === "pagar" && money.toPay > 0 ? ` · ${brl(money.toPay)}` : ""}
             {k === "lives" && counts.pending > 0 ? ` · ${counts.pending} na fila` : ""}
@@ -156,7 +156,7 @@ async function PayTab() {
       {cards.map(({ a, list, total, pix, qr }) => (
         <div key={a.id} className="card p-5">
           <div className="flex flex-wrap gap-5">
-            <div className="h-36 w-36 shrink-0 rounded-xl bg-white p-2 [&_svg]:h-full [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: qr }} role="img" aria-label="QR Pix" />
+            <div className="keep-light h-36 w-36 shrink-0 rounded-xl bg-white p-2 [&_svg]:h-full [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: qr }} role="img" aria-label="QR Pix" />
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted">Pagar para</p>
               <p className="text-lg font-bold">{a.name} <span className="font-mono text-sm font-normal text-muted">{a.code}</span></p>
@@ -228,21 +228,23 @@ function maskCpf(c: string) {
 
 // ---------------------------------------------------------------- afiliados
 async function AffiliatesTab({ q, cfg }: { q?: string; cfg: Awaited<ReturnType<typeof affiliateConfig>> }) {
-  const all = await db.query.affiliates.findMany({ orderBy: desc(schema.affiliates.createdAt), with: { cohort: true }, limit: 500 });
+  const [all, stats, leads, clicks, cohorts] = await Promise.all([
+    db.query.affiliates.findMany({ orderBy: desc(schema.affiliates.createdAt), with: { cohort: true }, limit: 500 }),
+    db
+      .select({
+        id: schema.affiliateCommissions.affiliateId,
+        sales: sql<number>`count(*) filter (where ${schema.affiliateCommissions.level} = 1 and ${schema.affiliateCommissions.kind} = 'SETUP' and ${schema.affiliateCommissions.status} <> 'CANCELLED')::int`,
+        earned: sql<number>`coalesce(sum(${schema.affiliateCommissions.amountMinor}) filter (where ${schema.affiliateCommissions.status} <> 'CANCELLED'), 0)::int`,
+      })
+      .from(schema.affiliateCommissions)
+      .groupBy(schema.affiliateCommissions.affiliateId),
+    db.select({ id: schema.affiliateLeads.affiliateId, n: sql<number>`count(*)::int` }).from(schema.affiliateLeads).groupBy(schema.affiliateLeads.affiliateId),
+    db.select({ id: schema.affiliateClicks.affiliateId, n: sql<number>`count(*)::int` }).from(schema.affiliateClicks).groupBy(schema.affiliateClicks.affiliateId),
+    db.query.affiliateCohorts.findMany({ orderBy: desc(schema.affiliateCohorts.startsAt), limit: 12 }),
+  ]);
   const term = (q ?? "").toLowerCase();
   const list = term ? all.filter((a) => `${a.name} ${a.email} ${a.code} ${a.city ?? ""}`.toLowerCase().includes(term)) : all;
-  const stats = await db
-    .select({
-      id: schema.affiliateCommissions.affiliateId,
-      sales: sql<number>`count(*) filter (where ${schema.affiliateCommissions.level} = 1 and ${schema.affiliateCommissions.kind} = 'SETUP' and ${schema.affiliateCommissions.status} <> 'CANCELLED')::int`,
-      earned: sql<number>`coalesce(sum(${schema.affiliateCommissions.amountMinor}) filter (where ${schema.affiliateCommissions.status} <> 'CANCELLED'), 0)::int`,
-    })
-    .from(schema.affiliateCommissions)
-    .groupBy(schema.affiliateCommissions.affiliateId);
-  const leads = await db.select({ id: schema.affiliateLeads.affiliateId, n: sql<number>`count(*)::int` }).from(schema.affiliateLeads).groupBy(schema.affiliateLeads.affiliateId);
-  const clicks = await db.select({ id: schema.affiliateClicks.affiliateId, n: sql<number>`count(*)::int` }).from(schema.affiliateClicks).groupBy(schema.affiliateClicks.affiliateId);
   const byId = new Map(all.map((a) => [a.id, a]));
-  const cohorts = await db.query.affiliateCohorts.findMany({ orderBy: desc(schema.affiliateCohorts.startsAt), limit: 12 });
   return (
     <div className="space-y-3">
       <form className="flex gap-2">
@@ -280,13 +282,13 @@ async function AffiliatesTab({ q, cfg }: { q?: string; cfg: Awaited<ReturnType<t
                     <form action={setAffiliateStatus} className="flex flex-wrap gap-1.5">
                       <input type="hidden" name="id" value={a.id} />
                       <input type="hidden" name="tab" value="afiliados" />
-                      <select name="status" defaultValue={a.status} className="input w-auto py-1.5 text-xs" aria-label="Situação">
+                      <select name="status" defaultValue={a.status} className="input w-auto max-w-[190px] py-1.5 text-xs" aria-label="Situação">
                         <option value="PENDING">Aguardando live</option>
                         <option value="ACTIVE">Ativo</option>
                         <option value="SUSPENDED">Suspenso</option>
                       </select>
                       {a.status === "PENDING" && (
-                        <select name="cohortId" defaultValue={a.cohortId ?? ""} className="input w-auto py-1.5 text-xs" aria-label="Turma">
+                        <select name="cohortId" defaultValue={a.cohortId ?? ""} className="input w-auto max-w-[190px] py-1.5 text-xs" aria-label="Turma">
                           <option value="">Sem turma</option>
                           {cohorts.map((c) => <option key={c.id} value={c.id}>{c.startsAt.toLocaleDateString("pt-BR")}</option>)}
                         </select>
@@ -335,8 +337,8 @@ async function CohortsTab() {
             <form action={saveCohort} className="mt-3 flex flex-wrap gap-2">
               <input type="hidden" name="id" value={c.id} />
               <input type="hidden" name="title" value={c.title} />
-              <input name="day" type="date" defaultValue={toDay(c.startsAt)} className="input w-auto" aria-label="Dia" />
-              <input name="time" type="time" defaultValue={toTime(c.startsAt)} className="input w-auto" aria-label="Hora" />
+              <input name="day" type="date" defaultValue={toDay(c.startsAt)} className="input w-auto max-w-[190px]" aria-label="Dia" />
+              <input name="time" type="time" defaultValue={toTime(c.startsAt)} className="input w-auto max-w-[190px]" aria-label="Hora" />
               <input name="liveUrl" defaultValue={c.liveUrl ?? ""} placeholder="Link da live" className="input min-w-[240px] flex-1" aria-label="Link da live" />
               <button className="btn-ghost">Salvar</button>
             </form>
@@ -371,8 +373,8 @@ async function LeadsTab({ status }: { status?: string }) {
   return (
     <div className="space-y-3">
       <nav className="no-scrollbar flex gap-1 overflow-x-auto text-sm">
-        <Link href="?aba=agenda" className={`shrink-0 rounded-lg px-3 py-1.5 font-semibold ${!f ? "bg-ink text-white" : "btn-ghost"}`}>Todas</Link>
-        {LEAD_STATUSES.map((s) => <Link key={s} href={`?aba=agenda&s=${s}`} className={`shrink-0 rounded-lg px-3 py-1.5 font-semibold ${f === s ? "bg-ink text-white" : "btn-ghost"}`}>{LEAD_LABELS[s].split(" (")[0]}</Link>)}
+        <Link href="?aba=agenda" className={`shrink-0 ${!f ? "btn border border-transparent bg-ink text-white" : "btn-ghost"}`}>Todas</Link>
+        {LEAD_STATUSES.map((s) => <Link key={s} href={`?aba=agenda&s=${s}`} className={`shrink-0 ${f === s ? "btn border border-transparent bg-ink text-white" : "btn-ghost"}`}>{LEAD_LABELS[s].split(" (")[0]}</Link>)}
       </nav>
       {leads.length === 0 && <p className="card p-8 text-center text-muted">Nenhuma indicação.</p>}
       {leads.map((l) => (
@@ -391,11 +393,11 @@ async function LeadsTab({ status }: { status?: string }) {
           {!["SIGNED", "WON"].includes(l.status) && (
             <form action={adminUpdateLead} className="mt-3 flex flex-wrap gap-2">
               <input type="hidden" name="id" value={l.id} />
-              <select name="status" defaultValue={l.status} className="input w-auto" aria-label="Situação">
+              <select name="status" defaultValue={l.status} className="input w-auto max-w-[190px]" aria-label="Situação">
                 {(["NEW", "SCHEDULED", "NOT_SCHEDULED", "LOST"] as const).map((s) => <option key={s} value={s}>{LEAD_LABELS[s]}</option>)}
               </select>
-              <input name="day" type="date" defaultValue={l.scheduledAt ? toDay(l.scheduledAt) : ""} className="input w-auto" aria-label="Dia" />
-              <input name="time" type="time" defaultValue={l.scheduledAt ? toTime(l.scheduledAt) : "10:00"} className="input w-auto" aria-label="Hora" />
+              <input name="day" type="date" defaultValue={l.scheduledAt ? toDay(l.scheduledAt) : ""} className="input w-auto max-w-[190px]" aria-label="Dia" />
+              <input name="time" type="time" defaultValue={l.scheduledAt ? toTime(l.scheduledAt) : "10:00"} className="input w-auto max-w-[190px]" aria-label="Hora" />
               <input name="adminNote" defaultValue={l.adminNote ?? ""} placeholder="Nota interna" className="input min-w-[200px] flex-1" aria-label="Nota interna" />
               <button className="btn-ghost">Salvar</button>
             </form>

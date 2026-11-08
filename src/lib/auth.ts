@@ -1,6 +1,7 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 export { hashPassword, verifyPassword } from "./password";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
@@ -94,7 +95,7 @@ export async function actorName(slug: string): Promise<string> {
 }
 
 /** Quem está logado no painel do tenant `slug` (dono, admin da plataforma ou funcionário). */
-export async function getPanelAccess(slug: string): Promise<PanelAccess | null> {
+export const getPanelAccess = cache(async function getPanelAccess(slug: string): Promise<PanelAccess | null> {
   const tenant = await db.query.tenants.findFirst({ where: eq(schema.tenants.slug, slug) });
   if (!tenant) return null;
   const subject = await sessionSubject();
@@ -121,7 +122,7 @@ export async function getPanelAccess(slug: string): Promise<PanelAccess | null> 
     }
   }
   return null;
-}
+});
 
 /** Área fora do plano personalizado → página do plano (com o módulo); senão, sem permissão (funcionário). */
 function blockedPath(slug: string, t: { modules: string | null }, area: PanelArea) {
@@ -164,9 +165,8 @@ async function platformAdminFrom(subject: string | null): Promise<PlatformAdminS
 }
 
 /** Quem está logado no admin da plataforma (null = ninguém). */
-export async function getPlatformAdmin() {
-  return platformAdminFrom(await sessionSubject());
-}
+/** Deduplicado por requisição (layout + página não repetem a consulta). */
+export const getPlatformAdmin = cache(async () => platformAdminFrom(await sessionSubject()));
 
 export async function isPlatformAdmin() {
   return !!(await getPlatformAdmin());

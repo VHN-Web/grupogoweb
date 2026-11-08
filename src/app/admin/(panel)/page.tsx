@@ -10,10 +10,13 @@ import { runCycleNow } from "./actions";
 
 export default async function AdminHome({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const sp = await searchParams;
-  const customers = await db.query.customers.findMany({ with: { plan: true }, orderBy: desc(schema.customers.createdAt) });
-  const tasks = await db.query.adminTasks.findMany({ where: eq(schema.adminTasks.done, false), with: { customer: true }, orderBy: desc(schema.adminTasks.createdAt) });
-  const overdue = await db.query.invoices.findMany({ where: and(eq(schema.invoices.status, "OPEN"), lt(schema.invoices.dueAt, new Date())), with: { customer: true } });
-  const recentPaid = await db.query.invoices.findMany({ where: eq(schema.invoices.status, "PAID"), with: { customer: true }, orderBy: desc(schema.invoices.paidAt), limit: 8 });
+  // consultas em paralelo (cada ida ao banco custa uma viagem de rede em produção)
+  const [customers, tasks, overdue, recentPaid] = await Promise.all([
+    db.query.customers.findMany({ with: { plan: true }, orderBy: desc(schema.customers.createdAt) }),
+    db.query.adminTasks.findMany({ where: eq(schema.adminTasks.done, false), with: { customer: true }, orderBy: desc(schema.adminTasks.createdAt) }),
+    db.query.invoices.findMany({ where: and(eq(schema.invoices.status, "OPEN"), lt(schema.invoices.dueAt, new Date())), with: { customer: true } }),
+    db.query.invoices.findMany({ where: eq(schema.invoices.status, "PAID"), with: { customer: true }, orderBy: desc(schema.invoices.paidAt), limit: 8 }),
+  ]);
 
   const paying = customers.filter((c) => ["ACTIVE", "PAST_DUE"].includes(c.status));
   // Receita recorrente mensal (anual / 12), na moeda preferida de cada cliente

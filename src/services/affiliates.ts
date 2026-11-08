@@ -382,22 +382,25 @@ export async function affiliateDashboard(affiliateId: string) {
   const now = Date.now();
   const d7 = new Date(now - 7 * DAY);
   const d30 = new Date(now - 30 * DAY);
-  const [clicks] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      d7: sql<number>`count(*) filter (where ${schema.affiliateClicks.createdAt} >= ${d7})::int`,
-      d30: sql<number>`count(*) filter (where ${schema.affiliateClicks.createdAt} >= ${d30})::int`,
-    })
-    .from(schema.affiliateClicks)
-    .where(eq(schema.affiliateClicks.affiliateId, affiliateId));
-  const leads = await db.query.affiliateLeads.findMany({ where: eq(schema.affiliateLeads.affiliateId, affiliateId), orderBy: desc(schema.affiliateLeads.createdAt), limit: 300 });
-  const commissions = await db.query.affiliateCommissions.findMany({
-    where: eq(schema.affiliateCommissions.affiliateId, affiliateId),
-    orderBy: desc(schema.affiliateCommissions.createdAt),
-    with: { customer: { columns: { businessName: true } } },
-    limit: 300,
-  });
-  const recruits = await db.query.affiliates.findMany({ where: eq(schema.affiliates.referredById, affiliateId), columns: { id: true, name: true, status: true, createdAt: true } });
+  const [[clicks], leads, commissions, recruits, ranking] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        d7: sql<number>`count(*) filter (where ${schema.affiliateClicks.createdAt} >= ${d7})::int`,
+        d30: sql<number>`count(*) filter (where ${schema.affiliateClicks.createdAt} >= ${d30})::int`,
+      })
+      .from(schema.affiliateClicks)
+      .where(eq(schema.affiliateClicks.affiliateId, affiliateId)),
+    db.query.affiliateLeads.findMany({ where: eq(schema.affiliateLeads.affiliateId, affiliateId), orderBy: desc(schema.affiliateLeads.createdAt), limit: 300 }),
+    db.query.affiliateCommissions.findMany({
+      where: eq(schema.affiliateCommissions.affiliateId, affiliateId),
+      orderBy: desc(schema.affiliateCommissions.createdAt),
+      with: { customer: { columns: { businessName: true } } },
+      limit: 300,
+    }),
+    db.query.affiliates.findMany({ where: eq(schema.affiliates.referredById, affiliateId), columns: { id: true, name: true, status: true, createdAt: true } }),
+    monthlyRanking(50),
+  ]);
   const recruitIds = recruits.map((r) => r.id);
   const recruitSales = recruitIds.length
     ? await db
@@ -431,7 +434,6 @@ export async function affiliateDashboard(affiliateId: string) {
     recruits: recruits.filter((r) => r.status === "ACTIVE").length,
     weeksWithSale,
   };
-  const ranking = await monthlyRanking(50);
   const myPos = ranking.find((r) => r.affiliateId === affiliateId)?.pos ?? null;
   const scheduledEver = leads.filter((l) => l.scheduledAt).length;
 

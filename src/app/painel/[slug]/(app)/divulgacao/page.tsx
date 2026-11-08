@@ -39,7 +39,7 @@ export default async function DivulgacaoPage({ params, searchParams }: { params:
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {KIT.map((s, i) => (
             <div key={s} className="flex min-w-0 gap-3 rounded-xl border border-line p-3">
-              <div className="h-20 w-20 shrink-0 bg-white p-1 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qrs[i] }} />
+              <div className="keep-light h-20 w-20 shrink-0 bg-white p-1 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qrs[i] }} />
               <div className="min-w-0 flex-1 text-sm">
                 <p className="font-semibold">{L(s)}</p>
                 <p className="truncate text-xs text-muted">{link(s)}</p>
