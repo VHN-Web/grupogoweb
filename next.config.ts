@@ -31,6 +31,8 @@ const nextConfig: NextConfig = {
   // Upload de logo/banner/fotos via Server Actions (limite padrão é 1 MB)
   experimental: { serverActions: { bodySizeLimit: "5mb" } },
   poweredByHeader: false,
+  // fontes das artes geradas no servidor (lidas com fs)
+  outputFileTracingIncludes: { "/api/afiliados/arte": ["./assets/fonts/**"] },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

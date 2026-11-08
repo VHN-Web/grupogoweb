@@ -92,3 +92,14 @@ export function GoWebStacked({ width = 220, dark = true, tagline }: { width?: nu
 
 /** SVG em texto (favicon, e-mails). */
 export const GOWEB_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 84"><defs><linearGradient id="a" x1="8" y1="0" x2="124" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${GW_BLUE}"/><stop offset=".55" stop-color="${GW_TEAL}"/><stop offset="1" stop-color="${GW_GREEN}"/></linearGradient><linearGradient id="b" x1="30" y1="60" x2="50" y2="18" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${GW_BLUE}"/><stop offset="1" stop-color="${GW_GREEN}"/></linearGradient></defs><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="${P_RIGHT}" stroke="url(#a)" stroke-width="12"/><path d="${P_LEFT}" stroke="url(#a)" stroke-width="12"/><path d="${P_SHAFT}" stroke="url(#b)" stroke-width="7"/><path d="${P_CIRC}" stroke="${GW_NAVY}" stroke-width="3"/></g><path d="${P_HEAD}" fill="${GW_GREEN}" stroke="${GW_GREEN}" stroke-width="2" stroke-linejoin="round"/><circle cx="${NODE[0]}" cy="${NODE[1]}" r="4" fill="#fff" stroke="${GW_NAVY}" stroke-width="3"/></svg>`;
+
+/** Logotipo horizontal em texto SVG (para imagens geradas no servidor, ex.: artes de divulgação). */
+export function goWebLogoSvg(dark = true) {
+  const s = 0.8;
+  const w = (150 + WORD_W * s + 4).toFixed(1);
+  const node = dark ? "#9FC6F2" : GW_NAVY;
+  const hole = dark ? "#0E0E10" : "#FFFFFF";
+  const ink = dark ? "#F4F1EA" : GW_NAVY;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} 84"><defs><linearGradient id="a" x1="8" y1="0" x2="124" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${GW_BLUE}"/><stop offset=".55" stop-color="${GW_TEAL}"/><stop offset="1" stop-color="${GW_GREEN}"/></linearGradient><linearGradient id="b" x1="30" y1="60" x2="50" y2="18" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${GW_BLUE}"/><stop offset="1" stop-color="${GW_GREEN}"/></linearGradient></defs><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="${P_RIGHT}" stroke="url(#a)" stroke-width="12"/><path d="${P_LEFT}" stroke="url(#a)" stroke-width="12"/><path d="${P_SHAFT}" stroke="url(#b)" stroke-width="7"/><path d="${P_CIRC}" stroke="${node}" stroke-width="3"/></g><path d="${P_HEAD}" fill="${GW_GREEN}" stroke="${GW_GREEN}" stroke-width="2" stroke-linejoin="round"/><circle cx="${NODE[0]}" cy="${NODE[1]}" r="4" fill="${hole}" stroke="${node}" stroke-width="3"/><g transform="translate(150 66) scale(${s})"><path d="${WORD}" fill="${ink}"/></g></svg>`;
+}
+export const GOWEB_LOGO_RATIO = (150 + WORD_W * 0.8 + 4) / 84;
