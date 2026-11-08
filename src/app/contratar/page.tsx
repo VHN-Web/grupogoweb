@@ -1,4 +1,5 @@
 import { clientIp, rateLimit } from "@/lib/security";
+import { refCodeFromCookie } from "@/lib/affiliate-auth";
 // Contratação self-service: o visitante escolhe o plano na página de vendas,
 // preenche os dados e cai direto na fatura da implantação (paga em R$, Gs. ou US$).
 import { redirect } from "next/navigation";
@@ -57,6 +58,7 @@ async function contratar(f: FormData) {
       notes: T("Contratación por el sitio", "Contratação pelo site"),
       theme: str(f, "theme") || null,
       country,
+      affiliateRef: await refCodeFromCookie(),
     });
     customerId = c.id;
   } catch (e) {

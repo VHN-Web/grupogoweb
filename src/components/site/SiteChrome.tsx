@@ -47,6 +47,7 @@ export function SiteFooter({ locale }: { locale: Locale }) {
         <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label={T("Enlaces", "Links")}>
           <Link href={`/planos?lang=${locale}`} className="hover:text-white">{T("Planes", "Planos")}</Link>
           <Link href={`/shopping?lang=${locale}`} className="hover:text-white">Shopping GoWeb</Link>
+          {locale === "pt" && <Link href="/afiliados" className="hover:text-white">Seja afiliado</Link>}
           <Link href="/vitrine" className="hover:text-white">{T("Vitrina de la ciudad", "Vitrine da cidade")}</Link>
           <Link href="/painel" className="hover:text-white">{T("Panel del comercio", "Painel do lojista")}</Link>
         </nav>

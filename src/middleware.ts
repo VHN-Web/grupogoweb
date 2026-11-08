@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // Pré-requisito de infraestrutura (🧑): apontar o DNS e adicionar o domínio no provedor
 // de hospedagem (ex.: Vercel > Domains, ou via API da Vercel para automatizar).
 
-const PASS = /^\/(_next|api|pay|fatura|contrato|recibo|contratar|painel|admin|uploads|icon\.svg|favicon\.ico|robots\.txt|sitemap\.xml|vitrine|shopping|planos)(\/|$)/;
+const PASS = /^\/(_next|api|pay|fatura|contrato|recibo|contratar|painel|admin|uploads|icon\.svg|favicon\.ico|robots\.txt|sitemap\.xml|vitrine|shopping|planos|a|afiliados)(\/|$)/;
 const cache = new Map<string, { slug: string | null; at: number }>();
 const TTL = 60_000;
 
@@ -21,7 +21,20 @@ function mainHosts() {
   return hosts;
 }
 
+/** ?ref=CODIGO em qualquer página guarda o afiliado que trouxe o visitante (60 dias). */
+function withRef(req: NextRequest, res: NextResponse) {
+  const ref = req.nextUrl.searchParams.get("ref");
+  if (ref && /^[A-Za-z0-9]{3,16}$/.test(ref)) {
+    res.cookies.set("gw_ref", ref.toUpperCase(), { path: "/", maxAge: 60 * 60 * 24 * 60, sameSite: "lax", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+  }
+  return res;
+}
+
 export async function middleware(req: NextRequest) {
+  return withRef(req, await route(req));
+}
+
+async function route(req: NextRequest) {
   const host = (req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "").toLowerCase().replace(/:\d+$/, "");
   const { pathname } = req.nextUrl;
   // ?lang=pt|es escolhido na página vale também para o <html lang> e o título (layout raiz)

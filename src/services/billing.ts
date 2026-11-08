@@ -27,6 +27,7 @@ import { slugify } from "@/core/codes";
 import { getTheme } from "@/core/themes";
 import { CURRENCIES, type Currency } from "@/core/types";
 import { getBillingProvider } from "@/adapters/billing/registry";
+import { attributeCustomer, onInvoicePaidAffiliate } from "./affiliates";
 import { sendEmail, sendWhatsApp } from "@/adapters/notify";
 import { provisionTenant, RESERVED_SLUGS } from "./provision";
 import { getRegion, tr } from "@/core/region";
@@ -120,6 +121,8 @@ export type NewCustomerInput = {
   country?: string;
   /** Plano personalizado: módulos escolhidos (o preço é sempre calculado aqui, nunca vem do navegador). */
   modules?: ModuleKey[] | null;
+  /** Código do afiliado (cookie gw_ref do link /a/CODE). Só vale no Brasil. */
+  affiliateRef?: string | null;
 };
 
 /** Cria o plano exclusivo desta contratação (oculto da lista) com o preço = núcleo + módulos. */
@@ -178,6 +181,9 @@ export async function createCustomer(input: NewCustomerInput) {
       notes: input.notes || null,
     })
     .returning();
+
+  // Programa de afiliados: liga o cliente a quem indicou (antes de qualquer pagamento)
+  await attributeCustomer(customer, input.affiliateRef ?? null).catch((e) => console.error("[afiliados]", e));
 
   const amounts = setupAmounts(plan, input.wantsDomain, settings);
   const TT = Tc(customer);
@@ -292,6 +298,9 @@ export async function markInvoicePaid(
 
   if (inv.kind === "SETUP") await onSetupPaid(inv.customerId);
   else await onSubscriptionPaid(inv.customerId);
+
+  // Comissão do afiliado: gerada na hora em que a fatura é paga
+  await onInvoicePaidAffiliate(inv).catch((e) => console.error("[afiliados]", e));
 
   // Contrato (implantação) + recibo/NFS-e, enviados por e-mail ao cliente contratante
   const docs = await onInvoicePaidDocuments(inv);

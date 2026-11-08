@@ -9,6 +9,7 @@ import { MODULES, MODULE_INFO, modulesLabel, parseModules } from "@/core/modules
 import { tenantPublicUrl } from "@/lib/urls";
 import { invoiceUrl, getSettings } from "@/services/billing";
 import { Flash } from "@/components/Flash";
+import { setCustomerAffiliateAction } from "../../affiliate-actions";
 import { StatusPill } from "@/components/StatusPill";
 import { deleteCustomer, cancelCustomerAction, cancelInvoice, confirmInvoicePaid, deliver, saveDomain, setTier, suspendCustomer, toggleTask, saveCustomerModules } from "../../actions";
 
@@ -17,6 +18,8 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   const sp = await searchParams;
   const c = await db.query.customers.findFirst({ where: eq(schema.customers.id, id), with: { plan: true, tenant: true } });
   if (!c) notFound();
+  const aff = c.affiliateId ? await db.query.affiliates.findFirst({ where: eq(schema.affiliates.id, c.affiliateId), columns: { name: true, code: true } }) : null;
+  const affPaid = c.affiliateId ? await db.query.affiliateCommissions.findMany({ where: eq(schema.affiliateCommissions.customerId, c.id), columns: { amountMinor: true, status: true } }).then((l) => l.filter((k) => k.status !== "CANCELLED")) : [];
   const [invoices, tasks, notes, settings] = await Promise.all([
     db.query.invoices.findMany({ where: eq(schema.invoices.customerId, id), orderBy: desc(schema.invoices.createdAt) }),
     db.query.adminTasks.findMany({ where: eq(schema.adminTasks.customerId, id), orderBy: schema.adminTasks.createdAt }),
@@ -71,6 +74,18 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           <Row k="WhatsApp" v={c.whatsapp ? `${c.whatsapp}${c.whatsappOptIn ? " ✓ avisos" : " (sem avisos)"}` : "—"} />
           <Row k="RUC" v={c.ruc ?? "—"} />
           {c.notes && <p className="pt-2 text-muted">{c.notes}</p>}
+          {c.country === "BR" && (
+            <div className="mt-3 border-t border-line pt-3">
+              <p className="font-semibold">Indicado por (afiliado)</p>
+              {aff ? <p className="text-muted">{aff.name} · <span className="font-mono">{aff.code}</span>{affPaid.length ? ` · comissão ${affPaid.map((k) => formatMinor(k.amountMinor, "BRL")).join(" + ")}` : ""}</p> : <p className="text-muted">Nenhum</p>}
+              {c.status === "AWAITING_SETUP_PAYMENT" && (
+                <form action={setCustomerAffiliateAction.bind(null, c.id)} className="mt-2 flex gap-2">
+                  <input name="code" defaultValue={aff?.code ?? ""} placeholder="Código do afiliado" className="input py-2" />
+                  <button className="btn-ghost px-3">Salvar</button>
+                </form>
+              )}
+            </div>
+          )}
         </section>
         <section className="card space-y-2 p-4 text-sm">
           <h2 className="font-semibold">Sistema</h2>

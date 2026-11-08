@@ -339,3 +339,25 @@ html.a11y-motion .th .cart-bar, html.a11y-motion .th .hero-art { animation: none
 .th .hero-in > .relative > *:nth-child(2) { animation-delay: .08s; }
 .th .hero-in > .relative > *:nth-child(3) { animation-delay: .16s; }
 @media (prefers-reduced-motion: reduce) { .th .hero-in > .relative > * { animation: none; } }
+
+/* ------------------------------------------------------------------ portal do afiliado (gamificado) */
+.aff-bar { width: var(--w, 0%); animation: affGrow 1.1s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes affGrow { from { width: 0; } }
+.aff-ring { background: conic-gradient(var(--c, #3cc46b) calc(var(--p, 0) * 1%), rgba(255,255,255,.1) 0); animation: affSpin 1.2s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes affSpin { from { transform: rotate(-90deg) scale(.85); opacity: 0; } }
+.aff-pop { animation: affPop .5s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes affPop { from { transform: scale(.6); opacity: 0; } }
+.aff-shine { position: relative; overflow: hidden; }
+.aff-shine::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.18) 50%, transparent 70%); transform: translateX(-100%); animation: affSweep 3.5s ease-in-out infinite; }
+@keyframes affSweep { 60%, 100% { transform: translateX(100%); } }
+.aff-float { animation: affFloat 4s ease-in-out infinite; }
+@keyframes affFloat { 50% { transform: translateY(-6px); } }
+.aff-confetti i { position: absolute; top: -10px; width: 8px; height: 12px; border-radius: 2px; opacity: 0; animation: affFall 2.6s ease-in forwards; }
+@keyframes affFall { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(260px) rotate(540deg); } }
+.aff-locked { filter: grayscale(1); opacity: .45; }
+@media (prefers-reduced-motion: reduce) { .aff-bar, .aff-ring, .aff-pop, .aff-float, .aff-shine::after, .aff-confetti i { animation: none !important; } .aff-confetti { display: none; } }
+html.a11y-motion .aff-bar, html.a11y-motion .aff-ring, html.a11y-motion .aff-pop, html.a11y-motion .aff-float, html.a11y-motion .aff-shine::after { animation: none !important; }
+html.a11y-motion .aff-confetti { display: none; }
+.aff .input { background: var(--s-card); border-color: var(--s-line); color: var(--s-ink); }
+.aff .label { color: var(--s-muted); }
+.aff .btn-ghost { background: var(--s-card); border-color: var(--s-line); color: var(--s-ink); }

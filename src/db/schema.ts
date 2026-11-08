@@ -343,6 +343,7 @@ export const platformSettings = pgTable("platform_settings", {
   nfseServiceCode: text("nfse_service_code"), // item da lista de serviços (LC 116) — ex.: 1.03 / 1.05
   // Retenção de contratos e notas/recibos no sistema (meses)
   docsRetentionMonths: integer("docs_retention_months").notNull().default(12),
+  affiliateConfig: text("affiliate_config").notNull().default("{}"), // programa de afiliados (core/affiliates.ts)
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -394,9 +395,11 @@ export const customers = pgTable(
     nextBillingAt: timestamp("next_billing_at", { withTimezone: true }), // próximo vencimento
     domainPaidUntil: timestamp("domain_paid_until", { withTimezone: true }), // planos sem domínio incluso renovam anualmente
     notes: text("notes"),
+    affiliateId: text("affiliate_id"), // afiliado que trouxe o cliente (só Brasil)
+    affiliateLeadId: text("affiliate_lead_id"),
     createdAt: createdAt(),
   },
-  (t) => [index("customers_status_idx").on(t.status)],
+  (t) => [index("customers_status_idx").on(t.status), index("customers_affiliate_idx").on(t.affiliateId)],
 );
 
 export const invoices = pgTable(
@@ -814,4 +817,153 @@ export const supportTicketsRelations = relations(supportTickets, ({ one, many })
 }));
 export const supportMessagesRelations = relations(supportMessages, ({ one }) => ({
   ticket: one(supportTickets, { fields: [supportMessages.ticketId], references: [supportTickets.id] }),
+}));
+
+// ---------------------------------------------------------------- programa de afiliados (só Brasil)
+// Turmas da live de boas-vindas (quinzenal). O afiliado se cadastra, entra na fila da próxima turma
+// e só é liberado (status ACTIVE) depois da live.
+export const affiliateCohorts = pgTable("affiliate_cohorts", {
+  id: id(),
+  title: text("title").notNull(),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  liveUrl: text("live_url"), // link da live (liberado para os inscritos)
+  notes: text("notes"),
+  createdAt: createdAt(),
+});
+
+export const affiliates = pgTable(
+  "affiliates",
+  {
+    id: id(),
+    code: text("code").notNull(), // usado no link /a/CODE
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    whatsapp: text("whatsapp").notNull(),
+    cpfHash: text("cpf_hash").notNull(), // para evitar cadastro duplicado
+    cpfSealed: text("cpf_sealed").notNull(), // CPF criptografado (lib/secrets)
+    city: text("city"),
+    passwordHash: text("password_hash").notNull(),
+    sessionVersion: integer("session_version").notNull().default(1),
+    pixKeyType: text("pix_key_type").$type<"cpf" | "email" | "phone" | "random">().notNull(),
+    pixKey: text("pix_key").notNull(),
+    status: text("status").$type<"PENDING" | "ACTIVE" | "SUSPENDED">().notNull().default("PENDING"),
+    cohortId: text("cohort_id").references(() => affiliateCohorts.id, { onDelete: "set null" }),
+    referredById: text("referred_by_id"), // afiliado que indicou este afiliado (ganha 3% das vendas dele)
+    acceptedTermsAt: timestamp("accepted_terms_at", { withTimezone: true }).notNull(),
+    activatedAt: timestamp("activated_at", { withTimezone: true }),
+    adminNote: text("admin_note"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("affiliates_code_uq").on(t.code),
+    uniqueIndex("affiliates_email_uq").on(t.email),
+    uniqueIndex("affiliates_cpf_uq").on(t.cpfHash),
+    index("affiliates_ref_idx").on(t.referredById),
+  ],
+);
+
+export const affiliateClicks = pgTable(
+  "affiliate_clicks",
+  {
+    id: id(),
+    affiliateId: text("affiliate_id")
+      .notNull()
+      .references(() => affiliates.id, { onDelete: "cascade" }),
+    visitor: text("visitor").notNull(), // hash do visitante (conta clique único por dia)
+    source: text("source"), // ?origem= (whatsapp, instagram…)
+    createdAt: createdAt(),
+  },
+  (t) => [index("affiliate_clicks_aff_idx").on(t.affiliateId, t.createdAt)],
+);
+
+export const affiliateLeads = pgTable(
+  "affiliate_leads",
+  {
+    id: id(),
+    affiliateId: text("affiliate_id")
+      .notNull()
+      .references(() => affiliates.id, { onDelete: "cascade" }),
+    businessName: text("business_name").notNull(),
+    contactName: text("contact_name").notNull(),
+    whatsapp: text("whatsapp").notNull(),
+    email: text("email"),
+    city: text("city"),
+    segment: text("segment"),
+    note: text("note"),
+    source: text("source").$type<"link" | "manual">().notNull().default("link"),
+    status: text("status").$type<"NEW" | "SCHEDULED" | "NOT_SCHEDULED" | "SIGNED" | "WON" | "LOST">().notNull().default("NEW"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    adminNote: text("admin_note"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("affiliate_leads_aff_idx").on(t.affiliateId, t.status), index("affiliate_leads_wa_idx").on(t.whatsapp)],
+);
+
+export const affiliateCommissions = pgTable(
+  "affiliate_commissions",
+  {
+    id: id(),
+    affiliateId: text("affiliate_id")
+      .notNull()
+      .references(() => affiliates.id, { onDelete: "cascade" }),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    level: integer("level").notNull().default(1), // 1 = venda própria · 2 = venda de quem ele indicou
+    kind: text("kind").$type<"SETUP" | "ANNUAL">().notNull(),
+    tierName: text("tier_name"),
+    baseMinor: integer("base_minor").notNull(), // centavos de R$
+    pctBp: integer("pct_bp").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    status: text("status").$type<"PENDING" | "PAID" | "CANCELLED">().notNull().default("PENDING"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    paidBy: text("paid_by"),
+    paidRef: text("paid_ref"), // identificador do Pix enviado
+    cancelReason: text("cancel_reason"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("affiliate_commissions_uq").on(t.invoiceId, t.affiliateId, t.level),
+    index("affiliate_commissions_aff_idx").on(t.affiliateId, t.status),
+  ],
+);
+
+export const affiliateMaterials = pgTable("affiliate_materials", {
+  id: id(),
+  kind: text("kind").$type<"video" | "live" | "arquivo" | "texto" | "link">().notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  url: text("url"),
+  body: text("body"), // texto pronto para copiar (scripts de abordagem)
+  liveAt: timestamp("live_at", { withTimezone: true }),
+  pinned: boolean("pinned").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: createdAt(),
+});
+
+export type Affiliate = typeof affiliates.$inferSelect;
+export type AffiliateLead = typeof affiliateLeads.$inferSelect;
+export type AffiliateCommission = typeof affiliateCommissions.$inferSelect;
+export type AffiliateCohort = typeof affiliateCohorts.$inferSelect;
+export type AffiliateMaterial = typeof affiliateMaterials.$inferSelect;
+
+export const affiliatesRelations = relations(affiliates, ({ one, many }) => ({
+  cohort: one(affiliateCohorts, { fields: [affiliates.cohortId], references: [affiliateCohorts.id] }),
+  leads: many(affiliateLeads),
+  commissions: many(affiliateCommissions),
+}));
+export const affiliateCohortsRelations = relations(affiliateCohorts, ({ many }) => ({ affiliates: many(affiliates) }));
+export const affiliateLeadsRelations = relations(affiliateLeads, ({ one }) => ({
+  affiliate: one(affiliates, { fields: [affiliateLeads.affiliateId], references: [affiliates.id] }),
+  customer: one(customers, { fields: [affiliateLeads.customerId], references: [customers.id] }),
+}));
+export const affiliateCommissionsRelations = relations(affiliateCommissions, ({ one }) => ({
+  affiliate: one(affiliates, { fields: [affiliateCommissions.affiliateId], references: [affiliates.id] }),
+  customer: one(customers, { fields: [affiliateCommissions.customerId], references: [customers.id] }),
+  invoice: one(invoices, { fields: [affiliateCommissions.invoiceId], references: [invoices.id] }),
 }));
