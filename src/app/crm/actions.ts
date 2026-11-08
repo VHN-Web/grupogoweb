@@ -201,12 +201,13 @@ export async function saveHuntAction(f: FormData) {
 
 export async function saveGeminiAction(f: FormData) {
   await requireCrm();
-  const key = s(f, "key");
+  const key = s(f, "key").replace(/\s+/g, "");
   if (f.get("remove") === "1") {
     await saveCrmConfig({ geminiKey: null });
     go("/crm/busca", "ok", "Chave removida.");
   }
-  if (!/^[A-Za-z0-9_\-]{30,60}$/.test(key)) go("/crm/busca", "err", "Essa chave não parece válida. Copie a chave inteira no Google AI Studio (começa com AIza).");
+  // O Google usa mais de um formato de chave (ex.: "AIza…" e "AQ.…"); o teste logo abaixo é que confirma se ela funciona.
+  if (!/^[A-Za-z0-9._\-]{20,200}$/.test(key)) go("/crm/busca", "err", "Essa chave não parece válida. Copie a chave inteira no Google AI Studio, sem espaços.");
   await saveCrmConfig({ geminiKey: key });
   try {
     await testGemini();

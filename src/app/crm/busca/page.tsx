@@ -45,12 +45,12 @@ export default async function Hunt({ searchParams }: { searchParams: Promise<{ o
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">
             <li>Abra <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" className="font-semibold underline">aistudio.google.com/apikey</a> e entre com a mesma conta Google que você usa no Gemini.</li>
             <li>Toque em <b>“Create API key”</b> (Criar chave de API). Se pedir um projeto, escolha o que aparecer ou crie um novo.</li>
-            <li>Copie a chave inteira (começa com <code className="rounded bg-[var(--s-soft)] px-1">AIza</code>) e cole aqui embaixo.</li>
+            <li>Copie a chave inteira (começa com <code className="rounded bg-[var(--s-soft)] px-1">AIza</code> ou <code className="rounded bg-[var(--s-soft)] px-1">AQ.</code>) e cole aqui embaixo.</li>
             <li>Não precisa cadastrar cartão: o plano gratuito do Gemini é suficiente para as 3 buscas diárias. Se um dia passar do limite grátis, a busca só tenta de novo no horário seguinte.</li>
           </ol>
         </details>
         <form action={saveGeminiAction} className="mt-4 flex flex-wrap gap-2">
-          <input name="key" type="password" autoComplete="off" placeholder={hasKey ? "Colar uma chave nova para trocar" : "Cole a chave aqui (AIza…)"} className="input min-w-[240px] flex-1" />
+          <input name="key" type="password" autoComplete="off" placeholder={hasKey ? "Colar uma chave nova para trocar" : "Cole a chave aqui"} className="input min-w-[240px] flex-1" />
           <SubmitButton className="btn-brand" pending="Testando…">Salvar e testar</SubmitButton>
         </form>
         {cfg.geminiKeySealed && (
