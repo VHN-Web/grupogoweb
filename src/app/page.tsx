@@ -13,6 +13,8 @@ import { RevealOnScroll } from "@/components/motion/RevealOnScroll";
 import { detectLocale, tr, type Locale } from "@/core/region";
 import { SiteFooter, SiteHeader } from "@/components/site/SiteChrome";
 import { H, INK, IVORY, MUTED, wrap } from "@/components/site/tokens";
+import { isPreLaunch } from "@/core/launch";
+import { LaunchPage } from "@/components/site/LaunchPage";
 
 export const dynamic = "force-dynamic";
 
@@ -118,9 +120,14 @@ const FAQ_ES = [
   ["¿Hay permanencia mínima?", "No. Cancelás cuando quieras, sin multa."],
 ];
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ lang?: string }> }) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ lang?: string; preview?: string; lista?: string }> }) {
   const sp = await searchParams;
   const locale: Locale = sp.lang === "pt" || sp.lang === "es" ? sp.lang : detectLocale(await headers());
+  // Até o lançamento oficial (core/launch.ts) a página inicial é a contagem regressiva; ?preview=1 mostra o site
+  if (isPreLaunch() && sp.preview !== "1") {
+    const s = await getSettings();
+    return <LaunchPage locale={locale} lista={sp.lista} whatsapp={s.supportWhatsapp} />;
+  }
   const pt = locale === "pt";
   const T = tr(locale);
   const FAQ = pt ? FAQ_PT : FAQ_ES;
