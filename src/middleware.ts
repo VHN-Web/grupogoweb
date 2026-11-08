@@ -38,7 +38,8 @@ async function route(req: NextRequest) {
   const host = (req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "").toLowerCase().replace(/:\d+$/, "");
   const { pathname } = req.nextUrl;
   // ?lang=pt|es escolhido na página vale também para o <html lang> e o título (layout raiz)
-  const lang = req.nextUrl.searchParams.get("lang");
+  // Programa de afiliados é só Brasil: sempre português
+  const lang = /^\/(afiliados|a)(\/|$)/.test(pathname) ? "pt" : req.nextUrl.searchParams.get("lang");
   if (lang === "pt" || lang === "es") {
     const h = new Headers(req.headers);
     h.set("x-gw-lang", lang);
