@@ -42,7 +42,7 @@ export async function saveGeovanaAiAction(f: FormData) {
   revalidatePath("/admin/config");
   if (!key) back("Modelo da IA salvo ✓");
   try {
-    await geminiChat({ key, model, system: "Responda só: ok", history: [{ role: "user", text: "teste" }], maxTokens: 10, timeoutMs: 15_000, retries: 0 });
+    await geminiChat({ key, model, system: "Responda só: ok", history: [{ role: "user", text: "teste" }], maxTokens: 10, timeoutMs: 8_000, retries: 2 });
   } catch (e) {
     if (e instanceof AiError && e.kind === "key") {
       await saveWhatsappPlatform({ model, geminiKeySealed: prev.geminiKeySealed });

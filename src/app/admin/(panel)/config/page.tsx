@@ -99,7 +99,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <form action={saveGeovanaAiAction} className="grid gap-3 border-t border-line pt-4 sm:grid-cols-[1fr_200px_auto] sm:items-end">
           <F label={wa.geminiKeySealed ? "Chave do Gemini (salva — cole outra para trocar)" : "Chave do Gemini (Google AI Studio)"}><input name="key" type="password" autoComplete="off" className="input" /></F>
           <F label="Modelo"><input name="model" className="input" defaultValue={wa.model} /></F>
-          <SubmitButton className="btn-primary" pending="Testando… (até 15 s)">Salvar e testar</SubmitButton>
+          <SubmitButton className="btn-primary" pending="Testando… (até 25 s)">Salvar e testar</SubmitButton>
         </form>
         <p className="text-xs text-muted">Status: {wa.evolutionKeySealed ? "Evolution ✓" : "Evolution não configurada (lojas só pela API oficial)"} · {wa.geminiKeySealed ? "IA ✓" : "IA sem chave (lojas precisam da chave própria)"}</p>
       </section>

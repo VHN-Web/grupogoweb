@@ -15,7 +15,7 @@ import { formatMoney } from "@/core/money";
 import { getRegion, tr } from "@/core/region";
 import type { Currency } from "@/core/types";
 import { parsePaymentConfig, publicPaymentConfig } from "@/core/tenant-config";
-import { geminiChat, geminiModel, AiError, type ChatTurn } from "@/adapters/ai/gemini";
+import { GEMINI_DEFAULT_MODEL, geminiChat, geminiModel, AiError, type ChatTurn } from "@/adapters/ai/gemini";
 import { EvolutionError, evoConnect, evoCreateInstance, evoDelete, evoLogout, evoSendText, evoSetWebhook, evoState } from "@/adapters/whatsapp/evolution";
 import { CloudError, cloudCheck, cloudSendText } from "@/adapters/whatsapp/cloud";
 import { openSecret, sealSecret } from "@/lib/secrets";
@@ -33,7 +33,8 @@ export async function whatsappPlatform(): Promise<WhatsappPlatform> {
   try {
     o = JSON.parse(s?.whatsappConfig ?? "{}");
   } catch {}
-  return { evolutionUrl: o.evolutionUrl ?? "", evolutionKeySealed: o.evolutionKeySealed ?? "", geminiKeySealed: o.geminiKeySealed ?? "", model: geminiModel(o.model) };
+  return { evolutionUrl: o.evolutionUrl ?? "", evolutionKeySealed: o.evolutionKeySealed ?? "", geminiKeySealed: o.geminiKeySealed ?? "", // 3.8 Flash foi salvo como padrão provisório e vive congestionado: a Geovana usa o Flash-Lite (rápido)
+  model: o.model === "gemini-3.8-flash" ? GEMINI_DEFAULT_MODEL : geminiModel(o.model) };
 }
 
 export async function saveWhatsappPlatform(patch: Partial<WhatsappPlatform>) {

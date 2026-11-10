@@ -5,14 +5,17 @@
 export class AiError extends Error {
   constructor(
     message: string,
-    readonly kind: "key" | "quota" | "busy" | "other" = "other",
+    readonly kind: "key" | "quota" | "busy" | "model" | "other" = "other",
   ) {
     super(message);
   }
 }
 
-/** Modelo padrão. O Google aposenta modelos antigos para contas novas — os 1.x/2.x salvos viram este. */
-export const GEMINI_DEFAULT_MODEL = "gemini-3.8-flash";
+/** Modelo padrão (rápido, feito para alto volume — ideal para atendimento). O Google aposenta modelos antigos
+ * para contas novas — os 1.x/2.x salvos viram este. */
+export const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash-lite";
+/** Reservas: se o modelo escolhido estiver sobrecarregado/indisponível, tenta estes, nesta ordem. */
+export const GEMINI_FALLBACKS = ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"];
 export function geminiModel(m: string | null | undefined): string {
   const v = String(m ?? "").trim();
   return !v || /^gemini-(1|2)\./.test(v) ? GEMINI_DEFAULT_MODEL : v;
@@ -39,17 +42,20 @@ export async function geminiChat(o: { key: string; model: string; system: string
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: o.system }] },
     contents,
-    generationConfig: geminiGenConfig(model, o.temperature ?? 0.5, o.maxTokens ?? 600),
+    generationConfig: "__MODEL_CFG__",
   });
-  // modelo sobrecarregado (503 / "high demand") é passageiro: tenta mais 2 vezes com espera curta
-  for (let attempt = 0; ; attempt++) {
+  // modelo sobrecarregado/indisponível: passa para o próximo modelo da lista de reservas
+  const chain = [model, ...GEMINI_FALLBACKS.filter((m) => m !== model)].slice(0, 1 + (o.retries ?? 2));
+  let last: unknown;
+  for (const m of chain) {
     try {
-      return await geminiOnce(o.key, model, body, o.timeoutMs ?? 25_000);
+      return await geminiOnce(o.key, m, body.replace(`"__MODEL_CFG__"`, JSON.stringify(geminiGenConfig(m, o.temperature ?? 0.5, o.maxTokens ?? 600))), o.timeoutMs ?? 20_000);
     } catch (e) {
-      if (!(e instanceof AiError) || e.kind !== "busy" || attempt >= (o.retries ?? 2)) throw e;
-      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      last = e;
+      if (!(e instanceof AiError) || (e.kind !== "busy" && e.kind !== "model")) throw e;
     }
   }
+  throw last;
 }
 
 async function geminiOnce(key: string, model: string, body: string, timeoutMs: number) {
@@ -67,6 +73,7 @@ async function geminiOnce(key: string, model: string, body: string, timeoutMs: n
   if (!res.ok) {
     const msg = j?.error?.message ?? `HTTP ${res.status}`;
     if (res.status === 400 && /API key/i.test(msg)) throw new AiError("Chave do Gemini inválida.", "key");
+    if (res.status === 404 || /not found|no longer available|not supported for generateContent/i.test(msg)) throw new AiError(`Modelo ${model} indisponível.`, "model");
     if (res.status === 503 || /high demand|overloaded|unavailable/i.test(msg)) throw new AiError("O Gemini está sobrecarregado agora (passageiro).", "busy");
     if (res.status === 429) throw new AiError("Limite do Gemini atingido por agora.", "quota");
     throw new AiError(`Gemini: ${msg}`);
