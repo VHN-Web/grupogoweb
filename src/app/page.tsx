@@ -1,3 +1,4 @@
+import { sortPlansByPrice } from "@/core/plans";
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -134,7 +135,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
   const DEMOS = pt ? DEMOS_PT : DEMOS_ES;
   const [settings, plans] = await Promise.all([
     getSettings(),
-    db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) }),
+    db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) }).then((ps) => sortPlansByPrice(ps, locale === "pt" ? "BRL" : "PYG")),
   ]);
   const mp = parseModulePrices(settings.modulePrices);
   const wa = settings.supportWhatsapp ? `https://wa.me/${settings.supportWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(T("¡Hola! Quiero conocer GoWeb para mi negocio.", "Olá! Quero conhecer a GoWeb para o meu negócio."))}` : `/planos?lang=${locale}`;

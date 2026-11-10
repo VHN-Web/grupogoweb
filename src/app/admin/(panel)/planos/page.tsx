@@ -1,3 +1,4 @@
+import { sortPlansByPrice } from "@/core/plans";
 import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatMinor } from "@/core/money";
@@ -12,7 +13,7 @@ import type { Amounts } from "@/core/billing";
 
 export default async function PlansPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const sp = await searchParams;
-  const plans = await db.query.plans.findMany({ where: eq(schema.plans.isCustom, false), orderBy: asc(schema.plans.sortOrder) });
+  const plans = await db.query.plans.findMany({ where: eq(schema.plans.isCustom, false), orderBy: asc(schema.plans.sortOrder) }).then((ps) => sortPlansByPrice(ps, "BRL"));
   const mp = parseModulePrices((await getSettings()).modulePrices);
   const all = customPrice(mp, [...MODULES]);
   return (

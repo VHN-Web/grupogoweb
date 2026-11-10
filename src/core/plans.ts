@@ -73,3 +73,14 @@ export function planToPt(p: { name: string; features: string | null }) {
     features: p.features == null ? null : p.features.split("\n").map((l) => planFeature(l, "pt")).join("\n"),
   };
 }
+
+/** Ordena planos do mais barato para o mais caro pelo valor exibido, na moeda de quem vê.
+ * Empate: a ordem definida no admin. */
+export function sortPlansByPrice<T extends { pricePyg: number; priceBrlMinor: number; priceUsdMinor: number; interval: string; sortOrder: number }>(
+  plans: T[],
+  currency: "PYG" | "BRL" | "USD" = "BRL",
+): T[] {
+  // ordem crescente pelo valor que o cliente vê no cartão (mensais primeiro; anual, mais caro no total, depois)
+  const shown = (p: T) => (currency === "PYG" ? p.pricePyg : currency === "USD" ? p.priceUsdMinor : p.priceBrlMinor);
+  return [...plans].sort((a, b) => shown(a) - shown(b) || a.sortOrder - b.sortOrder);
+}

@@ -1,3 +1,4 @@
+import { sortPlansByPrice } from "@/core/plans";
 import Link from "next/link";
 import { and, asc, eq, gte } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -294,7 +295,7 @@ function TierLadder({ cfg }: { cfg: Awaited<ReturnType<typeof affiliateConfig>> 
 // ---------------------------------------------------------------- página pública do programa
 async function ProgramLanding() {
   const cfg = await affiliateConfig();
-  const plans = await db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) });
+  const plans = await db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) }).then((ps) => sortPlansByPrice(ps, "BRL"));
   const ex = plans.filter((p) => p.setupBrlMinor > 0).sort((a, b) => a.setupBrlMinor - b.setupBrlMinor)[0];
   const low = cfg.tiers[0].pctBp;
   const high = cfg.tiers[cfg.tiers.length - 1].pctBp;

@@ -1172,6 +1172,7 @@ export const waChats = pgTable(
     name: text("name"),
     pausedUntil: timestamp("paused_until", { withTimezone: true }), // humano assumiu: IA quieta até
     needsHuman: boolean("needs_human").notNull().default(false),
+    closedNoticeAt: timestamp("closed_notice_at", { withTimezone: true }), // último aviso "estamos fechados"
     lastAt: timestamp("last_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
   },

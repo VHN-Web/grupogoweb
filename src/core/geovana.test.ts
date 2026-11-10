@@ -34,3 +34,18 @@ describe("Geovana", () => {
     expect(p).toContain("[[CARRINHO:");
   });
 });
+
+import { geovanaAnswers, closedNotice } from "./geovana";
+describe("horário da Geovana", () => {
+  it("responde conforme o modo e a loja aberta/fechada", () => {
+    expect(geovanaAnswers("open", true)).toBe(true);
+    expect(geovanaAnswers("open", false)).toBe(false);
+    expect(geovanaAnswers("closed", true)).toBe(false);
+    expect(geovanaAnswers("always", false)).toBe(true);
+  });
+  it("modo antigo 'só fechada' vira closed; padrão é só aberta", () => {
+    expect(parseGeovana(JSON.stringify({ onlyWhenClosed: true })).when).toBe("closed");
+    expect(parseGeovana(null).when).toBe("open");
+    expect(closedNotice("Burger do Zé", "18h às 23h", true)).toContain("18h às 23h");
+  });
+});

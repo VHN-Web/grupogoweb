@@ -13,7 +13,7 @@ import { PhoneInput } from "@/components/forms/PhoneInput";
 import { detectLocale, getRegion, isValidE164, isValidName, tr, type Locale } from "@/core/region";
 import { THEMES, THEME_IDS } from "@/core/themes";
 import { formatMinor } from "@/core/money";
-import { planName } from "@/core/plans";
+import { planName, sortPlansByPrice } from "@/core/plans";
 import { BillingError, createCustomer, getSettings } from "@/services/billing";
 import { CORE_INFO, MODULES, MODULE_INFO, parseModulePrices, sanitizeModules } from "@/core/modules";
 import { ModulePicker } from "@/components/forms/ModulePicker";
@@ -77,7 +77,7 @@ export default async function Contratar({ searchParams }: { searchParams: Promis
   const locale: Locale = sp.lang === "pt" || sp.lang === "es" ? sp.lang : detectLocale(await headers());
   const T = tr(locale);
   const pt = locale === "pt";
-  const plans = await db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) });
+  const plans = await db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) }).then((ps) => sortPlansByPrice(ps, locale === "pt" ? "BRL" : "PYG"));
   const mp = parseModulePrices((await getSettings()).modulePrices);
   const custom = sp.plano === "personalizado" && mp.enabled;
   const found = plans.find((p) => p.id === sp.plano) ?? plans[0];

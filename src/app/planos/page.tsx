@@ -5,7 +5,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { BRAND } from "@/components/brand/GoWebLogo";
 import { Icon } from "@/components/ui/Icon";
-import { planFeature, planName } from "@/core/plans";
+import { planFeature, planName, sortPlansByPrice } from "@/core/plans";
 import { parseModulePrices } from "@/core/modules";
 import { detectLocale, tr, type Locale } from "@/core/region";
 import { getSettings } from "@/services/billing";
@@ -27,7 +27,7 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
   const T = tr(locale);
   const [settings, plans] = await Promise.all([
     getSettings(),
-    db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) }),
+    db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) }).then((ps) => sortPlansByPrice(ps, locale === "pt" ? "BRL" : "PYG")),
   ]);
   const mp = parseModulePrices(settings.modulePrices);
   const wa = settings.supportWhatsapp ? `https://wa.me/${settings.supportWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(T("¡Hola! Tengo dudas sobre los planes de GoWeb.", "Olá! Tenho dúvidas sobre os planos da GoWeb."))}` : `mailto:${settings.supportEmail ?? "suporte@goweboficial.com"}`;

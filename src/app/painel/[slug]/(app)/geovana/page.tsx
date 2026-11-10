@@ -142,7 +142,16 @@ export default async function GeovanaPage({ params, searchParams }: { params: Pr
           <div className="grid gap-2 sm:col-span-2">
             <label className="flex items-center gap-2"><input type="checkbox" name="takeOrders" defaultChecked={cfg.takeOrders} /> {T("Arma el pedido en la charla y manda el link con el carrito listo", "Monta o pedido na conversa e manda o link com o carrinho pronto")}</label>
             <label className="flex items-center gap-2"><input type="checkbox" name="orderNotices" defaultChecked={cfg.orderNotices} /> {T("Avisos automáticos del pedido (en preparación, salió con el mapa, entregado)", "Avisos automáticos do pedido (em preparo, saiu com o mapa do motoboy, entregue)")}</label>
-            <label className="flex items-center gap-2"><input type="checkbox" name="onlyWhenClosed" defaultChecked={cfg.onlyWhenClosed} /> {T("Responder solo con la tienda cerrada", "Responder só com a loja fechada")}</label>
+            <label className="grid gap-1 sm:max-w-md">
+              {T("¿Cuándo responde?", "Quando ela responde?")}
+              <select name="when" className="input" defaultValue={cfg.when}>
+                <option value="open">{T("Solo con la tienda abierta (recomendado)", "Só com a loja aberta (recomendado)")}</option>
+                <option value="always">{T("Siempre, día y noche", "Sempre, dia e noite")}</option>
+                <option value="closed">{T("Solo con la tienda cerrada", "Só com a loja fechada")}</option>
+              </select>
+              <span className="text-xs text-muted">{T("Abierta/cerrada = el botón \"Tienda abierta\" del panel.", "Aberta/fechada = o botão \"Loja aberta\" do painel.")}</span>
+            </label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="closedMessage" defaultChecked={cfg.closedMessage} /> {T("Fuera del horario, avisar que está cerrado (1 vez cada 6 h por cliente)", "Fora do horário, avisar que está fechado (1 vez a cada 6 h por cliente)")}</label>
             <label className="flex items-center gap-2"><input type="checkbox" name="emojis" defaultChecked={cfg.emojis} /> {T("Usar emojis", "Usar emojis")}</label>
           </div>
           <details className="sm:col-span-2">

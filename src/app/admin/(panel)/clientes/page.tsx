@@ -1,3 +1,4 @@
+import { sortPlansByPrice } from "@/core/plans";
 import Link from "next/link";
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -16,7 +17,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const [customers, plans] = await Promise.all([
     db.query.customers.findMany({ with: { plan: true, tenant: true }, orderBy: desc(schema.customers.createdAt) }),
-    db.query.plans.findMany({ where: eq(schema.plans.active, true), orderBy: asc(schema.plans.sortOrder) }),
+    db.query.plans.findMany({ where: eq(schema.plans.active, true), orderBy: asc(schema.plans.sortOrder) }).then((ps) => sortPlansByPrice(ps, "BRL")),
   ]);
   const orphans = await orphanStores();
 

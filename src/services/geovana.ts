@@ -9,7 +9,7 @@ import { randomBytes } from "node:crypto";
 import { and, desc, eq, gte, like } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Tenant } from "@/db/schema";
-import { buildSystemPrompt, jidToE164, orderNotice, parseGeovana, parseReply, wantsHuman, type GeovanaConfig, type GeovanaContext } from "@/core/geovana";
+import { CLOSED_NOTICE_EVERY_MS, buildSystemPrompt, closedNotice, geovanaAnswers, jidToE164, orderNotice, parseGeovana, parseReply, wantsHuman, type GeovanaConfig, type GeovanaContext } from "@/core/geovana";
 import { getLabels } from "@/core/types";
 import { formatMoney } from "@/core/money";
 import { getRegion, tr } from "@/core/region";
@@ -265,7 +265,17 @@ export async function handleInbound(t: Tenant, m: { jid: string; name: string | 
   if (!(await store(t.id, chat.id, "user", m.text, m.externalId))) return "duplicate";
   if (!cfg.enabled || t.tier !== "pro" || t.demo) return "disabled";
   if (chat.pausedUntil && chat.pausedUntil > new Date()) return "paused";
-  if (cfg.onlyWhenClosed && t.isOpen) return "open-hours";
+  if (!geovanaAnswers(cfg.when, t.isOpen)) {
+    // fora do horário escolhido: avisa uma vez (a cada 6 h) que a loja está fechada; a mensagem fica para a equipe
+    if (cfg.when === "open" && cfg.closedMessage && (!chat.closedNoticeAt || Date.now() - chat.closedNoticeAt.getTime() > CLOSED_NOTICE_EVERY_MS)) {
+      const text = closedNotice(t.name, cfg.hours, getRegion(t.country).locale === "pt");
+      const extId = await sendText(t, cfg, phone, text);
+      await store(t.id, chat.id, "ai", text, extId);
+      await db.update(schema.waChats).set({ closedNoticeAt: new Date() }).where(eq(schema.waChats.id, chat.id));
+      return "closed-notice";
+    }
+    return "off-hours";
+  }
 
   const T = tr(getRegion(t.country).locale);
   let reply: { text: string; handoff: boolean };
@@ -331,5 +341,11 @@ export async function simulate(t: Tenant, history: ChatTurn[]) {
   const cfg = geovanaOf(t);
   const last = history.at(-1)?.text ?? "";
   if (wantsHuman(last, cfg.handoffWords)) return { text: tr(getRegion(t.country).locale)("Perfecto, ya llamo a alguien del equipo. 🙌", "Certo! Já chamei alguém da equipe para te atender. 🙌"), handoff: true };
+  // mostra no teste o que o cliente receberia fora do horário
+  if (!geovanaAnswers(cfg.when, t.isOpen)) {
+    const pt = getRegion(t.country).locale === "pt";
+    const note = pt ? "(Simulação: agora ela NÃO responde — fora do horário escolhido.)" : "(Simulación: ahora NO responde — fuera del horario elegido.)";
+    return { text: cfg.when === "open" && cfg.closedMessage ? `${closedNotice(t.name, cfg.hours, pt)}\n\n${note}` : note, handoff: false };
+  }
   return geovanaReply(t, cfg, history, null, null);
 }

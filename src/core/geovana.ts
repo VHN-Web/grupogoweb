@@ -6,6 +6,22 @@ export type GeovanaChannel = "none" | "evolution" | "cloud";
 export type GeovanaTone = "amigavel" | "profissional" | "descontraido";
 export type GeovanaFaq = { q: string; a: string };
 
+export type GeovanaWhen = "always" | "open" | "closed";
+
+/** A IA responde agora? (loja aberta = botão "Loja aberta" do painel) */
+export function geovanaAnswers(when: GeovanaWhen, isOpen: boolean): boolean {
+  return when === "always" || (when === "open" ? isOpen : !isOpen);
+}
+
+/** Aviso automático (1x a cada 6 h por conversa) quando a IA não atende por estar fora do horário. */
+export const CLOSED_NOTICE_EVERY_MS = 6 * 3600_000;
+export function closedNotice(store: string, hours: string, pt: boolean): string {
+  const h = hours.trim();
+  return pt
+    ? `Oi! A ${store} está fechada agora 🙂${h ? ` Nosso horário: ${h}.` : ""} Assim que abrirmos, respondemos por aqui.`
+    : `¡Hola! ${store} está cerrado ahora 🙂${h ? ` Nuestro horario: ${h}.` : ""} Apenas abramos, te respondemos por aquí.`;
+}
+
 export type GeovanaConfig = {
   enabled: boolean; // IA respondendo
   name: string; // nome da atendente
@@ -18,7 +34,9 @@ export type GeovanaConfig = {
   promos: string; // promoções da semana
   faq: GeovanaFaq[];
   handoffWords: string[]; // palavras que chamam um humano
-  onlyWhenClosed: boolean; // IA só fora do horário (loja fechada)
+  onlyWhenClosed: boolean; // (legado) IA só fora do horário — hoje: when = "closed"
+  when: GeovanaWhen; // quando a IA responde: sempre, só com a loja aberta, só com a loja fechada
+  closedMessage: boolean; // fora do horário: avisa uma vez que está fechado (em vez de silêncio)
   pauseMinutes: number; // atendente humano respondeu → IA pausa nessa conversa
   takeOrders: boolean; // monta o carrinho e manda o link
   orderNotices: boolean; // avisos automáticos do pedido ao cliente
@@ -47,6 +65,8 @@ export const DEFAULT_GEOVANA: GeovanaConfig = {
   faq: [],
   handoffWords: ["atendente", "humano", "pessoa", "gerente", "reclamação"],
   onlyWhenClosed: false,
+  when: "open",
+  closedMessage: true,
   pauseMinutes: 60,
   takeOrders: true,
   orderNotices: true,
@@ -90,6 +110,8 @@ export function parseGeovana(raw: string | null | undefined): GeovanaConfig {
     faq,
     handoffWords: words,
     onlyWhenClosed: o.onlyWhenClosed === true,
+    when: o.when === "always" || o.when === "open" || o.when === "closed" ? o.when : o.onlyWhenClosed === true ? "closed" : d.when,
+    closedMessage: o.closedMessage !== false,
     pauseMinutes: Number.isFinite(pm) && pm >= 5 && pm <= 1440 ? Math.round(pm) : d.pauseMinutes,
     takeOrders: o.takeOrders !== false,
     orderNotices: o.orderNotices !== false,
