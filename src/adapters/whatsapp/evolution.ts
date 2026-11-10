@@ -81,7 +81,11 @@ export const evoDelete = (server: Srv, instance: string) => call(server, `/insta
 export const evoSendText = (server: Srv, instance: string, toE164: string, text: string) =>
   call<{ key?: { id?: string } }>(server, `/message/sendText/${encodeURIComponent(instance)}`, { body: { number: toE164.replace(/\D/g, ""), text, delay: 1200, linkPreview: true } });
 
-export type Inbound = { id: string; jid: string; fromMe: boolean; text: string; name: string | null };
+export type Inbound = { id: string; jid: string; fromMe: boolean; text: string; name: string | null; image?: { mimetype: string } | null };
+
+/** Baixa a mídia (ex.: foto) de uma mensagem recebida, em base64. */
+export const evoMediaBase64 = (server: Srv, instance: string, messageId: string) =>
+  call<{ base64?: string; mimetype?: string }>(server, `/chat/getBase64FromMediaMessage/${encodeURIComponent(instance)}`, { body: { message: { key: { id: messageId } }, convertToMp4: false } });
 
 /** Mensagem recebida/enviada no webhook (texto); null = outro evento. */
 export function evoParse(body: unknown): { kind: "message"; msg: Inbound } | { kind: "connection"; state: string } | null {
@@ -100,5 +104,6 @@ export function evoParse(body: unknown): { kind: "message"; msg: Inbound } | { k
     "";
   if (!d?.key?.remoteJid || !d.key.id) return null;
   const audio = !!m.audioMessage;
-  return { kind: "message", msg: { id: d.key.id, jid: d.key.remoteJid, fromMe: !!d.key.fromMe, text: text || (audio ? "[áudio]" : ""), name: d.pushName ?? null } };
+  const img = m.imageMessage as { mimetype?: string } | undefined;
+  return { kind: "message", msg: { id: d.key.id, jid: d.key.remoteJid, fromMe: !!d.key.fromMe, text: text || (audio ? "[áudio]" : img ? "[foto]" : ""), name: d.pushName ?? null, image: img ? { mimetype: img.mimetype ?? "image/jpeg" } : null } };
 }

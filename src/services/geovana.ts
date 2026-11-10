@@ -168,7 +168,7 @@ async function sendText(t: Tenant, cfg: GeovanaConfig, phone: string, text: stri
 }
 
 // ---------------------------------------------------------------- contexto e cérebro
-async function aiKey(cfg: GeovanaConfig) {
+export async function aiKey(cfg: GeovanaConfig) {
   const p = await whatsappPlatform();
   const key = (cfg.ownKeySealed && openSecret(cfg.ownKeySealed)) || (p.geminiKeySealed && openSecret(p.geminiKeySealed)) || process.env.GEMINI_API_KEY || "";
   if (!key) throw new GeovanaError("IA sem chave: a GoWeb precisa cadastrar a chave do Gemini (ou use a chave da sua loja).");

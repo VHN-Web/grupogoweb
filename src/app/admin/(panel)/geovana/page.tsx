@@ -79,6 +79,12 @@ export default async function GwBotPage({ searchParams }: { searchParams: Promis
         </label>
         <label className="flex items-center gap-2"><input type="checkbox" name="autoFollowUp" defaultChecked={cfg.autoFollowUp} /> Retorno automático para leads que pararam de responder</label>
         <label className="grid gap-1">Depois de quantas horas (ex.: 24, 72)<input name="followUpHours" className="input" defaultValue={cfg.followUpHours.join(", ")} /></label>
+        <fieldset className="grid gap-2 rounded-xl border border-line p-3 sm:col-span-2">
+          <legend className="px-1 text-xs font-semibold">Lembretes automáticos para as lojas (WhatsApp da GoWeb, 9h–19h, sem repetir)</legend>
+          <label className="flex items-center gap-2"><input type="checkbox" name="setupNudges" defaultChecked={cfg.setupNudges} /> Passo a passo: lembra o lojista do próximo passo da configuração (a cada 2 dias, até a loja ficar pronta)</label>
+          <label className="flex items-center gap-2"><input type="checkbox" name="idleNudges" defaultChecked={cfg.idleNudges} /> Loja parada: 7+ dias sem pedido → dicas ao lojista e aviso aos sócios (1x por semana)</label>
+          <label className="flex items-center gap-2"><input type="checkbox" name="billingNudges" defaultChecked={cfg.billingNudges} /> Cobrança gentil: fatura 3 dias antes, no dia, 1 e 3 dias depois, com o link de pagamento</label>
+        </fieldset>
         <p className="text-xs text-muted sm:col-span-2">Retornos só entre 9h e 20h, nunca para quem pediu para parar (“parar”, “sair”), e param quando o lead fecha ou é perdido no CRM.</p>
         <div className="sm:col-span-2"><SubmitButton className="btn-primary" pending="Salvando…">Salvar</SubmitButton></div>
       </form>

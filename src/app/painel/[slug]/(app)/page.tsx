@@ -3,6 +3,8 @@ import { Icon } from "@/components/ui/Icon";
 import Link from "next/link";
 import { after } from "next/server";
 import { OD_PLATFORM_INFO, isOdPlatform } from "@/core/opendelivery";
+import { setupProgress } from "@/core/setup";
+import { storeSetup } from "@/services/setup";
 import { and, desc, eq, gte } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
@@ -48,9 +50,32 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
       ])
     : [0, 0];
 
+  // primeiros passos (só Brasil, some quando tudo estiver pronto)
+  const steps = t.country === "BR" && !t.demo ? await storeSetup(t) : [];
+  const prog = setupProgress(steps);
   return (
     <div className="space-y-6">
       <AutoRefresh ms={5000} />
+      {steps.length > 0 && prog.next && (
+        <details className="card p-4 text-sm" open={prog.done <= 2}>
+          <summary className="flex cursor-pointer items-center gap-3">
+            <span className="font-semibold">Primeiros passos · {prog.done} de {prog.total}</span>
+            <span className="h-2 flex-1 overflow-hidden rounded-full bg-black/10"><span className="block h-full rounded-full bg-[#3CC46B]" style={{ width: `${prog.pct}%` }} /></span>
+            <span className="text-xs text-muted">Próximo: {prog.next.title}</span>
+          </summary>
+          <ol className="mt-3 space-y-2">
+            {steps.map((s) => (
+              <li key={s.key} className="flex items-start gap-2">
+                <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold ${s.done ? "bg-[#3CC46B] text-white" : "bg-black/10"}`}>{s.done ? "✓" : ""}</span>
+                <span className="flex-1">
+                  <Link href={s.href} className={`font-semibold ${s.done ? "text-muted line-through" : "underline-offset-2 hover:underline"}`}>{s.title}</Link>
+                  {!s.done && <span className="block text-xs text-muted">{s.how}</span>}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
       {(abandoned > 0 || pendingAppts > 0) && (
         <div className="flex flex-wrap gap-2">
           {pendingAppts > 0 && (

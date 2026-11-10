@@ -16,7 +16,9 @@ export type GwBotConfig = {
   pauseMinutes: number; // sócio respondeu pelo celular → IA pausa nessa conversa
   autoFollowUp: boolean; // retorno automático para leads que pararam de responder
   followUpHours: number[]; // depois de quantas horas sem resposta (ex.: 24, 72)
-  dailyDigest: boolean; // resumo diário no WhatsApp dos sócios
+  setupNudges: boolean; // passo a passo: lembra o lojista do próximo passo
+  idleNudges: boolean; // loja parada: dicas ao lojista + aviso aos sócios
+  billingNudges: boolean; // cobrança gentil: lembretes de fatura com link
   partnerPhones: string[]; // WhatsApp dos sócios (E.164) para avisos
 };
 
@@ -30,7 +32,9 @@ export const DEFAULT_GW_BOT: GwBotConfig = {
   pauseMinutes: 120,
   autoFollowUp: true,
   followUpHours: [24, 72],
-  dailyDigest: true,
+  setupNudges: true,
+  idleNudges: true,
+  billingNudges: true,
   partnerPhones: [],
 };
 
@@ -53,7 +57,9 @@ export function parseGwBot(raw: string | null | undefined): GwBotConfig {
     pauseMinutes: Number.isFinite(pm) && pm >= 5 && pm <= 1440 ? Math.round(pm) : DEFAULT_GW_BOT.pauseMinutes,
     autoFollowUp: o.autoFollowUp !== false,
     followUpHours: fu.length ? fu.sort((a, b) => a - b) : DEFAULT_GW_BOT.followUpHours,
-    dailyDigest: o.dailyDigest !== false,
+    setupNudges: o.setupNudges !== false,
+    idleNudges: o.idleNudges !== false,
+    billingNudges: o.billingNudges !== false,
     partnerPhones: phones,
   };
 }

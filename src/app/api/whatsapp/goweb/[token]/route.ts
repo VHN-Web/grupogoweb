@@ -11,7 +11,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!cfg) return NextResponse.json({ error: "not found" }, { status: 404 });
   const ev = evoParse(await req.json().catch(() => null));
   if (ev?.kind === "message") {
-    after(() => handleGwInbound({ jid: ev.msg.jid, name: ev.msg.name, text: ev.msg.text, externalId: ev.msg.id, fromMe: ev.msg.fromMe }).catch((e) => console.error("[gw-bot evo]", e)));
+    after(() => handleGwInbound({ jid: ev.msg.jid, name: ev.msg.name, text: ev.msg.text, externalId: ev.msg.id, fromMe: ev.msg.fromMe, image: ev.msg.image ?? null }).catch((e) => console.error("[gw-bot evo]", e)));
   }
   return NextResponse.json({ ok: true });
 }

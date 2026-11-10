@@ -162,6 +162,7 @@ export const products = pgTable(
     promoEndsAt: timestamp("promo_ends_at", { withTimezone: true }),
     // Serviço agendável (ex: corte de cabelo): duração em minutos
     durationMin: integer("duration_min"),
+    importBatch: text("import_batch"), // cardápio por foto: lote importado (ocultos até a loja publicar)
     createdAt: createdAt(),
   },
   (t) => [index("products_tenant_idx").on(t.tenantId)],
@@ -1274,3 +1275,9 @@ export const gwMessages = pgTable(
   (t) => [uniqueIndex("gw_messages_ext_uq").on(t.externalId), index("gw_messages_chat_idx").on(t.chatId, t.createdAt)],
 );
 export type GwChat = typeof gwChats.$inferSelect;
+
+// Lembretes automáticos já enviados (passo a passo, loja parada, cobrança gentil…) — evita repetir
+export const nudgeLog = pgTable("nudge_log", {
+  key: text("key").primaryKey(), // ex.: setup:<tenantId>:<dia> · idle:<tenantId>:<semana> · inv:<invoiceId>:<etapa>
+  createdAt: createdAt(),
+});

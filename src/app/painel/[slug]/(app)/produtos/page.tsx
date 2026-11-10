@@ -12,12 +12,15 @@ import type { Category, Product } from "@/db/schema";
 import { ILLUSTRATION_KEYS, illustrationLabel } from "@/core/illustrations";
 import { Illustration } from "@/components/Illustration";
 import { adjustStock, deleteCategory, deleteProduct, saveCategory, saveProduct } from "../actions";
+import Link from "next/link";
+import { pendingImports } from "@/services/menu-import";
+import { discardImportAction, publishImportAction } from "../menu-import-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ err?: string }> }) {
+export default async function ProductsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ err?: string; ok?: string }> }) {
   const { slug } = await params;
-  const { err } = await searchParams;
+  const { err, ok } = await searchParams;
   const t = await requireTenantAdmin(slug, "products");
   const { T, fm } = panelI18n(t);
   const [cats, prods, moves] = await Promise.all([
@@ -27,6 +30,7 @@ export default async function ProductsPage({ params, searchParams }: { params: P
   ]);
   const prodName = new Map(prods.map((p) => [p.id, p.name]));
   const low = prods.filter((p) => p.trackStock && p.stock <= 3);
+  const pending = await pendingImports(t.id);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -35,7 +39,21 @@ export default async function ProductsPage({ params, searchParams }: { params: P
           <h1 className="text-xl font-bold">{T("Productos", "Produtos")}</h1>
           <span className="text-sm text-muted">{prods.length} {T("productos", "produtos")}</span>
         </div>
+        {ok && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{ok}</p>}
         {err && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
+        {t.country === "BR" && (
+          <Link href={`/painel/${slug}/produtos/importar`} className="card flex items-center gap-3 p-4 text-sm hover:bg-black/5">
+            <Icon name="camera" size={20} />
+            <span className="flex-1"><b>Cadastrar pela foto do cardápio</b><span className="block text-xs text-muted">Tire uma foto do cardápio de papel e a IA cadastra categorias, produtos e preços. Você confere antes.</span></span>
+          </Link>
+        )}
+        {pending.map((b) => (
+          <div key={b.batch} className="card flex flex-wrap items-center gap-2 border-l-4 border-amber-400 p-4 text-sm">
+            <p className="flex-1"><b>{b.n} produto(s) importado(s) pela foto</b> estão ocultos. Confira preços abaixo e publique.</p>
+            <form action={publishImportAction.bind(null, slug, b.batch)}><button className="btn-brand py-1.5 text-xs">Publicar todos</button></form>
+            <form action={discardImportAction.bind(null, slug, b.batch)}><button className="btn-ghost py-1.5 text-xs text-red-600">Descartar</button></form>
+          </div>
+        ))}
         {low.length > 0 && (
           <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {T("Stock bajo", "Estoque baixo")}: {low.map((p) => `${p.name} (${p.stock})`).join(", ")}

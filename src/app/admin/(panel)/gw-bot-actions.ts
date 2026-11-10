@@ -46,6 +46,9 @@ export async function gwSaveAction(f: FormData) {
     hours: String(f.get("hours") ?? "").slice(0, 200) || undefined,
     pauseMinutes: Math.min(1440, Math.max(5, Number(f.get("pauseMinutes")) || 120)),
     autoFollowUp: f.get("autoFollowUp") === "on",
+    setupNudges: f.get("setupNudges") === "on",
+    idleNudges: f.get("idleNudges") === "on",
+    billingNudges: f.get("billingNudges") === "on",
     followUpHours: hours.length ? hours.slice(0, 4).sort((a, b) => a - b) : undefined,
     partnerPhones: phones.filter((p) => /^\+\d{12,15}$/.test(p)).slice(0, 6),
   });

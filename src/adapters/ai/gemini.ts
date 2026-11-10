@@ -58,6 +58,27 @@ export async function geminiChat(o: { key: string; model: string; system: string
   throw last;
 }
 
+/** Lê uma imagem (ex.: foto do cardápio) e responde em JSON. Usa a mesma lista de modelos reservas. */
+export async function geminiVision(o: { key: string; model: string; prompt: string; imageBase64: string; mime: string; maxTokens?: number; timeoutMs?: number }) {
+  if (!o.key) throw new AiError("IA sem chave configurada", "key");
+  const model = geminiModel(o.model);
+  const chain = [model, ...GEMINI_FALLBACKS.filter((m) => m !== model)];
+  let last: unknown;
+  for (const m of chain) {
+    const body = JSON.stringify({
+      contents: [{ role: "user", parts: [{ inline_data: { mime_type: o.mime, data: o.imageBase64 } }, { text: o.prompt }] }],
+      generationConfig: { ...geminiGenConfig(m, 0.1, o.maxTokens ?? 8192), responseMimeType: "application/json" },
+    });
+    try {
+      return await geminiOnce(o.key, m, body, o.timeoutMs ?? 55_000);
+    } catch (e) {
+      last = e;
+      if (!(e instanceof AiError) || (e.kind !== "busy" && e.kind !== "model")) throw e;
+    }
+  }
+  throw last;
+}
+
 async function geminiOnce(key: string, model: string, body: string, timeoutMs: number) {
   const res = await fetch(`${process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com"}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",

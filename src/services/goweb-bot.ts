@@ -25,12 +25,16 @@ import { MODULES, MODULE_INFO, CORE_INFO, parseModulePrices } from "@/core/modul
 import { sortPlansByPrice } from "@/core/plans";
 import { jidToE164 } from "@/core/geovana";
 import { geminiChat, type ChatTurn } from "@/adapters/ai/gemini";
-import { EvolutionError, evoConnect, evoCreateInstance, evoLogout, evoSendText, evoSetWebhook, evoState } from "@/adapters/whatsapp/evolution";
+import { EvolutionError, evoMediaBase64, evoConnect, evoCreateInstance, evoLogout, evoSendText, evoSetWebhook, evoState } from "@/adapters/whatsapp/evolution";
 import { evoServer, whatsappPlatform } from "@/services/geovana";
 import { upsertLead, activity } from "@/services/crm";
 import { openTicket } from "@/services/support";
 import { sendPush } from "@/services/push";
 import { getSettings } from "@/services/billing";
+import { MenuImportError, importMenu, readMenuPhoto } from "@/services/menu-import";
+import { menuSummary } from "@/core/menu-import";
+import { setupForPrompt } from "@/core/setup";
+import { storeSetup } from "@/services/setup";
 import { openSecret, sealSecret } from "@/lib/secrets";
 import { appUrl } from "@/lib/urls";
 
@@ -167,7 +171,7 @@ async function contextFor(chat: GwChat, cfg: GwBotConfig): Promise<GwContext> {
       shopping: `${base}/shopping?lang=pt`,
       afiliados: `${base}/afiliados`,
     },
-    extra: [cfg.extra, `Base de toda loja: ${CORE_INFO.pt} — ${CORE_INFO.descPt}`].filter(Boolean).join("\n"),
+    extra: [cfg.extra, `Base de toda loja: ${CORE_INFO.pt} — ${CORE_INFO.descPt}`, tenant ? setupForPrompt(await storeSetup(tenant), base) : ""].filter(Boolean).join("\n"),
     hours: cfg.hours,
     launch: isPreLaunch() ? "12/11/2026" : null,
     store: tenant ? { name: tenant.name, slug: tenant.slug, plan: (custPlan as { plan?: { name?: string } } | null)?.plan?.name ?? null } : null,
@@ -241,7 +245,7 @@ async function applyReply(chat: GwChat, r: GwReply): Promise<string> {
   return extra;
 }
 
-export async function handleGwInbound(m: { jid: string; name: string | null; text: string; externalId: string | null; fromMe: boolean }) {
+export async function handleGwInbound(m: { jid: string; name: string | null; text: string; externalId: string | null; fromMe: boolean; image?: { mimetype: string } | null }) {
   const phone = jidToE164(m.jid);
   if (!phone || !m.text.trim()) return "ignored";
   const cfg = await gwBotConfig();
@@ -277,6 +281,9 @@ export async function handleGwInbound(m: { jid: string; name: string | null; tex
     await notifyPartners("Lead esquentando 🔥", `${chat.name || chat.phone} está perguntando de preço/contratação no WhatsApp. Bom momento para um sócio entrar.`, chat.leadId ? `/crm/leads/${chat.leadId}` : "/admin/geovana");
   }
 
+  // cardápio por foto: lojista cliente manda a foto → a Geovana cadastra os produtos (ocultos até ele publicar)
+  if (m.image && chat.tenantId && m.externalId) return menuFromWhatsapp(chat, m.externalId, m.image.mimetype);
+
   if (HUMAN_WORDS.test(m.text)) {
     await sendAndStore(chat, "Claro! Já chamei um dos sócios da GoWeb para falar com você por aqui. 🙌");
     await applyReply(chat, { text: "", lead: null, schedule: null, support: null, human: true });
@@ -303,6 +310,39 @@ export async function handleGwInbound(m: { jid: string; name: string | null; tex
   });
   if (r.text || extra) await sendAndStore(chat, `${r.text}${extra}`.trim());
   return r.human ? "handoff" : "replied";
+}
+
+async function menuFromWhatsapp(chat: GwChat, messageId: string, mime: string) {
+  const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.id, chat.tenantId!) });
+  if (!t) return "ignored";
+  await sendAndStore(chat, "Recebi a foto! Vou ler o cardápio e já te aviso. 📸");
+  try {
+    const cfg = await gwBotConfig();
+    const media = await evoMediaBase64(await evoServer(), cfg.instance, messageId);
+    if (!media.base64) throw new MenuImportError("Não consegui baixar a foto. Pode mandar de novo?");
+    const items = await readMenuPhoto(t, media.base64.replace(/^data:[^,]+,/, ""), media.mimetype || mime);
+    const r = await importMenu(t, items, { hidden: true });
+    await sendAndStore(
+      chat,
+      `Pronto! Li ${menuSummary(items)} e cadastrei ${r.created} na sua loja${r.skipped ? ` (${r.skipped} já existiam)` : ""}. Eles estão *ocultos* até você conferir os preços e clicar em *Publicar todos*:\n${appUrl()}/painel/${t.slug}/produtos\n\nTem mais páginas? Pode mandar as outras fotos.`,
+    );
+    return "menu-imported";
+  } catch (e) {
+    const msg = e instanceof MenuImportError || e instanceof GwBotError ? e.message : "Não consegui ler essa foto agora.";
+    await sendAndStore(chat, `${msg} Dica: foto de frente, nítida e com boa luz — ou cadastre em Painel → Produtos → Cadastrar pela foto.`);
+    return "menu-error";
+  }
+}
+
+/** Mensagem iniciada pela GoWeb (lembretes): registra na conversa do número e envia. */
+export async function gwProactive(phone: string, text: string, link: { tenantId?: string | null } = {}) {
+  const chat = await chatFor(phone, null);
+  if (chat.optOut) return false;
+  if (link.tenantId && !chat.tenantId) await db.update(schema.gwChats).set({ tenantId: link.tenantId }).where(eq(schema.gwChats.id, chat.id));
+  const id = await gwSend(phone, text);
+  await store(chat.id, "ai", text, id);
+  await db.update(schema.gwChats).set({ lastBotAt: new Date() }).where(eq(schema.gwChats.id, chat.id));
+  return true;
 }
 
 async function sendAndStore(chat: GwChat, text: string) {
