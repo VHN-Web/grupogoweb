@@ -2,6 +2,7 @@ import { CURRENCIES } from "@/core/types";
 import { listBillingProviders } from "@/adapters/billing/registry";
 import { gatewayMap, getSettings } from "@/services/billing";
 import { Flash } from "@/components/Flash";
+import { SubmitButton } from "@/components/crm/SubmitButton";
 import { saveSettings, testStorage } from "../actions";
 import { blobConfigured } from "@/adapters/storage";
 import { asaasConfig, asaasWebhookUrl } from "@/services/asaas";
@@ -93,12 +94,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <form action={saveEvolutionAction} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <F label="Servidor Evolution API (URL)"><input name="url" className="input" defaultValue={wa.evolutionUrl} placeholder="https://evo.goweboficial.com" /></F>
           <F label={wa.evolutionKeySealed ? "Chave global (salva — cole outra para trocar)" : "Chave global (AUTHENTICATION_API_KEY)"}><input name="key" type="password" autoComplete="off" className="input" /></F>
-          <button className="btn-primary">{wa.evolutionKeySealed ? "Atualizar" : "Conectar"}</button>
+          <SubmitButton className="btn-primary" pending="Conectando…">{wa.evolutionKeySealed ? "Atualizar" : "Conectar"}</SubmitButton>
         </form>
         <form action={saveGeovanaAiAction} className="grid gap-3 border-t border-line pt-4 sm:grid-cols-[1fr_200px_auto] sm:items-end">
           <F label={wa.geminiKeySealed ? "Chave do Gemini (salva — cole outra para trocar)" : "Chave do Gemini (Google AI Studio)"}><input name="key" type="password" autoComplete="off" className="input" /></F>
           <F label="Modelo"><input name="model" className="input" defaultValue={wa.model} /></F>
-          <button className="btn-primary">Salvar e testar</button>
+          <SubmitButton className="btn-primary" pending="Testando… (até 15 s)">Salvar e testar</SubmitButton>
         </form>
         <p className="text-xs text-muted">Status: {wa.evolutionKeySealed ? "Evolution ✓" : "Evolution não configurada (lojas só pela API oficial)"} · {wa.geminiKeySealed ? "IA ✓" : "IA sem chave (lojas precisam da chave própria)"}</p>
       </section>

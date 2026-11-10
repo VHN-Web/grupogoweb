@@ -25,7 +25,7 @@ export function geminiGenConfig(model: string, temperature: number, maxTokens: n
 
 export type ChatTurn = { role: "user" | "model"; text: string };
 
-export async function geminiChat(o: { key: string; model: string; system: string; history: ChatTurn[]; maxTokens?: number; temperature?: number }) {
+export async function geminiChat(o: { key: string; model: string; system: string; history: ChatTurn[]; maxTokens?: number; temperature?: number; timeoutMs?: number; retries?: number }) {
   if (!o.key) throw new AiError("IA sem chave configurada", "key");
   // a API exige alternância começando por "user": junta mensagens seguidas do mesmo papel
   const contents: { role: string; parts: { text: string }[] }[] = [];
@@ -44,20 +44,24 @@ export async function geminiChat(o: { key: string; model: string; system: string
   // modelo sobrecarregado (503 / "high demand") é passageiro: tenta mais 2 vezes com espera curta
   for (let attempt = 0; ; attempt++) {
     try {
-      return await geminiOnce(o.key, model, body);
+      return await geminiOnce(o.key, model, body, o.timeoutMs ?? 25_000);
     } catch (e) {
-      if (!(e instanceof AiError) || e.kind !== "busy" || attempt >= 2) throw e;
+      if (!(e instanceof AiError) || e.kind !== "busy" || attempt >= (o.retries ?? 2)) throw e;
       await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
     }
   }
 }
 
-async function geminiOnce(key: string, model: string, body: string) {
+async function geminiOnce(key: string, model: string, body: string, timeoutMs: number) {
   const res = await fetch(`${process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com"}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": key },
     body,
-    signal: AbortSignal.timeout(45_000),
+    signal: AbortSignal.timeout(timeoutMs),
+  }).catch((e: unknown) => {
+    // demorou demais = modelo congestionado (passageiro)
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) throw new AiError("O Gemini demorou para responder (sobrecarga passageira).", "busy");
+    throw new AiError("Não consegui falar com o Gemini.");
   });
   const j = (await res.json().catch(() => null)) as { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } } | null;
   if (!res.ok) {
