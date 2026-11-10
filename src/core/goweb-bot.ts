@@ -90,7 +90,7 @@ export type GwContext = {
   hours: string;
   launch: string | null; // "12/11/2026" se ainda não lançou
   store: { name: string; slug: string; plan: string | null } | null; // quem fala é lojista cliente
-  affiliate: { name: string; code: string; link: string; tier: string } | null; // quem fala é afiliado
+  affiliate: { name: string; code: string; link: string; tier: string; stats: string } | null; // quem fala é afiliado
   lead: { name: string; status: string; demoAt: string | null } | null;
   flyer: string | null;
   contactName: string | null;
@@ -110,7 +110,7 @@ export function buildGwPrompt(c: GwContext): string {
   const who = c.store
     ? `QUEM ESTÁ FALANDO: lojista CLIENTE da GoWeb — loja "${c.store.name}" (painel: ${c.links.site}/painel/${c.store.slug}${c.store.plan ? `, plano ${c.store.plan}` : ""}). Ajude no SUPORTE. Se não resolver com uma explicação simples, abra chamado com [[SUPORTE: prioridade | assunto | descrição]] (prioridade: baixa, normal, alta ou urgente — urgente só se a loja está sem vender agora).`
     : c.affiliate
-      ? `QUEM ESTÁ FALANDO: AFILIADO da GoWeb — ${c.affiliate.name} (nível ${c.affiliate.tier}). Link de indicação dele: ${c.affiliate.link}. Portal com artes, textos e comissões: ${c.links.afiliados}. Ajude a divulgar: explique como usar o link e o kit; dúvidas de pagamento de comissão → [[HUMANO]].`
+      ? `QUEM ESTÁ FALANDO: AFILIADO da GoWeb — ${c.affiliate.name} (nível ${c.affiliate.tier}). Link de indicação dele: ${c.affiliate.link}. Números dele: ${c.affiliate.stats}. Portal com artes, textos e comissões: ${c.links.afiliados}. Ajude a divulgar: explique como usar o link e o kit; dúvidas de pagamento de comissão → [[HUMANO]].`
       : `QUEM ESTÁ FALANDO: possível cliente (dono de comércio)${c.contactName ? `, nome no WhatsApp: ${c.contactName}` : ""}${c.flyer ? `. Chegou pelo ${FLYERS[c.flyer] ?? c.flyer}` : ""}${c.lead ? `. Já está no nosso CRM como "${c.lead.name}" (etapa ${c.lead.status}${c.lead.demoAt ? `, conversa marcada ${c.lead.demoAt}` : ""})` : ""}.`;
   return [
     `Você é a Geovana, atendente da GoWeb no WhatsApp. A GoWeb (${c.links.site}) é uma plataforma brasileira para comércios locais venderem online SEM comissão por pedido: site/cardápio com a marca da loja, pedidos no WhatsApp e no site, mesas com QR, delivery com motoboys e mapa ao vivo, caixa, impressora, cupons, fidelidade e uma IA (a própria Geovana) que atende o WhatsApp da loja. Slogan: "Clique, Conecte, Venda."`,

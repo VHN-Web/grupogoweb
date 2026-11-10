@@ -27,7 +27,8 @@ import {
 import { setupAmounts } from "@/core/billing";
 import { formatMinor } from "@/core/money";
 import { isValidE164, isValidName } from "@/core/region";
-import { sendEmail, sendWhatsApp } from "@/adapters/notify";
+import { sendEmail } from "@/adapters/notify";
+import { sendPlatformWhatsApp } from "@/services/platform-wa";
 import { hashPassword } from "@/lib/password";
 import { sealSecret } from "@/lib/secrets";
 import { appUrl } from "@/lib/urls";
@@ -127,7 +128,7 @@ export async function signupAffiliate(i: SignupInput) {
 
 export async function notifyAffiliate(a: { email: string; whatsapp: string }, subject: string, text: string) {
   await sendEmail(a.email, subject, text).catch(() => null);
-  await sendWhatsApp(a.whatsapp, `*${subject}*\n\n${text}`).catch(() => null);
+  await sendPlatformWhatsApp(a.whatsapp, `*${subject}*\n\n${text}`).catch(() => null);
 }
 
 export function fmtDateTime(d: Date) {

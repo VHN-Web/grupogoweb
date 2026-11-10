@@ -175,11 +175,20 @@ async function contextFor(chat: GwChat, cfg: GwBotConfig): Promise<GwContext> {
     hours: cfg.hours,
     launch: isPreLaunch() ? "12/11/2026" : null,
     store: tenant ? { name: tenant.name, slug: tenant.slug, plan: (custPlan as { plan?: { name?: string } } | null)?.plan?.name ?? null } : null,
-    affiliate: aff ? { name: aff.name, code: aff.code, link: `${base}/a/${aff.code}`, tier: aff.status === "ACTIVE" ? "ativo" : "aguardando aprovação" } : null,
+    affiliate: aff ? { name: aff.name, code: aff.code, link: `${base}/a/${aff.code}`, tier: aff.status === "ACTIVE" ? "ativo" : "aguardando aprovação", stats: await affiliateStats(aff.id) } : null,
     lead: lead ? { name: lead.name, status: lead.status, demoAt: lead.demoAt ? lead.demoAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) : null } : null,
     flyer: chat.flyer,
     contactName: chat.name,
   };
+}
+
+/** Resumo do afiliado para a Geovana responder "quanto eu tenho?" sem abrir o portal. */
+async function affiliateStats(affiliateId: string) {
+  const rows = await db.query.affiliateCommissions.findMany({ where: eq(schema.affiliateCommissions.affiliateId, affiliateId), columns: { amountMinor: true, status: true } });
+  const sum = (st: string) => rows.filter((r) => r.status === st).reduce((a, r) => a + r.amountMinor, 0);
+  const brl = (m: number) => `R$ ${(m / 100).toFixed(2).replace(".", ",")}`;
+  const leads = await db.$count(schema.affiliateLeads, eq(schema.affiliateLeads.affiliateId, affiliateId));
+  return `${leads} indicação(ões) agendada(s); comissões a receber ${brl(sum("PENDING"))}, já pagas ${brl(sum("PAID"))} (pagamento por Pix na chave cadastrada)`;
 }
 
 async function aiKey() {

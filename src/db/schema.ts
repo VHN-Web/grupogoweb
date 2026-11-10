@@ -375,7 +375,8 @@ export const platformSettings = pgTable("platform_settings", {
   asaasConfig: text("asaas_config").notNull().default("{}"),
   whatsappConfig: text("whatsapp_config").notNull().default("{}"), // Geovana: servidor Evolution (chave selada) + IA (chave Gemini selada, modelo) // Asaas: ambiente, chave da conta principal (selada), walletId, token do webhook, split padrão
   odConfig: text("od_config").notNull().default("{}"),
-  gwBotConfig: text("gw_bot_config").notNull().default("{}"), // Geovana da GoWeb (WhatsApp da própria GoWeb) — core/goweb-bot.ts // Apps de delivery (Open Delivery): credenciais padrão da GoWeb por app (segredo selado)
+  gwBotConfig: text("gw_bot_config").notNull().default("{}"),
+  contentIdeas: text("content_ideas"), // última geração de ideias de posts/Reels (JSON) — core/content-ideas.ts // Geovana da GoWeb (WhatsApp da própria GoWeb) — core/goweb-bot.ts // Apps de delivery (Open Delivery): credenciais padrão da GoWeb por app (segredo selado)
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

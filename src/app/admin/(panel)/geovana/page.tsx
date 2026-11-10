@@ -9,7 +9,8 @@ import { whatsappPlatform } from "@/services/geovana";
 import { evoConnect } from "@/adapters/whatsapp/evolution";
 import { evoServer } from "@/services/geovana";
 import { gwBotConfig, gwChatMessages, gwChatsList, gwStatus } from "@/services/goweb-bot";
-import { gwConnectAction, gwDisconnectAction, gwReplyAction, gwResumeAction, gwSaveAction, gwSimulateAction } from "../gw-bot-actions";
+import { generateIdeasAction, gwConnectAction, gwDisconnectAction, gwReplyAction, gwResumeAction, gwSaveAction, gwSimulateAction } from "../gw-bot-actions";
+import { lastIdeas } from "@/services/content-ideas";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ const fmt = (d: Date | null) => (d ? d.toLocaleString("pt-BR", { timeZone: "Amer
 export default async function GwBotPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string; qr?: string; chat?: string; sim?: string }> }) {
   await requirePlatformAdmin();
   const sp = await searchParams;
-  const [cfg, st, plat, chats] = await Promise.all([gwBotConfig(), gwStatus(), whatsappPlatform(), gwChatsList()]);
+  const [cfg, st, plat, chats, ideas] = await Promise.all([gwBotConfig(), gwStatus(), whatsappPlatform(), gwChatsList(), lastIdeas()]);
   const qr = sp.qr && cfg.instance && !st.connected ? await evoServer().then((s) => evoConnect(s, cfg.instance)).catch(() => null) : null;
   const sel = sp.chat ? chats.find((c) => c.id === sp.chat) : null;
   const msgs = sel ? await gwChatMessages(sel.id) : [];
@@ -149,6 +150,46 @@ export default async function GwBotPage({ searchParams }: { searchParams: Promis
           </form>
         </section>
       )}
+
+      <section id="conteudo" className="card scroll-mt-20 space-y-4 p-5 text-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1">
+            <h2 className="font-semibold">5. Ideias de conteúdo para o Instagram</h2>
+            <p className="text-muted">A IA lê as perguntas que chegam no WhatsApp (sem nomes nem telefones) e as dores anotadas no CRM, e sugere posts, roteiros de Reels e um FAQ para os destaques.</p>
+          </div>
+          <form action={generateIdeasAction}><SubmitButton className="btn-brand" pending="Criando… (até 1 min)">{ideas ? "Gerar ideias novas" : "Gerar ideias"}</SubmitButton></form>
+        </div>
+        {ideas && (
+          <>
+            <p className="text-xs text-muted">Gerado em {fmt(new Date(ideas.generatedAt))} com base em {ideas.basedOn} pergunta(s)/dor(es).</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              {ideas.posts.map((p, i) => (
+                <article key={i} className="rounded-xl border border-line p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted">{p.format}</p>
+                  <h3 className="font-semibold">{p.title}</h3>
+                  <p className="mt-1 whitespace-pre-wrap text-muted">{p.caption}</p>
+                </article>
+              ))}
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {ideas.reels.map((r, i) => (
+                <article key={i} className="rounded-xl border border-line p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted">Reels {i + 1}</p>
+                  <h3 className="font-semibold">“{r.hook}”</h3>
+                  <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-muted">{r.scenes.map((s, k) => <li key={k}>{s}</li>)}</ol>
+                  <p className="mt-1 text-xs"><b>CTA:</b> {r.cta}</p>
+                </article>
+              ))}
+            </div>
+            {ideas.faq.length > 0 && (
+              <div>
+                <h3 className="font-semibold">Perguntas mais comuns (para o destaque “Dúvidas”)</h3>
+                <ul className="mt-1 list-disc pl-5 text-muted">{ideas.faq.map((q, i) => <li key={i}>{q}</li>)}</ul>
+              </div>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

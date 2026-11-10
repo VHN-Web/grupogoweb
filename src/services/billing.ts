@@ -29,7 +29,8 @@ import { CURRENCIES, type Currency } from "@/core/types";
 import { getBillingProvider } from "@/adapters/billing/registry";
 import { attributeCustomer, onInvoicePaidAffiliate } from "./affiliates";
 import { onCustomerCreated, onSetupPaid as crmOnSetupPaid } from "./crm";
-import { sendEmail, sendWhatsApp } from "@/adapters/notify";
+import { sendEmail } from "@/adapters/notify";
+import { sendPlatformWhatsApp } from "@/services/platform-wa";
 import { provisionTenant, RESERVED_SLUGS } from "./provision";
 import { getRegion, tr } from "@/core/region";
 import { planName } from "@/core/plans";
@@ -93,7 +94,7 @@ export async function notifyCustomer(c: Customer, subject: string, text: string)
   });
   if (c.whatsappOptIn && c.whatsapp) {
     const msg = `*${subject}*\n\n${text}`;
-    const wa = await sendWhatsApp(c.whatsapp, msg);
+    const wa = await sendPlatformWhatsApp(c.whatsapp, msg);
     await db.insert(schema.notifications).values({
       customerId: c.id,
       channel: "WHATSAPP",

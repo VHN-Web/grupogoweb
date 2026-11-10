@@ -84,3 +84,15 @@ export async function gwSimulateAction(as: "lead" | "store" | "affiliate", histo
     return { text: "", error: errMsg(e) };
   }
 }
+
+export async function generateIdeasAction() {
+  await requirePlatformAdmin();
+  const { generateIdeas, ContentError } = await import("@/services/content-ideas");
+  try {
+    await generateIdeas();
+  } catch (e) {
+    back(e instanceof ContentError || e instanceof AiError ? e.message : "Não consegui gerar agora.", "err", "#conteudo");
+  }
+  revalidatePath("/admin/geovana");
+  redirect("/admin/geovana?ok=Ideias%20novas%20prontas%20%E2%9C%93#conteudo");
+}
