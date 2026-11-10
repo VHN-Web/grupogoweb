@@ -72,7 +72,7 @@ export function myActiveDeliveries(c: Courier) {
 /** Deliveries da loja sem entregador (em preparo ou prontos) — o entregador online pode pegar. */
 export function openDeliveries(c: Courier) {
   return db.query.orders.findMany({
-    where: and(eq(schema.orders.tenantId, c.tenantId), isNull(schema.orders.courierId), eq(schema.orders.type, "DELIVERY"), inArray(schema.orders.status, ["PREPARING", "READY"])),
+    where: and(eq(schema.orders.tenantId, c.tenantId), isNull(schema.orders.courierId), eq(schema.orders.type, "DELIVERY"), eq(schema.orders.marketplaceDelivery, false), inArray(schema.orders.status, ["PREPARING", "READY"])),
     columns: { id: true, number: true, address: true, lat: true, lng: true, distanceKm: true, deliveryFeePyg: true, status: true, createdAt: true },
     orderBy: [schema.orders.createdAt],
     limit: 20,
@@ -93,7 +93,7 @@ export async function claimDelivery(c: Courier, orderId: string) {
   const [o] = await db
     .update(schema.orders)
     .set({ courierId: c.id, updatedAt: new Date() })
-    .where(and(eq(schema.orders.id, orderId), eq(schema.orders.tenantId, c.tenantId), isNull(schema.orders.courierId), eq(schema.orders.type, "DELIVERY"), inArray(schema.orders.status, ["PREPARING", "READY"])))
+    .where(and(eq(schema.orders.id, orderId), eq(schema.orders.tenantId, c.tenantId), isNull(schema.orders.courierId), eq(schema.orders.type, "DELIVERY"), eq(schema.orders.marketplaceDelivery, false), inArray(schema.orders.status, ["PREPARING", "READY"])))
     .returning({ id: schema.orders.id });
   if (!o) throw new CourierError("Outro entregador já pegou essa entrega");
 }
@@ -250,6 +250,7 @@ export async function autoAssign(tenantId: string, onlyOrderId?: string) {
       eq(schema.orders.tenantId, tenantId),
       eq(schema.orders.type, "DELIVERY"),
       isNull(schema.orders.courierId),
+      eq(schema.orders.marketplaceDelivery, false),
       inArray(schema.orders.status, ["PREPARING", "READY"]),
       ...(onlyOrderId ? [eq(schema.orders.id, onlyOrderId)] : []),
     ),

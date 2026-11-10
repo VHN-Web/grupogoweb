@@ -8,6 +8,9 @@ import { asaasConfig, asaasWebhookUrl } from "@/services/asaas";
 import { connectAsaasAction, disconnectAsaasAction, saveAsaasRulesAction } from "../asaas-actions";
 import { whatsappPlatform } from "@/services/geovana";
 import { saveEvolutionAction, saveGeovanaAiAction } from "../whatsapp-actions";
+import { odConfig } from "@/services/opendelivery";
+import { OD_PLATFORMS, OD_PLATFORM_INFO } from "@/core/opendelivery";
+import { saveOdDefaultsAction } from "../od-actions";
 
 const CUR = { PYG: "Guarani (Gs.)", USD: "Dólar (US$)", BRL: "Real (R$)" } as const;
 
@@ -19,6 +22,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const az = await asaasConfig();
   const azOn = !!az.apiKeySealed;
   const wa = await whatsappPlatform();
+  const od = await odConfig();
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -97,6 +101,23 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <button className="btn-primary">Salvar e testar</button>
         </form>
         <p className="text-xs text-muted">Status: {wa.evolutionKeySealed ? "Evolution ✓" : "Evolution não configurada (lojas só pela API oficial)"} · {wa.geminiKeySealed ? "IA ✓" : "IA sem chave (lojas precisam da chave própria)"}</p>
+      </section>
+
+      <section id="apps-delivery" className="card scroll-mt-20 space-y-4 p-5 text-sm">
+        <div>
+          <h2 className="font-semibold">Apps de delivery — Open Delivery (99Food, Keeta)</h2>
+          <p className="text-muted">Credenciais que o app entrega à GoWeb como sistema homologado. A loja conecta em Painel → Apps de delivery; se ela não informar credenciais próprias, usa estas.</p>
+        </div>
+        {OD_PLATFORMS.map((p) => (
+          <form key={p} action={saveOdDefaultsAction.bind(null, p)} className="grid gap-3 border-t border-line pt-4 sm:grid-cols-2">
+            <p className="font-semibold sm:col-span-2">{OD_PLATFORM_INFO[p].name} {od[p]?.clientSecretSealed ? <span className="text-xs font-normal text-emerald-700">· credenciais salvas</span> : null}</p>
+            <F label="Client ID"><input name="clientId" className="input" autoComplete="off" defaultValue={od[p]?.clientId ?? ""} /></F>
+            <F label={od[p]?.clientSecretSealed ? "Client Secret (salvo — cole outro para trocar)" : "Client Secret"}><input name="clientSecret" type="password" autoComplete="new-password" className="input" /></F>
+            <F label="Endereço da API"><input name="baseUrl" className="input" defaultValue={od[p]?.baseUrl ?? OD_PLATFORM_INFO[p].defaultBaseUrl} placeholder="https://…" /></F>
+            <F label="App ID (opcional)"><input name="appId" className="input" defaultValue={od[p]?.appId ?? ""} /></F>
+            <div className="sm:col-span-2"><button className="btn-primary">Salvar</button></div>
+          </form>
+        ))}
       </section>
 
       <form action={saveSettings} className="space-y-5">

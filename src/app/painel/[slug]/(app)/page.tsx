@@ -1,6 +1,8 @@
 import { hasModule } from "@/core/modules";
 import { Icon } from "@/components/ui/Icon";
 import Link from "next/link";
+import { after } from "next/server";
+import { OD_PLATFORM_INFO, isOdPlatform } from "@/core/opendelivery";
 import { and, desc, eq, gte } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireTenantAdmin } from "@/lib/auth";
@@ -31,6 +33,8 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
     with: { items: true },
     orderBy: desc(schema.orders.createdAt),
   });
+  // Apps de delivery: busca pedidos novos dos apps (no máximo a cada 25 s; o webhook já entrega na hora)
+  if (t.country === "BR") after(() => import("@/services/opendelivery").then((od) => od.pollTenantIfDue(t.id)).catch(() => 0));
   const finished = orders.filter((o) => o.status === "COMPLETED" || o.status === "CANCELLED");
   const today = orders.filter((o) => o.status !== "CANCELLED");
   const pro = t.tier === "pro";
@@ -96,6 +100,11 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
                           <Link href={`/painel/${slug}/pedidos/${o.id}`} className="text-2xl font-black tabular-nums hover:underline">
                             #{o.number}
                           </Link>
+                          {o.channel && isOdPlatform(o.channel) && (
+                            <span className="mt-0.5 inline-block rounded-md px-1.5 py-0.5 text-[11px] font-bold text-black" style={{ background: OD_PLATFORM_INFO[o.channel].color }}>
+                              {OD_PLATFORM_INFO[o.channel].name}{o.externalDisplayId ? ` #${o.externalDisplayId}` : ""}
+                            </span>
+                          )}
                           <p className="text-sm font-semibold">{o.customerName}</p>
                           <p className="text-xs text-muted">
                             {o.tableLabel ?? L.orderType[o.type]} · {timeAgo(o.createdAt, region.locale)}
@@ -111,6 +120,11 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
                           </li>
                         ))}
                       </ul>
+                      {o.cancelRequestedAt && (
+                        <Link href={`/painel/${slug}/pedidos/${o.id}`} className="mt-2 block rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+                          O cliente pediu para cancelar — responder
+                        </Link>
+                      )}
                       {o.notes && <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">{o.notes}</p>}
                       {o.type === "DELIVERY" && o.address && <p className="mt-2 text-xs text-muted">{o.address}</p>}
                       <div className="mt-2.5 flex items-start justify-between gap-3 text-sm">
@@ -149,7 +163,10 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
             {finished.map((o) => (
               <Link key={o.id} href={`/painel/${slug}/pedidos/${o.id}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-paper">
                 <b className="w-14 tabular-nums">#{o.number}</b>
-                <span className="flex-1 truncate">{o.customerName}</span>
+                <span className="flex-1 truncate">
+                  {o.customerName}
+                  {o.channel && isOdPlatform(o.channel) && <span className="ml-2 rounded px-1.5 py-0.5 text-[11px] font-bold text-black" style={{ background: OD_PLATFORM_INFO[o.channel].color }}>{OD_PLATFORM_INFO[o.channel].name}</span>}
+                </span>
                 <span className={o.status === "CANCELLED" ? "text-red-600" : "text-muted"}>{L.orderStatus[o.status]}</span>
                 <PayBadge status={o.paymentStatus} locale={region.locale} />
                 <b className="w-28 text-right">{fm(o.totalPyg)}</b>

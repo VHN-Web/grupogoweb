@@ -2,6 +2,7 @@
 // Server Actions do painel. TODA action começa com requireTenantAdmin(slug)
 // e TODA query filtra por tenant.id — regra de isolamento multi-tenant.
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -21,6 +22,14 @@ import { ivaIncluded } from "@/adapters/fiscal/FiscalProvider";
 import { saveImage, UploadError } from "@/adapters/storage";
 import { isIllustration } from "@/core/illustrations";
 import { THEME_IDS, type ThemeId } from "@/core/themes";
+
+/** Apps de delivery (Open Delivery): avisa que o cardápio mudou ou que a loja abriu/fechou — depois da resposta. */
+function menuChanged(tenantId: string, status?: "AVAILABLE" | "UNAVAILABLE") {
+  after(async () => {
+    const od = await import("@/services/opendelivery");
+    await od.notifyMerchantChanged(tenantId, status).catch((e) => console.error("[od menu]", e));
+  });
+}
 
 /** Faz upload se veio arquivo; "remove" apaga; senão mantém o atual. */
 async function imageField(f: FormData, fileKey: string, removeKey: string, current: string | null, folder: string) {
@@ -51,6 +60,7 @@ const base = (slug: string) => `/painel/${slug}`;
 export async function toggleOpen(slug: string) {
   const t = await requireTenantAdmin(slug, "orders");
   await db.update(schema.tenants).set({ isOpen: !t.isOpen }).where(eq(schema.tenants.id, t.id));
+  menuChanged(t.id, t.isOpen ? "UNAVAILABLE" : "AVAILABLE");
   revalidatePath(base(slug), "layout");
 }
 
@@ -138,6 +148,7 @@ export async function saveProduct(slug: string, f: FormData) {
       await db.insert(schema.stockMovements).values({ tenantId: t.id, productId: p.id, delta: stock, reason: "ADJUSTMENT", note: "Stock inicial" });
     }
   }
+  menuChanged(t.id);
   revalidatePath(`${base(slug)}/produtos`);
 }
 
@@ -145,6 +156,7 @@ export async function deleteProduct(slug: string, productId: string) {
   const t = await requireTenantAdmin(slug, "products");
   const [p] = await db.delete(schema.products).where(and(eq(schema.products.id, productId), eq(schema.products.tenantId, t.id))).returning({ name: schema.products.name });
   if (p) await audit(t.id, await actorName(slug), "product.delete", p.name);
+  menuChanged(t.id);
   revalidatePath(`${base(slug)}/produtos`);
 }
 
@@ -163,6 +175,7 @@ export async function adjustStock(slug: string, productId: string, f: FormData) 
     await tx.insert(schema.stockMovements).values({ tenantId: t.id, productId, delta, reason, note: optStr(f, "note") });
   });
   await audit(t.id, await actorName(slug), "stock.adjust", `${delta > 0 ? "+" : ""}${delta} (${reason})`);
+  menuChanged(t.id);
   revalidatePath(`${base(slug)}/produtos`);
 }
 
@@ -174,12 +187,14 @@ export async function saveCategory(slug: string, f: FormData) {
   const sortOrder = int(f, "sortOrder");
   if (id) await db.update(schema.categories).set({ name, sortOrder }).where(and(eq(schema.categories.id, id), eq(schema.categories.tenantId, t.id)));
   else await db.insert(schema.categories).values({ tenantId: t.id, name, sortOrder });
+  menuChanged(t.id);
   revalidatePath(`${base(slug)}/produtos`);
 }
 
 export async function deleteCategory(slug: string, id: string) {
   const t = await requireTenantAdmin(slug, "products");
   await db.delete(schema.categories).where(and(eq(schema.categories.id, id), eq(schema.categories.tenantId, t.id)));
+  menuChanged(t.id);
   revalidatePath(`${base(slug)}/produtos`);
 }
 

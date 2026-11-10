@@ -273,6 +273,14 @@ export const orders = pgTable(
     platformSplitMinor: integer("platform_split_minor").notNull().default(0),
     splitStatus: text("split_status").$type<"PENDING" | "CONFIRMED" | "REFUNDED" | "CANCELLED">(),
     pixPayload: text("pix_payload"), // Pix copia e cola gerado pelo gateway
+    // Apps de delivery (Open Delivery: 99Food, Keeta…): null = pedido do site/painel
+    channel: text("channel"), // "99food" | "keeta"
+    externalId: text("external_id"), // id do pedido no app
+    externalDisplayId: text("external_display_id"), // número que o app mostra ao cliente
+    marketplaceDelivery: boolean("marketplace_delivery").notNull().default(false), // entregador do app (não usa motoboys da loja)
+    odConfirmed: boolean("od_confirmed").notNull().default(false), // já confirmado no app
+    odFlags: text("od_flags"), // JSON: quais status o app quer receber (sendPreparing/sendDelivered/sendPickedUp)
+    cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }), // app/cliente pediu para cancelar (loja decide)
     source: text("source"),
     referrerShopperId: text("referrer_shopper_id"),
     growthDone: boolean("growth_done").notNull().default(false), // recompensas já processadas (uma vez só)
@@ -283,6 +291,7 @@ export const orders = pgTable(
   (t) => [
     index("orders_tenant_created_idx").on(t.tenantId, t.createdAt),
     index("orders_tenant_number_idx").on(t.tenantId, t.number),
+    uniqueIndex("orders_channel_ext_uq").on(t.tenantId, t.channel, t.externalId),
   ],
 );
 
@@ -364,6 +373,7 @@ export const platformSettings = pgTable("platform_settings", {
   crmConfig: text("crm_config").notNull().default("{}"), // CRM: busca de leads, metas, chave Gemini (selada), VAPID
   asaasConfig: text("asaas_config").notNull().default("{}"),
   whatsappConfig: text("whatsapp_config").notNull().default("{}"), // Geovana: servidor Evolution (chave selada) + IA (chave Gemini selada, modelo) // Asaas: ambiente, chave da conta principal (selada), walletId, token do webhook, split padrão
+  odConfig: text("od_config").notNull().default("{}"), // Apps de delivery (Open Delivery): credenciais padrão da GoWeb por app (segredo selado)
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -1185,3 +1195,47 @@ export const waMessages = pgTable(
   },
   (t) => [index("wa_messages_chat_idx").on(t.chatId, t.createdAt), uniqueIndex("wa_messages_ext_uq").on(t.tenantId, t.externalId)],
 );
+
+// Apps de delivery pelo padrão Open Delivery (Abrasel): 99Food, Keeta… — um canal por loja e app.
+export const odChannels = pgTable(
+  "od_channels",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(), // core/opendelivery.ts#OD_PLATFORMS
+    merchantId: text("merchant_id").notNull(), // id da loja no padrão (gerado pela GoWeb, igual em todos os apps da loja)
+    orderingAppMerchantId: text("ordering_app_merchant_id"), // id da loja dentro do app (se o app informar)
+    baseUrl: text("base_url").notNull(), // API do app
+    clientId: text("client_id").notNull(),
+    clientSecretSealed: text("client_secret_sealed").notNull(),
+    appId: text("app_id"), // X-App-Id esperado no webhook (opcional)
+    hookToken: text("hook_token").notNull().unique(), // parte da URL pública da loja (cardápio + webhook)
+    apiKeySealed: text("api_key_sealed").notNull(), // X-API-KEY que o app usa no GET /merchant
+    signRequests: boolean("sign_requests").notNull().default(false), // Keeta: X-App-Signature em toda chamada
+    autoConfirm: boolean("auto_confirm").notNull().default(true), // aceita o pedido no app assim que chega
+    enabled: boolean("enabled").notNull().default(true),
+    merchantInfo: text("merchant_info").notNull().default("{}"), // JSON OdMerchantInfo + endereço (CNPJ, razão social, categorias…)
+    tokenSealed: text("token_sealed"),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    onboardedAt: timestamp("onboarded_at", { withTimezone: true }), // cadastro enviado ao app (PUT merchantOnboarding)
+    lastPollAt: timestamp("last_poll_at", { withTimezone: true }),
+    lastEventAt: timestamp("last_event_at", { withTimezone: true }),
+    lastMenuAt: timestamp("last_menu_at", { withTimezone: true }), // última vez que o app leu o cardápio
+    lastError: text("last_error"),
+    lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("od_channels_tenant_platform_uq").on(t.tenantId, t.platform)],
+);
+
+// Eventos do Open Delivery já processados (o mesmo evento pode chegar por webhook e por polling)
+export const odEvents = pgTable("od_events", {
+  id: text("id").primaryKey(), // channelId:eventId
+  channelId: text("channel_id").notNull(),
+  eventType: text("event_type").notNull(),
+  orderId: text("order_id"),
+  createdAt: createdAt(),
+});
+export type OdChannel = typeof odChannels.$inferSelect;

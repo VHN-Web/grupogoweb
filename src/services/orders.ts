@@ -397,7 +397,7 @@ export async function getOrderWithItems(tenantId: string, orderId: string) {
   });
 }
 
-export async function setOrderStatus(tenantId: string, orderId: string, status: OrderStatus) {
+export async function setOrderStatus(tenantId: string, orderId: string, status: OrderStatus, opts: { fromChannel?: boolean } = {}) {
   const order = await getOrderWithItems(tenantId, orderId);
   if (!order) throw new OrderError("NOT_FOUND", "Pedido não encontrado");
   if (order.status === "CANCELLED") throw new OrderError("STATE", "Pedido cancelado");
@@ -425,7 +425,12 @@ export async function setOrderStatus(tenantId: string, orderId: string, status: 
     await tx.update(schema.orders).set({ status, updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
   });
   // App do entregador: avisa sobre entrega livre (pronta, sem motoboy) ou cancelada
-  if (order.type === "DELIVERY" && order.status !== status) {
+  // Apps de delivery (Open Delivery): devolve o novo status ao app — exceto quando a mudança veio dele
+  if (order.channel && order.status !== status && !opts.fromChannel) {
+    const od = await import("@/services/opendelivery");
+    await od.pushStatus(tenantId, orderId, status).catch((e) => console.error("[od push]", e));
+  }
+  if (order.type === "DELIVERY" && order.status !== status && !order.marketplaceDelivery) {
     const ca = await import("@/services/courier-app");
     // em preparo/pronto sem motoboy: passa para o online mais perto; ninguém disponível → avisa todos (pronto)
     if ((status === "PREPARING" || status === "READY") && !order.courierId) {

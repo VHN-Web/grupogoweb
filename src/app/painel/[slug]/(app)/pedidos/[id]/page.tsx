@@ -18,11 +18,14 @@ import { OrderTracker } from "@/components/maps/OrderTracker";
 import { deliveryMessage, listCouriers } from "@/services/couriers";
 import { hasModule } from "@/core/modules";
 import { waLink } from "@/core/intelligence";
+import { OD_PLATFORM_INFO, isOdPlatform } from "@/core/opendelivery";
+import { answerCancelAction } from "../../od-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrderDetail({ params }: { params: Promise<{ slug: string; id: string }> }) {
+export default async function OrderDetail({ params, searchParams }: { params: Promise<{ slug: string; id: string }>; searchParams: Promise<{ err?: string }> }) {
   const { slug, id } = await params;
+  const { err } = await searchParams;
   const t = await requireTenantAdmin(slug, "orders");
   const { T, L, region } = panelI18n(t);
   const o = await getOrderWithItems(t.id, id);
@@ -31,7 +34,8 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
     where: and(eq(schema.fiscalDocuments.orderId, o.id), eq(schema.fiscalDocuments.tenantId, t.id)),
   });
   const next = nextStatus(o);
-  const showCouriers = o.type === "DELIVERY" && hasModule(t, "delivery");
+  const app = o.channel && isOdPlatform(o.channel) ? OD_PLATFORM_INFO[o.channel] : null;
+  const showCouriers = o.type === "DELIVERY" && hasModule(t, "delivery") && !o.marketplaceDelivery;
   const couriers = showCouriers ? await listCouriers(t.id) : [];
   const courier = couriers.find((c) => c.id === o.courierId);
   const open = o.status !== "COMPLETED" && o.status !== "CANCELLED";
@@ -44,7 +48,26 @@ export default async function OrderDetail({ params }: { params: Promise<{ slug: 
           <h1 className="text-3xl font-black tabular-nums">#{o.number}</h1>
           <span className="rounded-full bg-ink px-2.5 py-1 text-xs font-semibold text-white">{L.orderStatus[o.status]}</span>
           <PayBadge status={o.paymentStatus} locale={region.locale} />
+          {app && (
+            <span className="rounded-full px-2.5 py-1 text-xs font-bold text-black" style={{ background: app.color }}>
+              {app.name}{o.externalDisplayId ? ` #${o.externalDisplayId}` : ""}
+            </span>
+          )}
         </div>
+        {err && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
+        {o.cancelRequestedAt && open && (
+          <div className="card border-l-4 border-red-500 p-4 text-sm">
+            <p className="font-semibold text-red-700">O cliente pediu para cancelar este pedido pelo {app?.name ?? "app"}.</p>
+            <p className="mt-1 text-muted">Se aceitar, o pedido é cancelado aqui e no app (o estoque volta). Se já estiver pronto ou a caminho, recuse.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <form action={answerCancelAction.bind(null, slug, o.id, true)}><button className="btn-brand bg-red-600">Aceitar cancelamento</button></form>
+              <form action={answerCancelAction.bind(null, slug, o.id, false)}><button className="btn-ghost">Recusar</button></form>
+            </div>
+          </div>
+        )}
+        {app && o.marketplaceDelivery && open && (
+          <p className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-900">A entrega é feita pelo entregador do {app.name}. Quando estiver pronto, marque &quot;Pronto&quot;: o app chama o entregador e avisa aqui quando ele sair e entregar.</p>
+        )}
         <div className="card space-y-1 p-4 text-sm">
           <p><span className="text-muted">Cliente:</span> {o.customerName} {o.customerPhone && `· ${formatPhone(o.customerPhone)}`}{o.customerDoc && ` · CPF ${formatCpf(o.customerDoc)}`}</p>
           <p><span className="text-muted">Tipo:</span> {L.orderType[o.type]} {o.tableLabel && `· ${o.tableLabel}`}</p>

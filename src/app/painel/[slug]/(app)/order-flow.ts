@@ -1,12 +1,13 @@
 import type { Order } from "@/db/schema";
 import type { OrderStatus } from "@/core/types";
 
-export function nextStatus(o: Pick<Order, "status" | "type">): OrderStatus | null {
+export function nextStatus(o: Pick<Order, "status" | "type"> & { marketplaceDelivery?: boolean }): OrderStatus | null {
   switch (o.status) {
     case "RECEIVED":
       return "PREPARING";
     case "PREPARING":
-      return o.type === "DELIVERY" ? "OUT_FOR_DELIVERY" : "READY";
+      // entregador do app de delivery: a loja só marca "pronto"; o app avisa quando saiu e quando entregou
+      return o.type === "DELIVERY" && !o.marketplaceDelivery ? "OUT_FOR_DELIVERY" : "READY";
     case "READY":
     case "OUT_FOR_DELIVERY":
       return "COMPLETED";
