@@ -6,7 +6,7 @@ import { adminActor, requirePlatformOwner } from "@/lib/auth";
 import { audit } from "@/lib/security";
 import { sealSecret } from "@/lib/secrets";
 import { saveWhatsappPlatform } from "@/services/geovana";
-import { geminiChat, AiError } from "@/adapters/ai/gemini";
+import { geminiChat, geminiModel, AiError } from "@/adapters/ai/gemini";
 
 const back = (msg: string, kind: "ok" | "err" = "ok"): never => redirect(`/admin/config?${kind}=${encodeURIComponent(msg)}#geovana`);
 
@@ -34,7 +34,7 @@ export async function saveEvolutionAction(f: FormData) {
 export async function saveGeovanaAiAction(f: FormData) {
   await requirePlatformOwner();
   const key = String(f.get("key") ?? "").replace(/\s+/g, "");
-  const model = String(f.get("model") ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
+  const model = geminiModel(String(f.get("model") ?? ""));
   if (key) {
     try {
       await geminiChat({ key, model, system: "Responda só: ok", history: [{ role: "user", text: "teste" }], maxTokens: 10 });

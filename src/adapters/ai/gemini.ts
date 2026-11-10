@@ -11,6 +11,18 @@ export class AiError extends Error {
   }
 }
 
+/** Modelo padrão. O Google aposenta modelos antigos para contas novas — os 1.x/2.x salvos viram este. */
+export const GEMINI_DEFAULT_MODEL = "gemini-3.8-flash";
+export function geminiModel(m: string | null | undefined): string {
+  const v = String(m ?? "").trim();
+  return !v || /^gemini-(1|2)\./.test(v) ? GEMINI_DEFAULT_MODEL : v;
+}
+/** Config de geração: nos 2.x "flash" desliga o raciocínio; nos novos deixa folga de tokens para ele. */
+export function geminiGenConfig(model: string, temperature: number, maxTokens: number) {
+  const legacy = /^gemini-2\./.test(model);
+  return { temperature, maxOutputTokens: legacy ? maxTokens : maxTokens + 2048, ...(legacy && /flash/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) };
+}
+
 export type ChatTurn = { role: "user" | "model"; text: string };
 
 export async function geminiChat(o: { key: string; model: string; system: string; history: ChatTurn[]; maxTokens?: number; temperature?: number }) {
@@ -23,13 +35,14 @@ export async function geminiChat(o: { key: string; model: string; system: string
     else contents.push({ role: t.role, parts: [{ text: t.text }] });
   }
   while (contents.length && contents[0].role !== "user") contents.shift();
-  const res = await fetch(`${process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com"}/v1beta/models/${encodeURIComponent(o.model)}:generateContent`, {
+  const model = geminiModel(o.model);
+  const res = await fetch(`${process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com"}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": o.key },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: o.system }] },
       contents,
-      generationConfig: { temperature: o.temperature ?? 0.5, maxOutputTokens: o.maxTokens ?? 600, ...(/flash/.test(o.model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+      generationConfig: geminiGenConfig(model, o.temperature ?? 0.5, o.maxTokens ?? 600),
     }),
     signal: AbortSignal.timeout(45_000),
   });

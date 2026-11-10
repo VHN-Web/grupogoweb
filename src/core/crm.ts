@@ -212,7 +212,7 @@ export const DEFAULT_CRM: CrmConfig = {
   callsPerRun: 4,
   perRun: 6,
   goals: { contacts: 30, demos: 2 },
-  model: "gemini-2.5-flash",
+  model: "gemini-3.8-flash",
   sheetId: "1KYqdv5IsGc61K5s86K-Y1I21jtJvvwwIzzQzLgMy2tg",
   geminiKeySealed: null,
   vapidPublic: null,

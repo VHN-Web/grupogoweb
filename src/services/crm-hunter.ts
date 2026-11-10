@@ -1,4 +1,5 @@
 import "server-only";
+import { geminiGenConfig, geminiModel } from "@/adapters/ai/gemini";
 // Busca automática de leads com o Gemini (chave do próprio Lázaro, Google AI Studio).
 // Usa a ferramenta "Google Search" do Gemini para achar negócios reais por cidade + categoria,
 // e aplica o score de qualificação (core/crm.ts) antes de salvar.
@@ -28,7 +29,7 @@ async function geminiKey() {
   const cfg = await crmConfig();
   const key = cfg.geminiKeySealed ? openSecret(cfg.geminiKeySealed) : process.env.GEMINI_API_KEY;
   if (!key) throw new CrmError("Cadastre a chave do Gemini em Configurações do CRM.");
-  return { key, model: cfg.model };
+  return { key, model: geminiModel(cfg.model) };
 }
 
 export async function gemini(prompt: string, opts: { search?: boolean; maxTokens?: number } = {}) {
@@ -39,7 +40,7 @@ export async function gemini(prompt: string, opts: { search?: boolean; maxTokens
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       ...(opts.search ? { tools: [{ google_search: {} }] } : {}),
-      generationConfig: { temperature: 0.4, maxOutputTokens: opts.maxTokens ?? 8192, ...(/flash/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+      generationConfig: geminiGenConfig(model, 0.4, opts.maxTokens ?? 8192),
     }),
     signal: AbortSignal.timeout(110_000),
   });
