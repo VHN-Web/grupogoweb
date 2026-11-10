@@ -35,15 +35,18 @@ export async function saveGeovanaAiAction(f: FormData) {
   await requirePlatformOwner();
   const key = String(f.get("key") ?? "").replace(/\s+/g, "");
   const model = geminiModel(String(f.get("model") ?? ""));
+  let busy = false;
   if (key) {
     try {
       await geminiChat({ key, model, system: "Responda só: ok", history: [{ role: "user", text: "teste" }], maxTokens: 10 });
     } catch (e) {
-      back(e instanceof AiError ? e.message : "O Gemini não respondeu.", "err");
+      // sobrecarga/limite = a chave passou na autenticação; salva assim mesmo
+      if (e instanceof AiError && (e.kind === "busy" || e.kind === "quota")) busy = true;
+      else back(e instanceof AiError ? e.message : "O Gemini não respondeu.", "err");
     }
   }
   await saveWhatsappPlatform({ model, ...(key ? { geminiKeySealed: sealSecret(key) } : {}) });
   await audit(null, await adminActor(), "whatsapp.ai", model);
   revalidatePath("/admin/config");
-  back("IA da Geovana salva ✓");
+  back(busy ? "Chave do Gemini salva ✓ — o modelo está sobrecarregado neste minuto; a Geovana tenta de novo sozinha." : "IA da Geovana salva ✓");
 }
