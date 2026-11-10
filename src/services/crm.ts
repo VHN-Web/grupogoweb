@@ -166,7 +166,7 @@ export async function upsertLead(i: LeadInput, source: schema.CrmLead["source"],
   return { lead, created: true };
 }
 
-export const SOURCE_LABEL: Record<schema.CrmLead["source"], string> = { hunter: "busca automática", import: "planilha", manual: "cadastro manual", affiliate: "afiliado", site: "site" };
+export const SOURCE_LABEL: Record<schema.CrmLead["source"], string> = { hunter: "busca automática", import: "planilha", manual: "cadastro manual", affiliate: "afiliado", site: "site", whatsapp: "WhatsApp (Geovana)" };
 
 /** Importa linhas (planilha/CSV). Não sobrescreve andamento de quem já existe. */
 export async function importRecords(rows: Record<string, string>[], source: "import" | "manual" = "import") {

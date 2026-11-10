@@ -7,6 +7,9 @@ import { QuickCounters } from "@/components/crm/QuickCounters";
 import { CRM_STATUSES, CRM_STATUS_COLOR, CRM_STATUS_LABEL, goalPct } from "@/core/crm";
 import { formatMinor } from "@/core/money";
 import { dashboard, firstName, fmtBr, requireCrm } from "@/services/crm";
+import { and, asc, eq, gte, isNotNull } from "drizzle-orm";
+import { db, schema } from "@/db";
+import { googleCalendarLink } from "@/core/goweb-bot";
 
 export const metadata = { title: "Hoje" };
 export const dynamic = "force-dynamic";
@@ -22,12 +25,34 @@ export default async function CrmToday({ searchParams }: { searchParams: Promise
   const totalOpen = CRM_STATUSES.filter((s) => s !== "LOST").reduce((s, k) => s + (d.funnel[k] ?? 0), 0);
   const maxF = Math.max(1, ...CRM_STATUSES.map((s) => d.funnel[s] ?? 0));
   const now = Date.now();
+  // agenda: próximas conversas/demonstrações (marcadas pelos sócios ou pela Geovana no WhatsApp)
+  const agenda = await db.query.crmLeads.findMany({
+    where: and(eq(schema.crmLeads.status, "DEMO"), isNotNull(schema.crmLeads.demoAt), gte(schema.crmLeads.demoAt, new Date(now - 2 * 3600_000))),
+    orderBy: asc(schema.crmLeads.demoAt),
+    limit: 8,
+  });
 
   return (
     <div className="space-y-5">
       <InstallHint />
       {sp.ok && <p className="rounded-2xl bg-[var(--s-good-bg)] px-4 py-3 text-sm font-semibold text-[var(--s-good-fg)]">{sp.ok}</p>}
       {sp.err && <p className="rounded-2xl bg-red-500/15 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-300">{sp.err}</p>}
+
+      {agenda.length > 0 && (
+        <section className={card}>
+          <h2 className="mb-3 flex items-center gap-2 font-bold"><Icon name="calendar" size={18} /> Agenda de conversas</h2>
+          <ul className="divide-y divide-[var(--s-line)] text-sm">
+            {agenda.map((l) => (
+              <li key={l.id} className="flex flex-wrap items-center gap-2 py-2">
+                <span className="w-32 font-semibold">{fmtBr(l.demoAt!)}</span>
+                <Link href={`/crm/leads/${l.id}`} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">{l.name}{l.city ? ` · ${l.city}` : ""}</Link>
+                {l.phone && <a className="text-xs font-semibold text-[#25D366]" href={`https://wa.me/${l.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                <a className="text-xs font-semibold text-[#1F7FD8]" href={googleCalendarLink(`GoWeb · conversa com ${l.name}`, l.demoAt!, `${l.phone ?? ""}\nhttps://goweboficial.com/crm/leads/${l.id}`)} target="_blank" rel="noopener noreferrer">+ Google Agenda</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
         <Journey name={me.name} journey={d.journey ? { startedAt: d.journey.startedAt.toISOString(), pauseStartedAt: d.journey.pauseStartedAt?.toISOString() ?? null, pausedSeconds: d.journey.pausedSeconds } : null} />

@@ -84,7 +84,7 @@ export function LaunchPage({ locale, lista, whatsapp }: { locale: Locale; lista?
         </section>
 
         <footer className="mt-auto flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-14 text-xs text-[#8a857b]">
-          {whatsapp && <a href={`https://wa.me/${whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="hover:text-white">WhatsApp</a>}
+          {whatsapp && <a href={`https://wa.me/${whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent("Oi! Vi o site da GoWeb e quero saber mais. (cód. P-site)")}`} target="_blank" rel="noopener noreferrer" className="hover:text-white">WhatsApp</a>}
           {pt && <Link href="/afiliados" className="hover:text-white">Seja afiliado</Link>}
           <span>goweboficial.com</span>
         </footer>

@@ -373,7 +373,8 @@ export const platformSettings = pgTable("platform_settings", {
   crmConfig: text("crm_config").notNull().default("{}"), // CRM: busca de leads, metas, chave Gemini (selada), VAPID
   asaasConfig: text("asaas_config").notNull().default("{}"),
   whatsappConfig: text("whatsapp_config").notNull().default("{}"), // Geovana: servidor Evolution (chave selada) + IA (chave Gemini selada, modelo) // Asaas: ambiente, chave da conta principal (selada), walletId, token do webhook, split padrão
-  odConfig: text("od_config").notNull().default("{}"), // Apps de delivery (Open Delivery): credenciais padrão da GoWeb por app (segredo selado)
+  odConfig: text("od_config").notNull().default("{}"),
+  gwBotConfig: text("gw_bot_config").notNull().default("{}"), // Geovana da GoWeb (WhatsApp da própria GoWeb) — core/goweb-bot.ts // Apps de delivery (Open Delivery): credenciais padrão da GoWeb por app (segredo selado)
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -1040,7 +1041,7 @@ export const crmLeads = pgTable(
     competitor: text("competitor"),
     status: text("status").$type<"NEW" | "CONTACT" | "DEMO" | "PROPOSAL" | "WON" | "LOST">().notNull().default("NEW"),
     ownerId: text("owner_id"),
-    source: text("source").$type<"hunter" | "import" | "manual" | "affiliate" | "site">().notNull().default("manual"),
+    source: text("source").$type<"hunter" | "import" | "manual" | "affiliate" | "site" | "whatsapp">().notNull().default("manual"),
     dedupeKey: text("dedupe_key").notNull(),
     contactAt: timestamp("contact_at", { withTimezone: true }), // 1º contato
     lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
@@ -1240,3 +1241,36 @@ export const odEvents = pgTable("od_events", {
   createdAt: createdAt(),
 });
 export type OdChannel = typeof odChannels.$inferSelect;
+
+// Geovana da GoWeb: conversas no WhatsApp da própria GoWeb (vendas, suporte, afiliados)
+export const gwChats = pgTable("gw_chats", {
+  id: id(),
+  phone: text("phone").notNull().unique(), // E.164
+  name: text("name"), // nome no WhatsApp
+  leadId: text("lead_id"), // crm_leads.id
+  tenantId: text("tenant_id"), // é lojista cliente
+  affiliateId: text("affiliate_id"), // é afiliado
+  flyer: text("flyer"), // origem (panfleto) — core/goweb-bot.ts#FLYERS
+  pausedUntil: timestamp("paused_until", { withTimezone: true }), // sócio assumiu
+  needsHuman: boolean("needs_human").notNull().default(false),
+  heat: integer("heat").notNull().default(0), // 0–100 (leads esquentando)
+  hotNotifiedAt: timestamp("hot_notified_at", { withTimezone: true }),
+  lastUserAt: timestamp("last_user_at", { withTimezone: true }),
+  lastBotAt: timestamp("last_bot_at", { withTimezone: true }),
+  followUpsSent: integer("follow_ups_sent").notNull().default(0),
+  optOut: boolean("opt_out").notNull().default(false), // pediu para não receber mensagens
+  createdAt: createdAt(),
+});
+export const gwMessages = pgTable(
+  "gw_messages",
+  {
+    id: id(),
+    chatId: text("chat_id").notNull().references(() => gwChats.id, { onDelete: "cascade" }),
+    role: text("role").$type<"user" | "ai" | "staff" | "system">().notNull(),
+    text: text("text").notNull(),
+    externalId: text("external_id"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("gw_messages_ext_uq").on(t.externalId), index("gw_messages_chat_idx").on(t.chatId, t.createdAt)],
+);
+export type GwChat = typeof gwChats.$inferSelect;

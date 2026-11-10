@@ -4,6 +4,7 @@ import { GoWebLogo } from "@/components/brand/GoWebLogo";
 import { isPreLaunch, LAUNCH_AT } from "@/core/launch";
 import { LaunchClock } from "@/components/site/LaunchClock";
 import { joinWaitlist } from "@/app/launch-actions";
+import { getSettings } from "@/services/billing";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Você escaneou! · GoWeb", robots: { index: false } };
@@ -22,6 +23,9 @@ export default async function Scanned({ searchParams }: { searchParams: Promise<
   const key = sp.v && V[sp.v] ? sp.v : "panfleto";
   const c = V[key];
   const pre = isPreLaunch();
+  const settings = await getSettings();
+  // o código (cód. P-xxx) diz à Geovana de qual panfleto a pessoa veio → origem do lead no CRM
+  const wa = settings.supportWhatsapp ? `https://wa.me/${settings.supportWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Oi! Escaneei o panfleto da GoWeb e quero saber mais. (cód. P-${key})`)}` : null;
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[#0E0E10] px-5 py-8 font-sans text-[#F4F1EA]" lang="pt-BR">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700..800&display=swap" precedence="default" />
@@ -32,6 +36,11 @@ export default async function Scanned({ searchParams }: { searchParams: Promise<
         <p className="mt-10 text-5xl">😏</p>
         <h1 style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }} className="mt-3 text-4xl font-extrabold leading-tight">{c.big}</h1>
         <p className="mt-4 text-lg text-[#B9B3A7]">{c.small}</p>
+        {wa && (
+          <a href={wa} target="_blank" rel="noopener noreferrer" className="mt-6 flex items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-6 py-4 text-center font-bold text-[#0E0E10]">
+            Falar agora no WhatsApp
+          </a>
+        )}
         {pre ? (
           <>
             <p className="mt-8 text-xs font-bold uppercase tracking-[.2em] text-[#3CC46B]">Lançamento oficial · 12/11/2026</p>

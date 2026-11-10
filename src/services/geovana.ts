@@ -47,7 +47,7 @@ export async function saveWhatsappPlatform(patch: Partial<WhatsappPlatform>) {
   return next;
 }
 
-async function evoServer() {
+export async function evoServer() {
   const p = await whatsappPlatform();
   if (!p.evolutionUrl || !p.evolutionKeySealed) throw new GeovanaError("A GoWeb ainda não ligou o servidor do WhatsApp. Use a API oficial ou fale com o suporte.");
   return { url: p.evolutionUrl, key: openSecret(p.evolutionKeySealed) };
