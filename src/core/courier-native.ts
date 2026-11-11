@@ -9,6 +9,8 @@ export const COURIER_APP = {
   scheme: "gowebentregador",
   /** Marca adicionada ao User-Agent do WebView do app. */
   uaMark: "GoWebEntregador",
+  /** APK publicado pelo GitHub Actions (Releases → entregador-latest). Outro endereço? Use COURIER_APK_URL. */
+  apkUrl: "https://github.com/eulazacruz/Atlas/releases/download/entregador-latest/entregas.apk",
   /** SHA-256 do certificado de assinatura padrão (App Links). Trocou a chave? Use ANDROID_CERT_SHA256. */
   defaultCertSha256: "B8:17:93:6D:FA:A7:08:E6:43:55:A9:62:F2:D7:38:1B:1C:2C:DB:7B:60:D5:68:94:BA:8B:1E:88:96:CB:2A:0E",
 } as const;
