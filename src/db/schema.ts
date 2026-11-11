@@ -374,6 +374,7 @@ export const platformSettings = pgTable("platform_settings", {
   affiliateConfig: text("affiliate_config").notNull().default("{}"), // programa de afiliados (core/affiliates.ts)
   crmConfig: text("crm_config").notNull().default("{}"), // CRM: busca de leads, metas, chave Gemini (selada), VAPID
   asaasConfig: text("asaas_config").notNull().default("{}"),
+  homologConfig: text("homolog_config").notNull().default("{}"), // Central de Homologação: repositório, token do GitHub (selado), segredo do webhook
   whatsappConfig: text("whatsapp_config").notNull().default("{}"), // Geovana: servidor Evolution (chave selada) + IA (chave Gemini selada, modelo) // Asaas: ambiente, chave da conta principal (selada), walletId, token do webhook, split padrão
   odConfig: text("od_config").notNull().default("{}"),
   gwBotConfig: text("gw_bot_config").notNull().default("{}"),
@@ -1384,6 +1385,24 @@ export const gwMessages = pgTable(
   (t) => [uniqueIndex("gw_messages_ext_uq").on(t.externalId), index("gw_messages_chat_idx").on(t.chatId, t.createdAt)],
 );
 export type GwChat = typeof gwChats.$inferSelect;
+
+// ---------------------------------------------------------------- Central de Homologação (core/homolog.ts + services/homolog.ts)
+/** Histórico de decisões: quem aprovou/reprovou/reverteu qual PR, quando e por quê. */
+export const homologEvents = pgTable(
+  "homolog_events",
+  {
+    id: id(),
+    prNumber: integer("pr_number").notNull(),
+    title: text("title").notNull(),
+    author: text("author"),
+    action: text("action").$type<"approved" | "rejected" | "revert_opened" | "merge_failed">().notNull(),
+    sha: text("sha"),
+    by: text("by").notNull(),
+    reason: text("reason"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("homolog_events_pr_idx").on(t.prNumber, t.createdAt)],
+);
 
 // Lembretes automáticos já enviados (passo a passo, loja parada, cobrança gentil…) — evita repetir
 export const nudgeLog = pgTable("nudge_log", {

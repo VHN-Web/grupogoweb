@@ -104,3 +104,4 @@ npm run build
 - Mudou o schema → `src/db/schema.ts` e rode `npm run db:push`.
 - Rode `npm test && npm run typecheck` antes de concluir.
 - Veja `docs/ROADMAP.md` para a ordem das próximas etapas e os pontos que exigem intervenção humana.
+- Toda mudança vai para a produção por PR aprovado na **Central de Homologação** (`/admin/homologacao`: `core/homolog.ts`, `services/homolog.ts`, `adapters/github/client.ts`, histórico em `homolog_events`, avisos categoria `homologacao`, webhook `/api/github/webhook`, ambientes `teste/<nome>` → `/teste/<nome>`). Detalhes em `docs/HOMOLOGACAO.md`.
