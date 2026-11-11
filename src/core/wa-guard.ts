@@ -58,6 +58,8 @@ export type WaGuardConfig = {
     gowebDailyTokens: number;
     storeDailyTokens: number;
     storeMonthlyTokens: number;
+    /** franquia: respostas de IA por loja no mês (WhatsApp + Instagram) */
+    storeMonthlyReplies: number;
     /** uma conversa sozinha não passa disto por dia */
     chatDailyTokens: number;
     /** US$ por 1 milhão de tokens (para a estimativa de custo) */
