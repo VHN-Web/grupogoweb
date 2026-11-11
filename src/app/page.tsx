@@ -16,6 +16,9 @@ import { SiteFooter, SiteHeader } from "@/components/site/SiteChrome";
 import { H, INK, IVORY, MUTED, wrap } from "@/components/site/tokens";
 import { isPreLaunch } from "@/core/launch";
 import { LaunchPage } from "@/components/site/LaunchPage";
+import { GeovanaHero } from "@/components/geovana/Geovana";
+import { AdvisoryVignette } from "@/components/advisory/AdvisoryVignette";
+import { advisoryConfig } from "@/services/advisory";
 
 export const dynamic = "force-dynamic";
 
@@ -133,10 +136,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
   const T = tr(locale);
   const FAQ = pt ? FAQ_PT : FAQ_ES;
   const DEMOS = pt ? DEMOS_PT : DEMOS_ES;
-  const [settings, plans] = await Promise.all([
+  const [settings, plans, advisory] = await Promise.all([
     getSettings(),
     db.query.plans.findMany({ where: and(eq(schema.plans.active, true), eq(schema.plans.isCustom, false)), orderBy: asc(schema.plans.sortOrder) }).then((ps) => sortPlansByPrice(ps, locale === "pt" ? "BRL" : "PYG")),
+    advisoryConfig().catch(() => null),
   ]);
+  // Assessoria GoWeb só aparece no site quando o dono liga no Admin e há preço na moeda do visitante
+  const showAdvisory = !!advisory?.enabled && !!advisory.pricing[pt ? "BRL" : "PYG"];
   const mp = parseModulePrices(settings.modulePrices);
   const wa = settings.supportWhatsapp ? `https://wa.me/${settings.supportWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(T("¡Hola! Quiero conocer GoWeb para mi negocio.", "Olá! Quero conhecer a GoWeb para o meu negócio. (cód. P-site)"))}` : `/planos?lang=${locale}`;
   const cheapest = [...plans.filter((p) => p.interval === "MONTHLY").map((p) => (pt ? p.priceBrlMinor : p.pricePyg)), ...(mp.enabled ? [pt ? mp.core.BRL : mp.core.PYG] : [])].sort((a, b) => a - b)[0];
@@ -296,6 +302,30 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
               </div>
             </div>
           </div>
+
+          {/* Destaque: Geovana (personagem oficial da IA da GoWeb) */}
+          <div className="grid items-center gap-8 overflow-hidden rounded-[32px] p-8 text-white md:grid-cols-[1fr_380px] md:p-12" style={{ background: "linear-gradient(120deg, #1D4F91, #1F7FD8 50%, #22A8B8 80%, #3CC46B)" }}>
+            <div>
+              <p className="font-semibold text-[#CFE6FF]">{T("Conocé a la Geovana", "Conheça a Geovana")}</p>
+              <h3 style={{ fontFamily: H }} className="mt-2 text-[clamp(28px,3vw,42px)] font-extrabold leading-tight">{T("Atiende tu WhatsApp mientras vos cocinás.", "Atende seu WhatsApp enquanto você cozinha.")}</h3>
+              <p className="mt-4 text-lg text-white/90">{T("Responde en segundos, arma el pedido con los precios de tu menú, avisa el estado de la entrega y llama a tu equipo cuando hace falta. Con las reglas que vos definís.", "Responde em segundos, monta o pedido com os preços do seu cardápio, avisa o status da entrega e chama a sua equipe quando precisa. Com as regras que você define.")}</p>
+              <a href={wa} className="btn-shine mt-6 inline-flex rounded-full bg-white px-6 py-3 font-extrabold text-[#1D4F91]">{T("Quiero a la Geovana en mi negocio", "Quero a Geovana no meu negócio")} →</a>
+            </div>
+            <div className="mx-auto w-full max-w-[380px]">
+              <GeovanaHero locale={locale} variant="store" country={pt ? "BR" : "PY"} />
+            </div>
+          </div>
+
+          {showAdvisory && (
+            <div className="grid items-center gap-8 rounded-[32px] border border-[#2C2C31] bg-[#141417] p-6 md:grid-cols-[1fr_1.2fr] md:p-10">
+              <div>
+                <p className="inline-flex rounded-full bg-gradient-to-r from-[#1F7FD8] to-[#3CC46B] px-3 py-1 text-xs font-black uppercase tracking-wider text-white">{T("Nuevo · Asesoría GoWeb", "Novo · Assessoria GoWeb")}</p>
+                <h3 style={{ fontFamily: H }} className="mt-3 text-[clamp(28px,3vw,42px)] font-extrabold leading-tight text-[#F4F1EA]">{T("Tu tienda vendiendo más, con un plan hecho para ella.", "Sua loja vendendo mais, com um plano feito para ela.")}</h3>
+                <p className="mt-4 text-lg" style={{ color: MUTED }}>{T("Diagnóstico gratis, plan mes a mes, calendario de posteos y guía de anuncios con resultado medido. Vos elegís cuánto invertir: la asesoría y los anuncios van separados, y los anuncios los pagás directo a Meta o Google.", "Diagnóstico grátis, plano mês a mês, calendário de posts e roteiro de anúncios com resultado medido. Você escolhe quanto investir: a assessoria e os anúncios vêm separados, e os anúncios você paga direto à Meta ou ao Google.")}</p>
+              </div>
+              <AdvisoryVignette locale={locale} country={pt ? "BR" : "PY"} ctaHref={planos} ctaLabel={T("Conocer los planes", "Conhecer os planos")} />
+            </div>
+          )}
         </div>
       </section>
 

@@ -404,3 +404,87 @@ html.a11y-motion .page-in, html.a11y-motion .skel { animation: none; }
 .gw-pulse { animation: gw-pulse 1.8s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .gw-pulse { animation: none; } }
 .leaflet-container { font: inherit; }
+
+/* geovana:start — personagem da Geovana (GeovanaHero, GeovanaAvatar) e vinheta da Assessoria (AdvisoryVignette) */
+.gv-hero { position: relative; width: 100%; aspect-ratio: 820 / 881; container-type: inline-size; }
+.gv-hero .gv-img { position: absolute; left: 0; bottom: 0; width: 78%; height: auto; animation: gvBreath 6s ease-in-out infinite; transform-origin: 40% 100%; }
+.gv-hero .gv-phone { position: absolute; left: 66%; top: 15%; width: 31%; aspect-ratio: 9 / 18.5; border-radius: 9cqw; background: #0E0E10; padding: 1.4cqw; box-shadow: 0 3cqw 6cqw rgba(14,14,16,.28); animation: gvPhone 5s ease-in-out infinite; }
+.gv-hero .gv-screen { position: relative; height: 100%; border-radius: 7.6cqw; background: #ECE5DD; overflow: hidden; display: flex; flex-direction: column; font-size: 2.6cqw; line-height: 1.25; color: #111; }
+.gv-hero .gv-top { display: flex; align-items: center; gap: 1.4cqw; padding: 2.6cqw 2.2cqw 1.6cqw; background: #075E54; color: #fff; font-weight: 700; }
+.gv-hero .gv-top img { width: 5.4cqw; height: 5.4cqw; border-radius: 999px; object-fit: cover; }
+.gv-hero .gv-top small { display: block; font-weight: 500; opacity: .8; font-size: 2.1cqw; }
+.gv-hero .gv-msgs { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 1.4cqw; padding: 2cqw; }
+.gv-hero .gv-b { max-width: 86%; padding: 1.4cqw 1.9cqw; border-radius: 2.4cqw; box-shadow: 0 .3cqw .6cqw rgba(0,0,0,.08); opacity: 0; }
+.gv-hero .gv-in { align-self: flex-start; background: #fff; border-top-left-radius: .6cqw; }
+.gv-hero .gv-out { align-self: flex-end; background: #DCF8C6; border-top-right-radius: .6cqw; }
+.gv-hero .gv-card { align-self: flex-start; background: #fff; border-radius: 2.4cqw; padding: 1.6cqw; width: 86%; opacity: 0; box-shadow: 0 .3cqw .6cqw rgba(0,0,0,.08); }
+.gv-hero .gv-card b { display: block; }
+.gv-hero .gv-btn { margin-top: 1.2cqw; display: block; text-align: center; border-radius: 1.8cqw; padding: 1cqw; color: #fff; font-weight: 800; background: linear-gradient(90deg, #1F7FD8, #3CC46B); }
+.gv-hero .gv-typing { align-self: flex-start; display: inline-flex; gap: .9cqw; padding: 1.6cqw 2cqw; background: #fff; border-radius: 2.4cqw; opacity: 0; }
+.gv-hero .gv-typing i { width: 1.2cqw; height: 1.2cqw; border-radius: 999px; background: #8a8a8a; animation: gvDot 1.1s infinite ease-in-out; }
+.gv-hero .gv-typing i:nth-child(2) { animation-delay: .15s; } .gv-hero .gv-typing i:nth-child(3) { animation-delay: .3s; }
+.gv-hero .gv-m1 { animation: gvMsg1 9s infinite; } .gv-hero .gv-t1 { animation: gvType1 9s infinite; } .gv-hero .gv-m2 { animation: gvMsg2 9s infinite; } .gv-hero .gv-m3 { animation: gvMsg3 9s infinite; }
+.gv-hero .gv-bubble { position: absolute; left: 0; top: 1%; max-width: 40%; padding: 1.6cqw 2.4cqw; border-radius: 3cqw 3cqw 3cqw .6cqw; background: #fff; color: #0E0E10; font-weight: 800; font-size: 3.1cqw; line-height: 1.15; box-shadow: 0 1.4cqw 3cqw rgba(14,14,16,.16); animation: gvCall 4.5s ease-in-out infinite; transform-origin: 0 100%; }
+.gv-hero .gv-bubble span { display: block; font-weight: 600; font-size: 2.3cqw; color: #1F7FD8; }
+.gv-hero .gv-badge { position: absolute; display: inline-flex; align-items: center; gap: .8cqw; padding: 1cqw 1.8cqw; border-radius: 999px; background: #fff; color: #0E0E10; font-weight: 800; font-size: 2.5cqw; white-space: nowrap; box-shadow: 0 1cqw 2.4cqw rgba(14,14,16,.18); opacity: 0; animation: gvBadge 4.5s ease-out infinite; }
+.gv-hero .gv-badge i { width: 1.6cqw; height: 1.6cqw; border-radius: 999px; background: #3CC46B; }
+.gv-hero .gv-ring { position: absolute; left: 70%; top: 10%; width: 28%; aspect-ratio: 1; border-radius: 999px; border: .5cqw solid #3CC46B; opacity: 0; animation: gvRing 3s ease-out infinite; pointer-events: none; }
+@keyframes gvBreath { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-.8%) scale(1.006); } }
+@keyframes gvPhone { 0%, 100% { transform: translateY(0) rotate(4deg); } 50% { transform: translateY(-3%) rotate(1.5deg); } }
+@keyframes gvDot { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-35%); opacity: 1; } }
+@keyframes gvMsg1 { 0%, 4% { opacity: 0; transform: translateY(20%); } 8%, 92% { opacity: 1; transform: none; } 97%, 100% { opacity: 0; } }
+@keyframes gvType1 { 0%, 12% { opacity: 0; } 15%, 33% { opacity: 1; } 36%, 100% { opacity: 0; height: 0; padding: 0; margin: 0; } }
+@keyframes gvMsg2 { 0%, 34% { opacity: 0; transform: translateY(20%); } 39%, 92% { opacity: 1; transform: none; } 97%, 100% { opacity: 0; } }
+@keyframes gvMsg3 { 0%, 54% { opacity: 0; transform: translateY(20%) scale(.96); } 60%, 92% { opacity: 1; transform: none; } 97%, 100% { opacity: 0; } }
+@keyframes gvCall { 0%, 100% { transform: rotate(0) scale(1); } 8% { transform: rotate(-3deg) scale(1.04); } 16% { transform: rotate(3deg) scale(1.04); } 24% { transform: rotate(0) scale(1); } }
+@keyframes gvBadge { 0% { opacity: 0; transform: translateY(30%) scale(.7); } 12%, 70% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-60%); } }
+@keyframes gvRing { 0% { opacity: .5; transform: scale(.7); } 100% { opacity: 0; transform: scale(1.5); } }
+.gv-avatar { position: relative; display: inline-block; flex-shrink: 0; }
+.gv-avatar img { width: 100%; height: 100%; border-radius: 999px; object-fit: cover; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #3CC46B; }
+.gv-avatar .gv-online { position: absolute; right: 2%; bottom: 2%; width: 26%; height: 26%; border-radius: 999px; background: #3CC46B; box-shadow: 0 0 0 2px #fff; }
+.gv-avatar .gv-online::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #3CC46B; animation: gw-pulse 1.8s ease-out infinite; }
+
+/* Vinheta da Assessoria (cenas trocadas pelo componente; cada cena remonta e as animações recomeçam) */
+.vg { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 28px; container-type: inline-size; font-family: 'Bricolage Grotesque', Inter, system-ui, sans-serif; color: #0E0E10; isolation: isolate; }
+@media (max-width: 640px) { .vg { aspect-ratio: 4 / 5; border-radius: 22px; } }
+.vg-scene { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 6cqw; animation: vgIn .45s cubic-bezier(.2,.8,.2,1) both; }
+.vg-row { display: flex; align-items: center; gap: 5cqw; width: 100%; }
+.vg-card { width: 40cqw; flex-shrink: 0; }
+.vg-list { width: 44cqw; flex-shrink: 0; }
+.vg-hello { height: 100%; gap: 2cqw; }
+.vg-gv { height: 118%; align-self: flex-end; margin-bottom: -12%; filter: drop-shadow(0 2cqw 3cqw rgba(0,0,0,.25)); }
+@container (max-width: 560px) {
+  .vg-scene { padding: 8cqw 7cqw; }
+  .vg-row { flex-direction: column; gap: 5cqw; text-align: center; }
+  .vg-card, .vg-list { width: 100%; text-align: left; }
+  .vg-hello { position: relative; justify-content: flex-start; align-items: flex-start; text-align: left; }
+  .vg-gv { position: absolute; right: -14%; bottom: -10%; height: 82%; margin: 0; }
+}
+.vg-w { display: inline-block; opacity: 0; animation: vgWord .55s cubic-bezier(.2,.9,.25,1.2) both; animation-delay: var(--d, 0s); }
+.vg-slam { display: block; opacity: 0; animation: vgSlam .5s cubic-bezier(.2,.9,.25,1.3) both; animation-delay: var(--d, 0s); }
+.vg-pop { opacity: 0; animation: gwPopIn .5s cubic-bezier(.2,.9,.25,1.2) both; animation-delay: var(--d, 0s); }
+.vg-up { opacity: 0; animation: gwFadeUp .6s cubic-bezier(.2,.8,.2,1) both; animation-delay: var(--d, 0s); }
+.vg-slide { opacity: 0; animation: vgSlide .8s cubic-bezier(.2,.8,.2,1) both; animation-delay: var(--d, 0s); }
+.vg-mark { white-space: nowrap; background: linear-gradient(transparent 58%, rgba(60,196,107,.55) 58%); background-size: 0 100%; background-repeat: no-repeat; animation: vgMark .6s ease both; animation-delay: var(--d, 0s); }
+.vg-w.vg-mark { animation: vgWord .55s cubic-bezier(.2,.9,.25,1.2) both, vgMark .6s ease both; animation-delay: var(--d, 0s), calc(var(--d, 0s) + .4s); }
+.vg-ring { animation: vgRing 1.6s cubic-bezier(.3,.8,.2,1) both; animation-delay: var(--d, 0s); }
+.vg-bar { transform-origin: left; animation: vgBar var(--t, 3s) linear both; }
+@keyframes vgIn { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+@keyframes vgWord { from { opacity: 0; transform: translateY(40%) rotate(4deg); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes vgSlam { 0% { opacity: 0; transform: scale(2.2); } 60% { opacity: 1; transform: scale(.94); } 100% { opacity: 1; transform: none; } }
+@keyframes vgSlide { from { opacity: 0; transform: translateX(30%); } to { opacity: 1; transform: none; } }
+@keyframes vgMark { to { background-size: 100% 100%; } }
+@keyframes vgRing { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: var(--to); } }
+@keyframes vgBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .gv-hero *, .gv-avatar *, .gv-avatar *::after, .vg * { animation-duration: .01s !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; }
+  .gv-hero .gv-b, .gv-hero .gv-card { opacity: 1; }
+}
+html.a11y-motion .gv-hero .gv-b, html.a11y-motion .gv-hero .gv-card, html.a11y-motion .vg * { opacity: 1 !important; }
+/* botão da Assessoria no menu do painel */
+.gv-navbtn { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px; color: #fff; text-decoration: none; background: linear-gradient(110deg, #1F7FD8, #22A8B8 45%, #3CC46B 75%, #1F7FD8); background-size: 250% 100%; animation: gwGradient 6s ease infinite; box-shadow: 0 6px 18px rgba(60,196,107,.35), inset 0 0 0 1px rgba(255,255,255,.25); transition: transform .15s ease; }
+.gv-navbtn:hover { transform: translateY(-1px); }
+.gv-navbtn.is-active { box-shadow: 0 0 0 2px #fff, 0 6px 18px rgba(60,196,107,.45); }
+.gv-navbtn img { width: 34px; height: 34px; border-radius: 999px; object-fit: cover; box-shadow: 0 0 0 2px #fff; flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) { .gv-navbtn { animation: none; } }
+/* geovana:end */

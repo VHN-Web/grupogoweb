@@ -136,3 +136,41 @@ export async function igSendText(token: string, recipientIgsid: string, text: st
   if (!res.ok) fail(res, j, "envio");
   return typeof j.message_id === "string" ? j.message_id : null;
 }
+
+// ---------------------------------------------------------------- publicação (Assessoria GoWeb, autonomia)
+/**
+ * Publica uma foto no feed: cria o contêiner (a Meta busca a imagem JPEG na URL pública) e publica.
+ * Exige instagram_business_content_publish. Limite da Meta: 100 publicações pela API a cada 24 h por conta.
+ */
+export async function igPublishImage(token: string, igUserId: string, imageUrl: string, caption: string): Promise<string> {
+  if (sandboxBlocks("instagram", igUserId, `post: ${caption.slice(0, 80)}`)) return `sandbox-${Date.now()}`; // prévia: nunca publica
+  const base = `${GRAPH()}/${encodeURIComponent(igUserId)}`;
+  const create = await fetch(`${base}/media`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ image_url: imageUrl, caption }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const c = await readJson(create);
+  if (!create.ok) fail(create, c, "contêiner do post");
+  const creationId = typeof c.id === "string" ? c.id : null;
+  if (!creationId) throw new IgError("Instagram (contêiner do post): sem id");
+  // imagem costuma ficar pronta na hora; confere o status algumas vezes antes de publicar
+  for (let i = 0; i < 5; i++) {
+    const st = await fetch(`${GRAPH()}/${encodeURIComponent(creationId)}?fields=status_code`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(TIMEOUT) }).catch(() => null);
+    const j = st?.ok ? await readJson(st) : {};
+    if (j.status_code === "FINISHED" || !st?.ok) break;
+    if (j.status_code === "ERROR" || j.status_code === "EXPIRED") throw new IgError(`Instagram (post): a Meta não aceitou a imagem (${String(j.status_code)})`);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  const pub = await fetch(`${base}/media_publish`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ creation_id: creationId }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const p = await readJson(pub);
+  if (!pub.ok) fail(pub, p, "publicação");
+  if (typeof p.id !== "string") throw new IgError("Instagram (publicação): sem id");
+  return p.id;
+}

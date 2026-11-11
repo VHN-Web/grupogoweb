@@ -82,7 +82,7 @@ export function featureOn(cfg: GrowthConfig, f: GrowthFeature, pro: boolean): bo
 }
 
 // ---------------------------------------------------------------- origem das vendas
-export const SOURCES = ["mesa", "qr", "instagram", "whatsapp", "google", "facebook", "tiktok", "panfleto", "indicacao", "vitrine", "campanha", "direto"] as const;
+export const SOURCES = ["mesa", "qr", "instagram", "whatsapp", "google", "facebook", "tiktok", "panfleto", "indicacao", "vitrine", "campanha", "anuncio", "direto"] as const;
 export type Source = (typeof SOURCES)[number];
 export const SOURCE_LABELS: Record<Source, { es: string; pt: string }> = {
   mesa: { es: "QR de la mesa", pt: "QR da mesa" },
@@ -96,6 +96,7 @@ export const SOURCE_LABELS: Record<Source, { es: string; pt: string }> = {
   indicacao: { es: "Recomendación", pt: "Indicação" },
   vitrine: { es: "Vitrina de la ciudad", pt: "Vitrine da cidade" },
   campanha: { es: "Campaña", pt: "Campanha" },
+  anuncio: { es: "Anuncio pago", pt: "Anúncio pago" },
   direto: { es: "Directo / sin origen", pt: "Direto / sem origem" },
 };
 
@@ -104,6 +105,8 @@ export function normalizeSource(raw: string | null | undefined): Source {
   const s = (raw ?? "").toLowerCase().trim();
   if (!s) return "direto";
   if ((SOURCES as readonly string[]).includes(s)) return s as Source;
+  if (/^(anuncio|ads?-)/.test(s)) return "anuncio"; // Assessoria: anúncio orientado
+  if (/^post-/.test(s)) return "instagram"; // Assessoria: post do calendário
   if (/^(ig|insta)/.test(s)) return "instagram";
   if (/^(wa|zap|whats)/.test(s)) return "whatsapp";
   if (/^(fb|face|meta)/.test(s)) return "facebook";

@@ -9,7 +9,7 @@ import type { ModuleKey } from "@/core/modules";
 import { Icon } from "@/components/ui/Icon";
 
 type Group = "sales" | "catalog" | "customers" | "admin";
-type Item = { href: string; es: string; pt: string; area?: PanelArea; icon: string; group: Group; pro?: boolean; module?: ModuleKey; brOnly?: boolean };
+type Item = { href: string; es: string; pt: string; area?: PanelArea; icon: string; group: Group; pro?: boolean; module?: ModuleKey; brOnly?: boolean; advisory?: boolean };
 
 export const GROUPS: Record<Group, { es: string; pt: string; color: string; soft: string }> = {
   sales: { es: "Ventas", pt: "Vendas", color: "#2FAE5F", soft: "#E3F5EA" },
@@ -28,6 +28,7 @@ const ITEMS: Item[] = [
   { href: "/aparencia", es: "Apariencia del sitio", pt: "Aparência do site", area: "appearance", icon: "palette", group: "catalog" },
   { href: "/clientes", es: "Clientes", pt: "Clientes", area: "customers", icon: "customers", group: "customers" },
   { href: "/crescimento", es: "Crecimiento", pt: "Crescimento", area: "customers", icon: "growth", group: "customers" },
+  { href: "/crescer", es: "Asesoría GoWeb", pt: "Assessoria GoWeb", area: "customers", icon: "sparkle", group: "customers", advisory: true },
   { href: "/divulgacao", es: "Divulgación", pt: "Divulgação", area: "customers", icon: "megaphone", group: "customers" },
   { href: "/marketing", es: "Marketing", pt: "Marketing", area: "marketing", icon: "tag", group: "customers", pro: true },
   { href: "/geovana", es: "Geovana (WhatsApp IA)", pt: "Geovana (WhatsApp IA)", area: "customers", icon: "chat", group: "customers", pro: true },
@@ -50,18 +51,19 @@ type Props = {
   areas: PanelArea[];
   pro: boolean;
   modules?: ModuleKey[] | null;
+  advisory?: boolean; // Assessoria GoWeb ligada para esta loja (conferido no servidor)
   store: React.ReactNode; // nome/logo + "ver meu site"
   actions: React.ReactNode; // abrir/fechar
   footer: React.ReactNode; // sair, acessibilidade
   children: React.ReactNode;
 };
 
-export function PanelShell({ slug, locale, areas, pro, modules = null, store, actions, footer, children }: Props) {
+export function PanelShell({ slug, locale, areas, pro, modules = null, advisory = false, store, actions, footer, children }: Props) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const base = `/painel/${slug}`;
   const L = (o: { es: string; pt: string }) => (locale === "pt" ? o.pt : o.es);
-  const items = ITEMS.filter((i) => (!i.area || areas.includes(i.area)) && (!i.module || !modules || modules.includes(i.module)) && (!i.brOnly || locale === "pt"));
+  const items = ITEMS.filter((i) => (!i.area || areas.includes(i.area)) && (!i.module || !modules || modules.includes(i.module)) && (!i.brOnly || locale === "pt") && (!i.advisory || advisory));
   const isActive = (i: Item) => (i.href === "" ? path === base || path.startsWith(`${base}/pedidos`) : path.startsWith(base + i.href));
   const current = items.find(isActive);
   const g = GROUPS[current?.group ?? "sales"];
@@ -74,10 +76,22 @@ export function PanelShell({ slug, locale, areas, pro, modules = null, store, ac
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  const featured = items.find((i) => i.advisory);
   const nav = (
     <nav aria-label={locale === "pt" ? "Menu do painel" : "Menú del panel"} className="space-y-5">
+      {/* Assessoria GoWeb: botão de destaque (degradê da marca, como o selo GoInteligence) com a Geovana */}
+      {featured && (
+        <Link href={base + featured.href} aria-current={isActive(featured) ? "page" : undefined} className={`gv-navbtn btn-shine ${isActive(featured) ? "is-active" : ""}`}>
+          <img src="/geovana/geovana-face.webp" alt="" width={34} height={34} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14px] font-extrabold leading-tight">{L(featured)}</span>
+            <span className="block truncate text-[11px] font-semibold opacity-90">{locale === "pt" ? "Venda mais com a Geovana" : "Vendé más con la Geovana"}</span>
+          </span>
+          <span className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-black text-[#1D4F91]">{locale === "pt" ? "NOVO" : "NUEVO"}</span>
+        </Link>
+      )}
       {(Object.keys(GROUPS) as Group[]).map((k) => {
-        const list = items.filter((i) => i.group === k);
+        const list = items.filter((i) => i.group === k && !i.advisory);
         if (!list.length) return null;
         return (
           <div key={k}>

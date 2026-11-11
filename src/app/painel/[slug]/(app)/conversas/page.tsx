@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GeovanaAvatar } from "@/components/geovana/Geovana";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
 import { formatPhone } from "@/core/region";
@@ -22,7 +23,7 @@ export default async function ConversasPage({ params, searchParams }: { params: 
   if (t.tier !== "pro") {
     return (
       <div className="max-w-2xl space-y-4">
-        <h1 className="text-xl font-bold">{T("Conversaciones", "Conversas")}</h1>
+        <h1 className="flex items-center gap-3 text-xl font-bold"><GeovanaAvatar size={40} />{T("Conversaciones", "Conversas")}</h1>
         <div className="card p-5 text-sm">
           <p>{T("WhatsApp e Instagram de la tienda en una sola bandeja, con la Geovana atendiendo.", "WhatsApp e Instagram da loja numa caixa só, com a Geovana atendendo.")}</p>
           <Link href={`/painel/${slug}/plano`} className="btn-brand mt-4 inline-block">{T("Disponible en GoInteligence", "Disponível no GoInteligence")}</Link>
@@ -48,7 +49,7 @@ export default async function ConversasPage({ params, searchParams }: { params: 
     <div className="max-w-4xl space-y-5">
       <AutoRefresh ms={20000} />
       <div>
-        <h1 className="text-xl font-bold">{T("Conversaciones", "Conversas")}</h1>
+        <h1 className="flex items-center gap-3 text-xl font-bold"><GeovanaAvatar size={40} />{T("Conversaciones", "Conversas")}</h1>
         <p className="text-sm text-muted">{T("WhatsApp e Instagram en una sola bandeja. La Geovana responde; cuando alguien del equipo responde, ella hace una pausa en esa conversación.", "WhatsApp e Instagram numa caixa só. A Geovana responde; quando alguém da equipe responde, ela pausa naquela conversa.")}</p>
       </div>
       {sp.ok && <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{sp.ok}</p>}

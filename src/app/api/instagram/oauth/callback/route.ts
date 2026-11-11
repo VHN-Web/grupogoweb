@@ -15,7 +15,7 @@ async function backTo(stateRaw: string | null) {
     const st = readState(JSON.parse(openSecret(stateRaw ?? "")), 0); // só para saber para onde voltar (mesmo vencido)
     if (st?.scope === "store" && st.tenantId) {
       const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.id, st.tenantId), columns: { slug: true } });
-      if (t) return `/painel/${t.slug}/instagram`;
+      if (t) return `/painel/${t.slug}/${st.purpose === "publish" ? "crescer" : "instagram"}`;
     }
   } catch {}
   return "/admin/geovana/instagram";
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
   }
   try {
     const r = await igFinishLogin(cleanAuthCode(code), state);
-    const dest = r.tenant ? `/painel/${r.tenant.slug}/instagram` : "/admin/geovana/instagram";
+    const dest = r.tenant ? `/painel/${r.tenant.slug}/${r.purpose === "publish" ? "crescer" : "instagram"}` : "/admin/geovana/instagram";
     return NextResponse.redirect(`${appUrl()}${dest}?ok=${encodeURIComponent(`Instagram @${r.username ?? ""} conectado.`)}`);
   } catch (e) {
     const msg = e instanceof InstagramError || e instanceof IgError ? e.message : "Não foi possível concluir o login do Instagram.";

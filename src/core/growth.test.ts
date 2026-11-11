@@ -19,6 +19,8 @@ describe("crescimento", () => {
     expect(normalizeSource("zap")).toBe("whatsapp");
     expect(normalizeSource("panfleto")).toBe("panfleto");
     expect(normalizeSource("<script>")).toBe("direto");
+    expect(normalizeSource("anuncio-s1-sex")).toBe("anuncio");
+    expect(normalizeSource("post-s2-ter")).toBe("instagram");
     expect(normalizeRef(" ab-12 c ")).toBe("AB12C");
   });
   it("valida aniversário", () => {

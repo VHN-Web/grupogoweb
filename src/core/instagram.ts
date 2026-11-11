@@ -4,8 +4,16 @@
 // Docs: developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-/** Permissões pedidas no login (só mensagens: nada de publicar ou ler comentários). */
+/** Permissões pedidas no login da Geovana (só mensagens: nada de publicar ou ler comentários). */
 export const IG_SCOPES = ["instagram_business_basic", "instagram_business_manage_messages"] as const;
+
+/** Assessoria GoWeb (autonomia): publicar posts do calendário. Pedido só nesse login, depois da aprovação da Meta. */
+export const IG_PUBLISH_SCOPE = "instagram_business_content_publish";
+
+/** Permissões do login: mensagens (Geovana) e/ou publicação (Assessoria). O básico vai sempre. */
+export function loginScopes(o: { messages: boolean; publish: boolean }): string[] {
+  return ["instagram_business_basic", ...(o.messages ? ["instagram_business_manage_messages"] : []), ...(o.publish ? [IG_PUBLISH_SCOPE] : [])];
+}
 
 /** A IA só responde dentro de 24 h da última mensagem do cliente; nunca inicia conversa nem usa a janela humana de 7 dias. */
 export const IG_WINDOW_MS = 24 * 3600_000;
@@ -31,12 +39,12 @@ export function instagramAllowed(t: IgTenant): { ok: true } | { ok: false; reaso
 }
 
 // ---------------------------------------------------------------- login (OAuth)
-export function igAuthUrl(o: { appId: string; redirectUri: string; state: string }) {
+export function igAuthUrl(o: { appId: string; redirectUri: string; state: string; scopes?: readonly string[] }) {
   const u = new URL("https://www.instagram.com/oauth/authorize");
   u.searchParams.set("client_id", o.appId);
   u.searchParams.set("redirect_uri", o.redirectUri);
   u.searchParams.set("response_type", "code");
-  u.searchParams.set("scope", IG_SCOPES.join(","));
+  u.searchParams.set("scope", (o.scopes ?? IG_SCOPES).join(","));
   u.searchParams.set("enable_fb_login", "0");
   u.searchParams.set("state", o.state);
   return u.toString();
@@ -46,10 +54,11 @@ export function igAuthUrl(o: { appId: string; redirectUri: string; state: string
 export const cleanAuthCode = (code: string) => code.replace(/#_$/, "").trim();
 
 /** state do OAuth: quem pediu + validade (10 min). Selado (criptografado) pelo serviço antes de ir na URL. */
-export type IgState = { scope: "goweb" | "store"; tenantId: string | null; actor: string; exp: number; nonce: string };
+/** purpose: "messages" = Geovana no Direct (padrão) · "publish" = Assessoria publicando o calendário. */
+export type IgState = { scope: "goweb" | "store"; tenantId: string | null; actor: string; exp: number; nonce: string; purpose: "messages" | "publish" };
 
-export function makeState(scope: IgScope, actor: string, now: number, nonce: string): IgState {
-  return { scope: scope === "goweb" ? "goweb" : "store", tenantId: scope === "goweb" ? null : scope.tenantId, actor, exp: now + 10 * 60_000, nonce };
+export function makeState(scope: IgScope, actor: string, now: number, nonce: string, purpose: IgState["purpose"] = "messages"): IgState {
+  return { scope: scope === "goweb" ? "goweb" : "store", tenantId: scope === "goweb" ? null : scope.tenantId, actor, exp: now + 10 * 60_000, nonce, purpose };
 }
 
 export function readState(raw: unknown, now: number): IgState | null {
@@ -57,7 +66,8 @@ export function readState(raw: unknown, now: number): IgState | null {
   if (!s || (s.scope !== "goweb" && s.scope !== "store") || typeof s.actor !== "string" || typeof s.exp !== "number" || typeof s.nonce !== "string") return null;
   if (s.exp < now) return null;
   if (s.scope === "store" && !s.tenantId) return null;
-  return { scope: s.scope, tenantId: s.scope === "store" ? String(s.tenantId) : null, actor: s.actor, exp: s.exp, nonce: s.nonce };
+  const purpose = s.purpose === "publish" && s.scope === "store" ? "publish" : "messages";
+  return { scope: s.scope, tenantId: s.scope === "store" ? String(s.tenantId) : null, actor: s.actor, exp: s.exp, nonce: s.nonce, purpose };
 }
 
 /** Resposta da troca do código: a Meta já devolveu com e sem o envelope `data: [...]`. */
@@ -77,7 +87,7 @@ export function parseLongToken(j: unknown, now: number): { token: string; expire
 }
 
 /** Faltam as permissões de mensagens? (a pessoa pode desmarcar na tela da Meta) */
-export const missingScopes = (granted: string[]) => IG_SCOPES.filter((s) => !granted.includes(s));
+export const missingScopes = (granted: string[], wanted: readonly string[] = IG_SCOPES) => wanted.filter((s) => !granted.includes(s));
 
 export function tokenNeedsRefresh(t: { expiresAt: Date | null; issuedAt: Date | null }, now: number) {
   if (!t.expiresAt) return false;

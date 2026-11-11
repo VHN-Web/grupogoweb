@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GeovanaAvatar } from "@/components/geovana/Geovana";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { Flash } from "@/components/Flash";
 import { AutoRefresh } from "@/components/AutoRefresh";
@@ -32,6 +33,7 @@ export default async function GwBotPage({ searchParams }: { searchParams: Promis
       <Flash ok={sp.ok} err={sp.err} />
       <div>
         <div className="flex flex-wrap items-center gap-3">
+          <GeovanaAvatar size={48} />
           <h1 className="flex-1 text-xl font-bold">Geovana da GoWeb</h1>
           <Link href="/admin/geovana/protecao" className="btn-ghost text-sm">Proteção: limites, consumo e emergência →</Link>
           <Link href="/admin/geovana/instagram" className="btn-ghost text-sm">Instagram →</Link>
