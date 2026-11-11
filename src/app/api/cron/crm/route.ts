@@ -5,6 +5,7 @@ import { runGwFollowUps } from "@/services/goweb-bot";
 import { runNudges } from "@/services/nudges";
 import { notifyVisitsSummary, pruneInbox } from "@/services/crm-notify";
 import { drainOutbox, pruneGuard } from "@/services/wa-guard";
+import { igMaintenance } from "@/services/instagram";
 
 export const maxDuration = 300;
 
@@ -21,6 +22,8 @@ export async function GET(req: Request) {
   // proteção da Geovana: envia o que ficou na fila (lembretes do horário comercial, reenvios) e limpa registros antigos
   const waQueue = await drainOutbox(40, 60_000).catch((e) => ({ error: String(e) }));
   await pruneGuard().catch(() => null);
+  // Instagram: renova tokens perto de vencer e pausa contas de lojas que saíram do GoInteligence
+  const instagram = await igMaintenance().catch((e) => ({ error: String(e) }));
   const hunt = await runHunt("cron").catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ followUps, gwFollowUps, nudges, visits, waQueue, hunt });
+  return NextResponse.json({ followUps, gwFollowUps, nudges, visits, waQueue, instagram, hunt });
 }

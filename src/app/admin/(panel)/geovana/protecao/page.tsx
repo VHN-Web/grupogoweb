@@ -258,6 +258,7 @@ export default async function ProtecaoPage({ searchParams }: { searchParams: Pro
               { name: "ai.gowebDailyTokens", label: "Tokens/dia — GoWeb", hint: "≈ 100 respostas", value: cfg.ai.gowebDailyTokens },
               { name: "ai.storeDailyTokens", label: "Tokens/dia — cada loja", hint: "≈ 70 respostas", value: cfg.ai.storeDailyTokens },
               { name: "ai.storeMonthlyTokens", label: "Tokens/mês — cada loja", hint: `Padrão ${fmtN(D.ai.storeMonthlyTokens)}`, value: cfg.ai.storeMonthlyTokens },
+              { name: "ai.storeMonthlyReplies", label: "Franquia — respostas de IA/mês por loja", hint: `WhatsApp + Instagram. Padrão ${fmtN(D.ai.storeMonthlyReplies)}`, value: cfg.ai.storeMonthlyReplies },
               { name: "ai.chatDailyTokens", label: "Tokens/dia — uma conversa", hint: "Passou disso, vai para a equipe", value: cfg.ai.chatDailyTokens },
               { name: "ai.maxOutputTokens.goweb", label: "Tamanho da resposta — GoWeb", hint: "Tokens de saída", value: cfg.ai.maxOutputTokens.goweb },
               { name: "ai.maxOutputTokens.store", label: "Tamanho da resposta — loja", hint: "Tokens de saída", value: cfg.ai.maxOutputTokens.store },

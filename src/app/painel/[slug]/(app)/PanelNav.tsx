@@ -31,6 +31,8 @@ const ITEMS: Item[] = [
   { href: "/divulgacao", es: "Divulgación", pt: "Divulgação", area: "customers", icon: "megaphone", group: "customers" },
   { href: "/marketing", es: "Marketing", pt: "Marketing", area: "marketing", icon: "tag", group: "customers", pro: true },
   { href: "/geovana", es: "Geovana (WhatsApp IA)", pt: "Geovana (WhatsApp IA)", area: "customers", icon: "chat", group: "customers", pro: true },
+  { href: "/conversas", es: "Conversaciones", pt: "Conversas", area: "customers", icon: "chat", group: "customers", pro: true },
+  { href: "/instagram", es: "Instagram (Direct IA)", pt: "Instagram (Direct IA)", area: "customers", icon: "chat", group: "customers", pro: true },
   { href: "/notas", es: "Facturas", pt: "Notas fiscais", area: "fiscal", icon: "receipt", group: "admin" },
   { href: "/equipe", es: "Equipo", pt: "Equipe", area: "team", icon: "team", group: "admin", pro: true, module: "equipe" },
   { href: "/apps-delivery", es: "Apps de delivery", pt: "Apps de delivery", area: "settings", icon: "store", group: "sales", brOnly: true },

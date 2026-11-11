@@ -109,6 +109,7 @@ export async function saveGuardAction(f: FormData) {
       gowebDailyTokens: n(f, "ai.gowebDailyTokens") ?? cur.ai.gowebDailyTokens,
       storeDailyTokens: n(f, "ai.storeDailyTokens") ?? cur.ai.storeDailyTokens,
       storeMonthlyTokens: n(f, "ai.storeMonthlyTokens") ?? cur.ai.storeMonthlyTokens,
+      storeMonthlyReplies: n(f, "ai.storeMonthlyReplies") ?? cur.ai.storeMonthlyReplies,
       chatDailyTokens: n(f, "ai.chatDailyTokens") ?? cur.ai.chatDailyTokens,
       priceInPerM: n(f, "ai.priceInPerM") ?? cur.ai.priceInPerM,
       priceOutPerM: n(f, "ai.priceOutPerM") ?? cur.ai.priceOutPerM,
