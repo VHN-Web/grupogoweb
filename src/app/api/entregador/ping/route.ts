@@ -2,9 +2,8 @@
 // O app Android também usa a resposta para avisar "nova entrega"/"entrega livre" com o app fechado.
 import { NextResponse } from "next/server";
 import { getCourier } from "@/lib/courier-auth";
-import { courierFeeLabel, myActiveDeliveries, openDeliveries, recordPing } from "@/services/courier-app";
+import { courierFeeLabel, courierLang, myActiveDeliveries, openDeliveries, recordPing } from "@/services/courier-app";
 import { offerData } from "@/core/courier-native";
-import { getRegion } from "@/core/region";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +24,7 @@ export async function POST(req: Request) {
     // dados da corrida para a tela cheia "Nova entrega" do app Android
     mine: mine.map((o) => ({ ...offerData({ type: "mine", orderId: o.id, number: o.number, address: o.address, km: o.distanceKm, fee: fee(o.deliveryFeePyg), store, auto: o.autoAssigned }), id: o.id, s: o.status })),
     open: open.map((o) => ({ ...offerData({ type: "open", orderId: o.id, number: o.number, address: o.address, km: o.distanceKm, fee: fee(o.deliveryFeePyg), store }), id: o.id })),
-    lang: getRegion(s.tenant.country).locale,
+    // idioma escolhido pelo entregador (pt/es/en): textos nativos do app Android (avisos, tela da corrida)
+    lang: courierLang(s.courier, s.tenant.country),
   });
 }

@@ -1,7 +1,7 @@
 // Botões da tela cheia "Nova entrega" do app Android: pegar entrega livre ou recusar a que foi passada.
 import { NextResponse } from "next/server";
 import { getCourier } from "@/lib/courier-auth";
-import { claimDelivery, CourierError, declineDelivery } from "@/services/courier-app";
+import { claimDelivery, CourierError, courierLang, declineDelivery } from "@/services/courier-app";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     if (body.action === "claim") await claimDelivery(s.courier, orderId);
     else await declineDelivery(s.courier, orderId);
   } catch (e) {
-    if (e instanceof CourierError) return NextResponse.json({ error: e.message }, { status: 409 });
+    if (e instanceof CourierError) return NextResponse.json({ error: e.text(courierLang(s.courier, s.tenant.country)) }, { status: 409 });
     throw e;
   }
   return NextResponse.json({ ok: true });

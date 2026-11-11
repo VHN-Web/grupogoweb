@@ -29,3 +29,13 @@ export function CourierLogoutForm({ action, label }: { action: () => Promise<voi
     </form>
   );
 }
+
+/** Passa o idioma escolhido (pt/es/en) para o app Android: avisos e tela da corrida no mesmo idioma das telas. */
+export function NativeLangSync({ lang }: { lang: string }) {
+  useEffect(() => {
+    try {
+      nativeApp()?.setLang?.(lang);
+    } catch {}
+  }, [lang]);
+  return null;
+}

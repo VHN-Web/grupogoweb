@@ -1,12 +1,17 @@
-// Manifesto do app do entregador — instalável pelo navegador (Android, iPhone), sem loja de apps.
-export const dynamic = "force-static";
+// Manifesto do app do entregador — instalável pelo navegador (Android, iPhone), no idioma escolhido (pt/es/en).
+import { intlOf } from "@/core/courier-i18n";
+import { requestCourierT } from "@/lib/courier-lang";
 
-export function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const { lang, T } = await requestCourierT();
   return Response.json(
     {
-      name: "Entregas GoWeb",
-      short_name: "Entregas",
-      description: "App do entregador: entregas, rota, GPS ao vivo e ganhos · App del repartidor",
+      name: T("Entregas GoWeb", "Entregas GoWeb", "GoWeb Deliveries"),
+      short_name: T("Entregas", "Entregas", "Deliveries"),
+      description: T("App del repartidor: entregas, ruta, GPS en vivo y ganancias", "App do entregador: entregas, rota, GPS ao vivo e ganhos", "Courier app: deliveries, route, live GPS and earnings"),
+      lang: intlOf(lang),
       id: "/entregador",
       start_url: "/entregador?app=1",
       scope: "/entregador",
@@ -20,6 +25,6 @@ export function GET() {
         { src: "/entregador/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
       ],
     },
-    { headers: { "content-type": "application/manifest+json" } },
+    { headers: { "content-type": "application/manifest+json", "cache-control": "no-store" } },
   );
 }

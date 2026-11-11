@@ -104,7 +104,8 @@ public class IncomingActivity extends Activity {
         store.setVisibility(o.store.isEmpty() ? View.GONE : View.VISIBLE);
         fee.setText(o.fee);
         fee.setVisibility(o.fee.isEmpty() ? View.GONE : View.VISIBLE);
-        km.setText(o.km.isEmpty() ? "" : L.t(this, "km_from_store").replace("{km}", o.km.replace('.', ',')));
+        String kmText = "en".equals(L.lang(this)) ? o.km : o.km.replace('.', ',');
+        km.setText(o.km.isEmpty() ? "" : L.t(this, "km_from_store").replace("{km}", kmText));
         km.setVisibility(o.km.isEmpty() ? View.GONE : View.VISIBLE);
         addr.setText(o.addr);
         addr.setVisibility(o.addr.isEmpty() ? View.GONE : View.VISIBLE);

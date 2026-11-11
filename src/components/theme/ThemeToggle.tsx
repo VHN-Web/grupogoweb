@@ -6,6 +6,7 @@ type Mode = "light" | "dark" | "system";
 const TXT = {
   pt: { light: "Claro", dark: "Escuro", system: "Sistema", label: "Tema" },
   es: { light: "Claro", dark: "Oscuro", system: "Sistema", label: "Tema" },
+  en: { light: "Light", dark: "Dark", system: "System", label: "Theme" },
 };
 
 function apply(m: Mode) {
@@ -23,7 +24,7 @@ const ICON: Record<Mode, React.ReactNode> = {
 };
 
 /** variant "segmented": três botões lado a lado. "compact": um botão que alterna. */
-export function ThemeToggle({ locale, variant = "segmented", tone = "dark" }: { locale: "es" | "pt"; variant?: "segmented" | "compact"; tone?: "dark" | "light" | "glass" }) {
+export function ThemeToggle({ locale, variant = "segmented", tone = "dark" }: { locale: "es" | "pt" | "en"; variant?: "segmented" | "compact"; tone?: "dark" | "light" | "glass" }) {
   const t = TXT[locale];
   const [mode, setMode] = useState<Mode>("system");
   useEffect(() => {
@@ -52,7 +53,7 @@ export function ThemeToggle({ locale, variant = "segmented", tone = "dark" }: { 
         type="button"
         onClick={() => set(next)}
         className={`flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold ${tone === "dark" ? "bg-white/10 text-white hover:bg-white/15" : tone === "glass" ? "bg-black/40 text-white backdrop-blur hover:bg-black/55" : "bg-black/5 hover:bg-black/10"}`}
-        aria-label={`${t.label}: ${t[mode]}. ${locale === "pt" ? "Mudar para" : "Cambiar a"} ${t[next]}`}
+        aria-label={`${t.label}: ${t[mode]}. ${locale === "pt" ? "Mudar para" : locale === "en" ? "Switch to" : "Cambiar a"} ${t[next]}`}
         title={`${t.label}: ${t[mode]}`}
       >
         <Svg m={mode} size={18} />

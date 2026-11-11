@@ -2,11 +2,12 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { CourierSw } from "./CourierSw";
+import { NativeLangSync } from "./CourierNative";
 
 type Tab = "home" | "ganhos" | "conta";
 
 /** Moldura do app do entregador: topo com a loja e abas embaixo. */
-export function CourierShell({ store, name, online, tab, locale, labels, children }: { store: string; name: string; online: boolean; tab: Tab; locale: "es" | "pt"; labels: { home: string; earnings: string; account: string; online: string; offline: string; install: string }; children: React.ReactNode }) {
+export function CourierShell({ store, name, online, tab, locale, labels, children }: { store: string; name: string; online: boolean; tab: Tab; locale: "es" | "pt" | "en"; labels: { home: string; earnings: string; account: string; online: string; offline: string; install: string }; children: React.ReactNode }) {
   const tabs: { id: Tab; href: string; icon: "home" | "cash" | "settings"; label: string }[] = [
     { id: "home", href: "/entregador", icon: "home", label: labels.home },
     { id: "ganhos", href: "/entregador/ganhos", icon: "cash", label: labels.earnings },
@@ -14,6 +15,7 @@ export function CourierShell({ store, name, online, tab, locale, labels, childre
   ];
   return (
     <>
+      <NativeLangSync lang={locale} />
       <header className="sticky top-0 z-30 flex items-center gap-3 bg-[#0E0E10] px-4 pb-3 text-[#F4F1EA]" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <img src="/entregador/icon-192.png" alt="" className="h-9 w-9 rounded-xl" />
         <div className="min-w-0 flex-1 leading-tight">

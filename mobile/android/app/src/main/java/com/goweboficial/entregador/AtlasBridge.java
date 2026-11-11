@@ -86,6 +86,14 @@ final class AtlasBridge {
         a.runOnUiThread(() -> LocationService.stop(a));
     }
 
+    /** Idioma escolhido no app (pt, es ou en): textos nativos, avisos e tela da corrida passam a usar ele. */
+    @JavascriptInterface
+    public void setLang(String lang) {
+        if (!a.trusted() || !("pt".equals(lang) || "es".equals(lang) || "en".equals(lang))) return;
+        Prefs.putStr(a, "lang", lang);
+        a.runOnUiThread(() -> Notifier.channels(a));
+    }
+
     @JavascriptInterface
     public void reload() {
         a.runOnUiThread(a::loadHome);
