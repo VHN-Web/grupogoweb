@@ -1,3 +1,5 @@
+import { advisoryVisible, currentPlan } from "@/services/advisory";
+import { AdvisoryPromo } from "@/components/advisory/AdvisoryPromo";
 import { desc, eq } from "drizzle-orm";
 import { customerCurrency, customerDocuments } from "@/services/documents";
 import { db, schema } from "@/db";
@@ -47,8 +49,10 @@ export default async function MyPlan({ params, searchParams }: { params: Promise
       ? waLink(settings.supportWhatsapp, T(`Hola! Quiero agregar el módulo "${L(m)}" a ${t.name} (${slug}).`, `Olá! Quero adicionar o módulo "${L(m)}" na ${t.name} (${slug}).`))
       : `mailto:${settings.supportEmail ?? "suporte@goweboficial.com"}?subject=${encodeURIComponent(L(m))}`;
 
+  const showAdvisory = (await advisoryVisible(t).catch(() => false)) && !(await currentPlan(t.id).catch(() => null));
   return (
     <div className="max-w-3xl space-y-5">
+      {showAdvisory && <AdvisoryPromo slug={slug} locale={region.locale} country={t.country} dismissible={false} />}
       {blocked && mods && !mods.includes(blocked) && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-semibold">{T(`"${L(blocked)}" no está en tu plan.`, `"${L(blocked)}" não faz parte do seu plano.`)}</p>

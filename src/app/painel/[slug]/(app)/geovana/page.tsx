@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GeovanaAvatar, GeovanaHero } from "@/components/geovana/Geovana";
 import { requireTenantAdmin } from "@/lib/auth";
 import { panelI18n } from "@/lib/panel-i18n";
 import { GEOVANA_PRESETS, faqToText } from "@/core/geovana";
@@ -23,6 +24,9 @@ export default async function GeovanaPage({ params, searchParams }: { params: Pr
     return (
       <div className="max-w-2xl space-y-4">
         <h1 className="text-xl font-bold">Geovana · {T("IA en tu WhatsApp", "IA no seu WhatsApp")}</h1>
+        <div className="mx-auto w-full max-w-[340px] rounded-[28px] bg-gradient-to-br from-[#1F7FD8] to-[#3CC46B] p-3">
+          <GeovanaHero locale={t.country === "PY" ? "es" : "pt"} country={t.country} />
+        </div>
         <div className="card p-5 text-sm">
           <p>{T("La Geovana atiende a tus clientes en el WhatsApp de la tienda las 24 horas: responde dudas, arma pedidos, informa el estado y avisa cuando sale para entrega.", "A Geovana atende seus clientes no WhatsApp da loja 24 horas: tira dúvidas, monta pedidos, informa o status e avisa quando sai para entrega.")}</p>
           <Link href={`/painel/${slug}/plano`} className="btn-brand mt-4 inline-block">{T("Disponible en GoInteligence", "Disponível no GoInteligence")}</Link>
@@ -50,6 +54,7 @@ export default async function GeovanaPage({ params, searchParams }: { params: Pr
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
+        <GeovanaAvatar size={52} online={st.connected && cfg.enabled} />
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold">{cfg.name} · {T("IA en tu WhatsApp", "IA no seu WhatsApp")}</h1>
           <p className="text-sm text-muted">{T("Atiende sola, con la información y las reglas que vos definís. Cuando hace falta, llama a alguien del equipo.", "Atende sozinha, com as informações e regras que você definir. Quando precisa, chama alguém da equipe.")}</p>

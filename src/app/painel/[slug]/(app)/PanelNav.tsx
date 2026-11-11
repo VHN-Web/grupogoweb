@@ -76,10 +76,22 @@ export function PanelShell({ slug, locale, areas, pro, modules = null, advisory 
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  const featured = items.find((i) => i.advisory);
   const nav = (
     <nav aria-label={locale === "pt" ? "Menu do painel" : "Menú del panel"} className="space-y-5">
+      {/* Assessoria GoWeb: botão de destaque (degradê da marca, como o selo GoInteligence) com a Geovana */}
+      {featured && (
+        <Link href={base + featured.href} aria-current={isActive(featured) ? "page" : undefined} className={`gv-navbtn btn-shine ${isActive(featured) ? "is-active" : ""}`}>
+          <img src="/geovana/geovana-face.webp" alt="" width={34} height={34} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14px] font-extrabold leading-tight">{L(featured)}</span>
+            <span className="block truncate text-[11px] font-semibold opacity-90">{locale === "pt" ? "Venda mais com a Geovana" : "Vendé más con la Geovana"}</span>
+          </span>
+          <span className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-black text-[#1D4F91]">{locale === "pt" ? "NOVO" : "NUEVO"}</span>
+        </Link>
+      )}
       {(Object.keys(GROUPS) as Group[]).map((k) => {
-        const list = items.filter((i) => i.group === k);
+        const list = items.filter((i) => i.group === k && !i.advisory);
         if (!list.length) return null;
         return (
           <div key={k}>

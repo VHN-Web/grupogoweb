@@ -5,6 +5,8 @@ import { ACTION_LABELS, OBJECTIVE_LABELS, THEME_LABELS, parseObjectives, type Ac
 import { advisoryConfig, advisoryErrorText, assertAdvisory, calendarLinks, currentPlan, planView, storeMetrics } from "@/services/advisory";
 import { AdvisorySimulator } from "@/components/advisory/AdvisorySimulator";
 import { PostCard } from "@/components/advisory/PostCard";
+import { AdvisoryVignette } from "@/components/advisory/AdvisoryVignette";
+import { GeovanaAvatar, GeovanaHero } from "@/components/geovana/Geovana";
 import { AD_STEPS, DOW, insightText } from "@/components/advisory/texts";
 import { minorToInput } from "@/core/money";
 import type { Currency } from "@/core/types";
@@ -40,9 +42,12 @@ export default async function CrescerPage({ params, searchParams }: { params: Pr
     </>
   );
   const header = (
-    <div>
+    <div className="flex items-center gap-3">
+      <GeovanaAvatar size={48} />
+      <div className="min-w-0">
       <h1 className="text-xl font-bold">{T("Asesoría GoWeb", "Assessoria GoWeb")}</h1>
       <p className="text-sm text-muted">{T("Un plan para vender más: más ticket, más clientes que vuelven, más presencia en Instagram y Google.", "Um plano para vender mais: ticket maior, mais clientes voltando, mais presença no Instagram e no Google.")}</p>
+      </div>
     </div>
   );
 
@@ -54,9 +59,17 @@ export default async function CrescerPage({ params, searchParams }: { params: Pr
       ? { objectives: parseObjectives(JSON.parse(plan.objectives)) as Objective[], total: plan.monthlyTotal, months: plan.months, report: JSON.parse(plan.selfReport) as SelfReport }
       : null;
     return (
-      <div className="max-w-4xl space-y-5">
+      <div className="max-w-5xl space-y-5">
         {header}
         {flash}
+        {!plan && (
+          <section className="grid items-center gap-5 lg:grid-cols-[1fr_280px]">
+            <AdvisoryVignette locale={locale} country={t.country} ctaHref="#simulador" />
+            <div className="hidden rounded-[28px] bg-gradient-to-br from-[#1D4F91] via-[#1F7FD8] to-[#3CC46B] p-3 lg:block">
+              <GeovanaHero locale={locale} variant="advisory" country={t.country} />
+            </div>
+          </section>
+        )}
         {plan && (
           <section className="card border-2 border-[#2FAE5F] p-5 text-sm">
             <p className="font-semibold">{T("Pedido enviado", "Pedido enviado")} · {fmtDate(plan.requestedAt ?? plan.createdAt)}</p>
@@ -69,6 +82,7 @@ export default async function CrescerPage({ params, searchParams }: { params: Pr
             </form>
           </section>
         )}
+        <div id="simulador" className="scroll-mt-24" />
         <AdvisorySimulator locale={locale} currency={t.currency as Currency} pricing={pricing} metrics={metrics} isPro={t.tier === "pro"} demo={t.demo} action={requestAdvisoryAction.bind(null, slug)} initial={initial} />
       </div>
     );

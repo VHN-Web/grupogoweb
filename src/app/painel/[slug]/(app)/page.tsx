@@ -16,6 +16,8 @@ import { listAbandonedCarts, notifyOwnerAbandoned } from "@/services/intelligenc
 import { PayBadge } from "@/components/PayBadge";
 import { markOrderPaid, updateOrderStatus } from "./actions";
 import { nextLabel, nextStatus } from "./order-flow";
+import { advisoryVisible, currentPlan } from "@/services/advisory";
+import { AdvisoryPromo } from "@/components/advisory/AdvisoryPromo";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +55,8 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
   // primeiros passos (só Brasil, some quando tudo estiver pronto)
   const steps = t.country === "BR" && !t.demo ? await storeSetup(t) : [];
   const prog = setupProgress(steps);
+  // Assessoria GoWeb: chamada no painel enquanto a loja não tem plano (complemento ligado no Admin)
+  const showAdvisory = (await advisoryVisible(t).catch(() => false)) && !(await currentPlan(t.id).catch(() => null));
   return (
     <div className="space-y-6">
       <AutoRefresh ms={5000} />
@@ -90,6 +94,7 @@ export default async function OrdersBoard({ params }: { params: Promise<{ slug: 
           )}
         </div>
       )}
+      {showAdvisory && <AdvisoryPromo slug={slug} locale={region.locale} country={t.country} />}
       <h1>{T("Pedidos de hoy", "Pedidos de hoje")}</h1>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat k={T("Pedidos en 24 h", "Pedidos em 24 h")} v={String(today.length)} icon="orders" color="#0F2747" />
