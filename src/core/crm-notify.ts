@@ -1,7 +1,7 @@
 // Notificações personalizadas do CRM: cada sócio escolhe o que quer receber e o horário de silêncio.
 // Vale para o app Android (canais com som próprio), o PWA e a central de avisos (/crm/avisos).
 
-export type NotifyCategory = "leads" | "retornos" | "demos" | "vendas" | "suporte" | "whatsapp" | "afiliados" | "acessos";
+export type NotifyCategory = "leads" | "retornos" | "demos" | "vendas" | "suporte" | "whatsapp" | "afiliados" | "acessos" | "homologacao";
 
 export const NOTIFY_CATEGORIES: { id: NotifyCategory; label: string; hint: string }[] = [
   { id: "leads", label: "Leads novos", hint: "Busca automática, lista de espera e leads passados para você" },
@@ -12,6 +12,7 @@ export const NOTIFY_CATEGORIES: { id: NotifyCategory; label: string; hint: strin
   { id: "whatsapp", label: "WhatsApp da GoWeb", hint: "Geovana pediu humano ou lead esquentando" },
   { id: "afiliados", label: "Afiliados", hint: "Cadastro e indicações de afiliados" },
   { id: "acessos", label: "Acessos", hint: "Resumo de visitas do site e da página de afiliados" },
+  { id: "homologacao", label: "Homologação", hint: "Mudança nova para aprovar, testes concluídos e decisões" },
 ];
 
 export type NotifyPrefs = {

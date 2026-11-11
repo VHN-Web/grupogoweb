@@ -31,6 +31,7 @@ final class Notifier {
             { "whatsapp", "WhatsApp da GoWeb", "Geovana pediu humano ou lead esquentando", "h" },
             { "afiliados", "Afiliados", "Cadastro e indicações de afiliados", "d" },
             { "acessos", "Acessos", "Resumo de visitas do site e da página de afiliados", "d" },
+            { "homologacao", "Homologação", "Mudança nova para aprovar, testes concluídos e decisões", "d" },
             { "geral", "Outros avisos", "Testes e avisos gerais", "d" },
     };
 

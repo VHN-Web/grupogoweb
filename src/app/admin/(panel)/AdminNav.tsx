@@ -15,6 +15,7 @@ const ITEMS = [
   { href: "/crm", label: "CRM (app)" },
   { href: "/admin/demos", label: "Demonstrações" },
   { href: "/admin/admins", label: "Administradores" },
+  { href: "/admin/homologacao", label: "Homologação" },
   { href: "/admin/config", label: "Configurações" },
 ];
 
