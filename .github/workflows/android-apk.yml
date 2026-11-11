@@ -55,12 +55,26 @@ jobs:
       - name: Chave de assinatura
         env:
           KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KS" ]; then
-            echo "$KS" | base64 -d > "$RUNNER_TEMP/entregador-release.jks"
-            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/entregador-release.jks" >> "$GITHUB_ENV"
-          else
+          if [ -z "$KS" ]; then
             echo "::warning::Sem ANDROID_KEYSTORE_BASE64: APK assinado com chave temporária (para atualizar será preciso desinstalar o anterior)."
+            exit 0
+          fi
+          F="$RUNNER_TEMP/entregador-release.jks"
+          printf '%s' "$KS" | tr -d '\r\n ' | base64 -d > "$F"
+          # sem ANDROID_KEY_PASSWORD, usa a mesma senha do arquivo (padrão do keytool em PKCS12)
+          [ -z "$KEY_PASS" ] && KEY_PASS="$KS_PASS"
+          # confere a chave antes de compilar: senha/alias errados não derrubam o build
+          if printf 'x' > "$RUNNER_TEMP/t.txt" && keytool -list -keystore "$F" -storepass "$KS_PASS" -alias "$KEY_ALIAS" >/dev/null 2>&1 \
+             && jarsigner -keystore "$F" -storepass "$KS_PASS" -keypass "$KEY_PASS" "$(cd "$RUNNER_TEMP" && zip -q t.zip t.txt && echo "$RUNNER_TEMP/t.zip")" "$KEY_ALIAS" >/dev/null 2>&1; then
+            echo "ANDROID_KEYSTORE_FILE=$F" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
+            echo "Chave de assinatura conferida."
+          else
+            echo "::error::Os secrets de assinatura não abrem a chave (senha ou alias não batem com ANDROID_KEYSTORE_BASE64). Gerando com chave temporária — confira os 4 secrets ANDROID_*."
           fi
 
       - name: Gerar APK
@@ -71,7 +85,6 @@ jobs:
           VERSION_NAME: 1.0.${{ github.run_number }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           gradle --no-daemon --stacktrace assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/entregas.apk"
