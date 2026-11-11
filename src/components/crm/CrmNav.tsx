@@ -6,10 +6,13 @@ import { Icon } from "@/components/ui/Icon";
 const MAIN = [
   { href: "/crm", label: "Hoje", icon: "home" },
   { href: "/crm/leads", label: "Leads", icon: "customers" },
-  { href: "/crm/funil", label: "Funil", icon: "funnel" },
-  { href: "/crm/busca", label: "Busca", icon: "search" },
+  { href: "/crm/agenda", label: "Agenda", icon: "calendar" },
+  { href: "/crm/notas", label: "Notas", icon: "note" },
 ];
 const MORE = [
+  { href: "/crm/lembretes", label: "Lembretes", icon: "alarm" },
+  { href: "/crm/funil", label: "Funil", icon: "funnel" },
+  { href: "/crm/busca", label: "Busca de leads", icon: "search" },
   { href: "/crm/acessos", label: "Acessos", icon: "growth" },
   { href: "/crm/avisos", label: "Avisos", icon: "bell" },
   { href: "/crm/equipe", label: "Equipe e metas", icon: "team" },
@@ -29,8 +32,9 @@ export function CrmNav({ variant }: { variant: "side" | "bottom" }) {
           const active = i.href === "/crm/mais" ? moreOn : on(i.href);
           return (
             <li key={i.href}>
-              <Link href={i.href} aria-current={active ? "page" : undefined} className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold ${active ? "text-[#3CC46B]" : "text-[#B9B3A7]"}`}>
-                <Icon name={i.icon} size={20} />
+              <Link href={i.href} aria-current={active ? "page" : undefined} className={`relative flex min-h-[60px] flex-col items-center justify-center gap-1 text-[12px] font-semibold ${active ? "text-[#3CC46B]" : "text-[#B9B3A7]"}`}>
+                {active && <span className="absolute top-0 h-1 w-8 rounded-b-full bg-[#3CC46B]" aria-hidden />}
+                <Icon name={i.icon} size={24} />
                 {i.label}
               </Link>
             </li>

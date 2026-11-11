@@ -1,7 +1,7 @@
 // Notificações personalizadas do CRM: cada sócio escolhe o que quer receber e o horário de silêncio.
 // Vale para o app Android (canais com som próprio), o PWA e a central de avisos (/crm/avisos).
 
-export type NotifyCategory = "leads" | "retornos" | "demos" | "vendas" | "suporte" | "whatsapp" | "afiliados" | "acessos" | "homologacao";
+export type NotifyCategory = "leads" | "retornos" | "demos" | "vendas" | "suporte" | "whatsapp" | "afiliados" | "acessos" | "homologacao" | "agenda" | "lembretes";
 
 export const NOTIFY_CATEGORIES: { id: NotifyCategory; label: string; hint: string }[] = [
   { id: "leads", label: "Leads novos", hint: "Busca automática, lista de espera e leads passados para você" },
@@ -13,6 +13,8 @@ export const NOTIFY_CATEGORIES: { id: NotifyCategory; label: string; hint: strin
   { id: "afiliados", label: "Afiliados", hint: "Cadastro e indicações de afiliados" },
   { id: "acessos", label: "Acessos", hint: "Resumo de visitas do site e da página de afiliados" },
   { id: "homologacao", label: "Homologação", hint: "Mudança nova para aprovar, testes concluídos e decisões" },
+  { id: "agenda", label: "Agenda", hint: "Compromisso chegando (no tempo que você escolheu)" },
+  { id: "lembretes", label: "Lembretes", hint: "Lembretes que você marcou" },
 ];
 
 export type NotifyPrefs = {
@@ -68,6 +70,6 @@ export function inQuietHours(p: NotifyPrefs, now = new Date()) {
  */
 export function shouldPush(p: NotifyPrefs, category: NotifyCategory | null | undefined, now = new Date()) {
   if (category && p.off.includes(category)) return false;
-  if (inQuietHours(p, now)) return !!category && p.urgentInQuiet && (category === "vendas" || category === "suporte");
+  if (inQuietHours(p, now)) return !!category && p.urgentInQuiet && (category === "vendas" || category === "suporte" || category === "agenda" || category === "lembretes");
   return true;
 }

@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { drainOutbox } from "@/services/wa-guard";
 import { publishDuePosts } from "@/services/advisory";
+import { fireDue } from "@/services/crm-planner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -15,5 +16,7 @@ export async function GET(req: Request) {
   const r = await drainOutbox(40, 45_000);
   // Assessoria GoWeb: posts aprovados no horário marcado (publicação automática, se liberada no Admin)
   const posts = await publishDuePosts().catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ...r, posts });
+  // CRM: avisos da agenda e lembretes no minuto certo
+  const reminders = await fireDue().catch((e) => ({ error: String(e) }));
+  return NextResponse.json({ ...r, posts, reminders });
 }

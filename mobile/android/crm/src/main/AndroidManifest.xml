@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Android 16: notificação "ao vivo" (compromisso/jornada) pode virar chip na barra de status -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -59,6 +61,46 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_visits_info" />
         </receiver>
 
+        <receiver
+            android:name=".AgendaWidget"
+            android:exported="false"
+            android:label="@string/widget_agenda">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.goweboficial.crm.REFRESH" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_agenda_info" />
+        </receiver>
+        <receiver
+            android:name=".RemindersWidget"
+            android:exported="false"
+            android:label="@string/widget_reminders">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.goweboficial.crm.REFRESH" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_reminders_info" />
+        </receiver>
+        <receiver
+            android:name=".NoteWidget"
+            android:exported="false"
+            android:label="@string/widget_note">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.goweboficial.crm.REFRESH" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_note_info" />
+        </receiver>
+        <receiver
+            android:name=".FunnelWidget"
+            android:exported="false"
+            android:label="@string/widget_funnel">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.goweboficial.crm.REFRESH" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_funnel_info" />
+        </receiver>
         <service
             android:name=".PushService"
             android:exported="false">

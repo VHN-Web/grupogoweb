@@ -7,6 +7,9 @@ import { CrmLogoutForm } from "@/components/crm/CrmLogoutForm";
 export const metadata = { title: "Mais" };
 
 const ITEMS = [
+  { href: "/crm/lembretes", label: "Lembretes", desc: "Avisos no horário que você marcar, com repetição", icon: "alarm" },
+  { href: "/crm/funil", label: "Funil", desc: "Leads por etapa, do primeiro contato ao fechamento", icon: "funnel" },
+  { href: "/crm/busca", label: "Busca de leads", desc: "Encontrar negócios novos com a IA", icon: "search" },
   { href: "/crm/acessos", label: "Acessos", desc: "Quantas pessoas abriram o site oficial, a página e os links de afiliados", icon: "growth" },
   { href: "/crm/avisos", label: "Avisos", desc: "Todas as notificações, mesmo as que chegaram no silêncio", icon: "bell" },
   { href: "/crm/equipe", label: "Equipe e metas", desc: "Contatos, demos e fechamentos por sócio", icon: "team" },

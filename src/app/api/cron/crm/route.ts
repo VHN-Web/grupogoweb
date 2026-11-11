@@ -7,6 +7,7 @@ import { notifyVisitsSummary, pruneInbox } from "@/services/crm-notify";
 import { drainOutbox, pruneGuard } from "@/services/wa-guard";
 import { igMaintenance } from "@/services/instagram";
 import { advisoryDaily, publishDuePosts } from "@/services/advisory";
+import { fireDue } from "@/services/crm-planner";
 
 export const maxDuration = 300;
 
@@ -28,6 +29,7 @@ export async function GET(req: Request) {
   // Assessoria GoWeb: calendário das próximas semanas, resumo do dia ao lojista, posts aprovados que chegaram na hora
   const advisory = await advisoryDaily().catch((e) => ({ error: String(e) }));
   const advisoryPosts = await publishDuePosts().catch((e) => ({ error: String(e) }));
+  const reminders = await fireDue().catch((e) => ({ error: String(e) }));
   const hunt = await runHunt("cron").catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ followUps, gwFollowUps, nudges, visits, waQueue, instagram, advisory, advisoryPosts, hunt });
+  return NextResponse.json({ followUps, gwFollowUps, nudges, visits, waQueue, instagram, advisory, advisoryPosts, reminders, hunt });
 }

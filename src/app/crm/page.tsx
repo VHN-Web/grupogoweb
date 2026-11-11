@@ -10,6 +10,9 @@ import { dashboard, firstName, fmtBr, requireCrm } from "@/services/crm";
 import { and, asc, eq, gte, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { googleCalendarLink } from "@/core/goweb-bot";
+import { plannerSummary } from "@/services/crm-planner";
+import { EVENT_KIND_COLOR, dayLabel, parseNote } from "@/core/crm-planner";
+import { brDayInput, brTimeInput } from "@/core/crm";
 
 export const metadata = { title: "Hoje" };
 export const dynamic = "force-dynamic";
@@ -20,7 +23,7 @@ const card = "rounded-3xl border border-[var(--s-line)] bg-[var(--s-card)] p-5";
 export default async function CrmToday({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const me = await requireCrm();
   const sp = await searchParams;
-  const d = await dashboard(me);
+  const [d, plan] = await Promise.all([dashboard(me), plannerSummary(me)]);
   const g = d.cfg.goals;
   const totalOpen = CRM_STATUSES.filter((s) => s !== "LOST").reduce((s, k) => s + (d.funnel[k] ?? 0), 0);
   const maxF = Math.max(1, ...CRM_STATUSES.map((s) => d.funnel[s] ?? 0));
@@ -37,6 +40,58 @@ export default async function CrmToday({ searchParams }: { searchParams: Promise
       <InstallHint />
       {sp.ok && <p className="rounded-2xl bg-[var(--s-good-bg)] px-4 py-3 text-sm font-semibold text-[var(--s-good-fg)]">{sp.ok}</p>}
       {sp.err && <p className="rounded-2xl bg-red-500/15 px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-300">{sp.err}</p>}
+
+      {/* seu dia: agenda, lembretes e nota fixada + atalhos */}
+      <section className="grid gap-3 sm:grid-cols-3">
+        <Link href="/crm/agenda?novo=1#form" className="flex items-center gap-3 rounded-3xl bg-[#1F7FD8] p-4 font-extrabold text-white"><Icon name="calendar" size={22} /> Novo compromisso</Link>
+        <Link href="/crm/lembretes" className="flex items-center gap-3 rounded-3xl bg-[#F5B301] p-4 font-extrabold text-[#0E0E10]"><Icon name="alarm" size={22} /> Novo lembrete</Link>
+        <Link href="/crm/notas" className="flex items-center gap-3 rounded-3xl bg-[#3CC46B] p-4 font-extrabold text-[#0E0E10]"><Icon name="note" size={22} /> Notas</Link>
+      </section>
+      {(plan.next.length > 0 || plan.reminders.length > 0 || plan.pinned) && (
+        <div className="grid gap-5 lg:grid-cols-3">
+          {plan.next.length > 0 && (
+            <section className={`${card} lg:col-span-2`}>
+              <h2 className="mb-3 flex items-center gap-2 font-bold"><Icon name="calendar" size={18} /> Próximos compromissos <Link href="/crm/agenda" className="ml-auto text-sm font-semibold text-[#1F7FD8]">Agenda →</Link></h2>
+              <ul className="space-y-2">
+                {plan.next.map((i) => (
+                  <li key={i.id}>
+                    <Link href={i.url} className="flex items-center gap-3 rounded-2xl border border-[var(--s-line)] p-3">
+                      <span className="h-10 w-1.5 rounded-full" style={{ background: EVENT_KIND_COLOR[i.kind] }} aria-hidden />
+                      <span className="w-20 shrink-0 text-sm"><b className="block">{brTimeInput(i.startsAt)}</b><span className="text-[var(--s-muted)]">{dayLabel(brDayInput(i.startsAt))}</span></span>
+                      <span className="min-w-0 flex-1 truncate font-semibold">{i.title}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <div className="space-y-5">
+            {plan.reminders.length > 0 && (
+              <section className={card}>
+                <h2 className="mb-3 flex items-center gap-2 font-bold"><Icon name="alarm" size={18} /> Lembretes <Link href="/crm/lembretes" className="ml-auto text-sm font-semibold text-[#1F7FD8]">Todos →</Link></h2>
+                <ul className="space-y-2 text-[15px]">
+                  {plan.reminders.slice(0, 4).map((r) => (
+                    <li key={r.id} className="flex gap-2">
+                      <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${r.remindAt.getTime() < now ? "bg-red-500" : "bg-[#F5B301]"}`} aria-hidden />
+                      <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{r.text}</span><span className="text-sm text-[var(--s-muted)]">{dayLabel(brDayInput(r.remindAt))} {brTimeInput(r.remindAt)}</span></span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {plan.pinned && (
+              <Link href={`/crm/notas?abrir=${plan.pinned.id}`} className={`${card} block`}>
+                <h2 className="mb-1 flex items-center gap-2 font-bold"><Icon name="pin" size={16} /> {plan.pinned.title || "Nota fixada"}</h2>
+                <ul className="space-y-0.5 text-[15px] text-[var(--s-muted)]">
+                  {parseNote(plan.pinned.body).filter((l) => l.kind === "check" || l.text.trim()).slice(0, 5).map((l, k) => (
+                    <li key={k} className={l.kind === "check" && l.done ? "line-through" : ""}>{l.kind === "check" ? (l.done ? "☑ " : "☐ ") : ""}{l.text}</li>
+                  ))}
+                </ul>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       {agenda.length > 0 && (
         <section className={card}>

@@ -5,4 +5,12 @@
     <string name="widget_visits">Acessos do site</string>
     <string name="widget_summary_desc">Retornos, leads novos, contatos e demos de hoje</string>
     <string name="widget_visits_desc">Quantas pessoas abriram o site e a página de afiliados hoje</string>
+    <string name="widget_agenda">Agenda</string>
+    <string name="widget_agenda_desc">Seus próximos compromissos, demos e retornos</string>
+    <string name="widget_reminders">Lembretes</string>
+    <string name="widget_reminders_desc">Os próximos lembretes (os atrasados em destaque)</string>
+    <string name="widget_note">Nota fixada</string>
+    <string name="widget_note_desc">Sua nota fixada e atalhos para nota, lembrete e agenda</string>
+    <string name="widget_funnel">Funil e meta</string>
+    <string name="widget_funnel_desc">Leads por etapa e a meta de contatos do dia</string>
 </resources>

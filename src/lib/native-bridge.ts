@@ -32,6 +32,8 @@ type Bridge = {
   app?(): string;
   openChannelSettings?(category: string): void;
   syncNow?(): void;
+  /** app do CRM: "ilha ao vivo" vira notificação em andamento com cronômetro ("" = some) */
+  setLive?(json: string): void;
   /** app do entregador: idioma dos textos nativos */
   setLang?(lang: string): void;
   beforeLogout(): void;

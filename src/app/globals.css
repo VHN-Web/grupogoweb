@@ -488,3 +488,52 @@ html.a11y-motion .gv-hero .gv-b, html.a11y-motion .gv-hero .gv-card, html.a11y-m
 .gv-navbtn img { width: 34px; height: 34px; border-radius: 999px; object-fit: cover; box-shadow: 0 0 0 2px #fff; flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) { .gv-navbtn { animation: none; } }
 /* geovana:end */
+
+/* ------------------------------------------------------------------ celular: proporção e toque (site, painel, loja, CRM)
+   Textos miúdos sobem um degrau, campos com 16 px (o iPhone não dá zoom ao tocar e a tela não "desanda"),
+   botões com altura mínima de toque (44 px, recomendação da Apple/Google) e nada de rolagem lateral acidental. */
+@media (max-width: 640px) {
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { overflow-x: clip; }
+  .text-xs { font-size: .8125rem; line-height: 1.15rem; }
+  .text-sm { font-size: .9375rem; line-height: 1.4rem; }
+  .text-\[10px\] { font-size: 11.5px; }
+  .text-\[11px\] { font-size: 12.5px; }
+  .text-\[12px\] { font-size: 13px; }
+  .text-\[12\.5px\] { font-size: 13.5px; }
+  .text-\[13px\] { font-size: 14px; }
+  .input, :where(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([class*="text-lg"]):not([class*="text-xl"]):not([class*="text-2xl"]):not([class*="text-3xl"]) { font-size: 16px; }
+  .input { padding-top: .7rem; padding-bottom: .7rem; }
+  .btn-brand, .btn-primary, .btn-ghost { min-height: 44px; }
+  .btn-brand.text-xs, .btn-ghost.text-xs, .btn-primary.text-xs { min-height: 40px; font-size: .875rem; }
+  input[type="checkbox"], input[type="radio"] { width: 1.3rem; height: 1.3rem; flex-shrink: 0; }
+  input[type="range"] { height: 2rem; }
+  table { font-size: .875rem; }
+  th, td { padding-top: .55rem; padding-bottom: .55rem; }
+  .card { border-radius: 1.15rem; }
+  .card.p-5 { padding: 1.1rem; }
+  .panel-main h1 { font-size: 1.5rem; }
+  .panel-main h2 { font-size: 1.15rem; }
+  summary { padding-top: .35rem; padding-bottom: .35rem; }
+  /* listas com links: área de toque maior */
+  .divide-y > li > a, .space-y-1 > li > a { min-height: 44px; }
+}
+/* telas bem estreitas (iPhone SE, Android pequenos): respira um pouco menos nas bordas */
+@media (max-width: 380px) {
+  .px-4 { padding-left: .875rem; padding-right: .875rem; }
+  .text-2xl { font-size: 1.4rem; }
+  .text-3xl { font-size: 1.7rem; }
+}
+/* aparelhos com recorte/ilha: topo fixo respeita a área segura */
+@supports (padding: max(0px)) {
+  .safe-top { padding-top: max(.625rem, env(safe-area-inset-top)); }
+}
+
+/* ilha do CRM (estilo Dynamic Island): pílula preta no topo, perto da câmera; abre como banner */
+.crm-island-wrap { position: fixed; left: 0; right: 0; top: calc(max(.75rem, env(safe-area-inset-top)) + 54px); z-index: 70; display: flex; justify-content: center; pointer-events: none; padding: 0 12px; }
+.crm-island { pointer-events: auto; display: flex; align-items: center; width: min(240px, 100%); min-height: 36px; padding: 6px 12px 6px 7px; border-radius: 999px; background: #000; color: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.08); transition: width .45s cubic-bezier(.2,.9,.25,1.15), border-radius .45s cubic-bezier(.2,.9,.25,1.15), padding .35s ease, min-height .45s cubic-bezier(.2,.9,.25,1.15); animation: islandIn .5s cubic-bezier(.2,.9,.25,1.2) both; }
+@media (min-width: 768px) { .crm-island-wrap { top: 14px; } }
+.crm-island.is-open { width: min(420px, 100%); border-radius: 28px; padding: 14px; min-height: 72px; }
+.crm-island-ping { position: absolute; inset: 0; border-radius: 999px; opacity: .6; animation: gw-pulse 1.8s ease-out infinite; z-index: -1; }
+@keyframes islandIn { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .crm-island { transition: none; animation: none; } .crm-island-ping { animation: none; } }

@@ -1585,3 +1585,65 @@ export const advisoryTasks = pgTable(
 export type AdvisoryPlan = typeof advisoryPlans.$inferSelect;
 export type AdvisoryPost = typeof advisoryPosts.$inferSelect;
 export type AdvisoryTask = typeof advisoryTasks.$inferSelect;
+
+// =============================================================================
+// CRM — agenda, bloco de notas e lembretes dos sócios (core/crm-planner.ts + services/crm-planner.ts)
+// =============================================================================
+export const crmEvents = pgTable(
+  "crm_events",
+  {
+    id: id(),
+    ownerId: text("owner_id").notNull(), // ator do CRM (id do admin ou "platform")
+    shared: boolean("shared").notNull().default(false), // aparece para todos os sócios
+    kind: text("kind").$type<"meeting" | "demo" | "call" | "visit" | "task" | "personal">().notNull().default("meeting"),
+    title: text("title").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    durationMin: integer("duration_min").notNull().default(30),
+    location: text("location"), // endereço ou link da chamada
+    notes: text("notes"),
+    leadId: text("lead_id").references(() => crmLeads.id, { onDelete: "set null" }),
+    remindMin: integer("remind_min"), // avisar X min antes (null = sem aviso)
+    remindedAt: timestamp("reminded_at", { withTimezone: true }),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("crm_events_owner_idx").on(t.ownerId, t.startsAt), index("crm_events_start_idx").on(t.startsAt)],
+);
+
+export const crmNotes = pgTable(
+  "crm_notes",
+  {
+    id: id(),
+    ownerId: text("owner_id").notNull(),
+    shared: boolean("shared").notNull().default(false),
+    title: text("title").notNull().default(""),
+    body: text("body").notNull().default(""), // texto livre; linhas "- [ ]" / "- [x]" viram checklist
+    color: text("color").notNull().default("ivory"),
+    pinned: boolean("pinned").notNull().default(false),
+    leadId: text("lead_id").references(() => crmLeads.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("crm_notes_owner_idx").on(t.ownerId, t.updatedAt)],
+);
+
+export const crmReminders = pgTable(
+  "crm_reminders",
+  {
+    id: id(),
+    ownerId: text("owner_id").notNull(),
+    text: text("text").notNull(),
+    remindAt: timestamp("remind_at", { withTimezone: true }).notNull(),
+    repeat: text("repeat").$type<"none" | "daily" | "weekdays" | "weekly" | "monthly">().notNull().default("none"),
+    leadId: text("lead_id").references(() => crmLeads.id, { onDelete: "set null" }),
+    firedAt: timestamp("fired_at", { withTimezone: true }), // último aviso disparado
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("crm_reminders_due_idx").on(t.doneAt, t.remindAt), index("crm_reminders_owner_idx").on(t.ownerId, t.remindAt)],
+);
+
+export type CrmEvent = typeof crmEvents.$inferSelect;
+export type CrmNote = typeof crmNotes.$inferSelect;
+export type CrmReminder = typeof crmReminders.$inferSelect;
