@@ -109,7 +109,8 @@ export async function adminReply(ticketId: string, adminName: string, body: stri
     const st = locale === "pt" ? STATUS_LABELS[status].pt : STATUS_LABELS[status].es;
     const text = `${publicReply ? `${body}\n\n` : ""}${T("Estado", "Situação")}: ${st}\n${appUrl()}/painel/${t.tenant.slug}/suporte/${t.id}`;
     await sendEmail(t.contactEmail, T(`Respuesta a tu chamado ${t.protocol}`, `Resposta ao seu chamado ${t.protocol}`), text).catch(() => null);
-    if (t.contactWhatsapp) await sendPlatformWhatsApp(t.contactWhatsapp, `*GoWeb — ${t.protocol}*\n\n${text}`).catch(() => null);
+    // resposta a chamado aberto pelo lojista: sai a qualquer hora, mas com os limites da proteção da Geovana
+    if (t.contactWhatsapp) await sendPlatformWhatsApp(t.contactWhatsapp, `*GoWeb — ${t.protocol}*\n\n${text}`, "support").catch(() => null);
   }
 }
 

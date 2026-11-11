@@ -2,6 +2,7 @@
 import { NextResponse, after } from "next/server";
 import { evoParse } from "@/adapters/whatsapp/evolution";
 import { gwByHook, handleGwInbound } from "@/services/goweb-bot";
+import { GOWEB, drainSoon, onConnection } from "@/services/wa-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -11,7 +12,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!cfg) return NextResponse.json({ error: "not found" }, { status: 404 });
   const ev = evoParse(await req.json().catch(() => null));
   if (ev?.kind === "message") {
-    after(() => handleGwInbound({ jid: ev.msg.jid, name: ev.msg.name, text: ev.msg.text, externalId: ev.msg.id, fromMe: ev.msg.fromMe, image: ev.msg.image ?? null }).catch((e) => console.error("[gw-bot evo]", e)));
+    after(async () => {
+      await handleGwInbound({ jid: ev.msg.jid, name: ev.msg.name, text: ev.msg.text, externalId: ev.msg.id, fromMe: ev.msg.fromMe, image: ev.msg.image ?? null }).catch((e) => console.error("[gw-bot evo]", e));
+      await drainSoon(); // a fila da proteção anda junto com o tráfego (a Vercel Hobby não tem cron por minuto)
+    });
   }
+  // número da GoWeb caiu ou foi deslogado pelo WhatsApp: a proteção pausa/para os envios
+  if (ev?.kind === "connection") after(() => onConnection(GOWEB, ev.state, ev.reason).catch((e) => console.error("[gw-bot conn]", e)));
   return NextResponse.json({ ok: true });
 }

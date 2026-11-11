@@ -31,7 +31,10 @@ export default async function GwBotPage({ searchParams }: { searchParams: Promis
       {(qr || sel) && <AutoRefresh ms={qr ? 8000 : 15000} />}
       <Flash ok={sp.ok} err={sp.err} />
       <div>
-        <h1 className="text-xl font-bold">Geovana da GoWeb</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="flex-1 text-xl font-bold">Geovana da GoWeb</h1>
+          <Link href="/admin/geovana/protecao" className="btn-ghost text-sm">Proteção: limites, consumo e emergência →</Link>
+        </div>
         <p className="text-sm text-muted">
           A IA no WhatsApp da própria GoWeb: explica planos e preços, manda os links, marca conversa com um sócio, cria o lead no CRM com a origem do panfleto, abre chamado para lojas clientes, atende afiliados, avisa quando um lead esquenta e faz o retorno automático.
         </p>

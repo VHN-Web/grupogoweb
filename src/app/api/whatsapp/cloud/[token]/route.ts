@@ -3,6 +3,7 @@ import { NextResponse, after } from "next/server";
 import { cloudParse, cloudVerifySignature } from "@/adapters/whatsapp/cloud";
 import { geovanaOf, handleInbound, tenantByHook } from "@/services/geovana";
 import { openSecret } from "@/lib/secrets";
+import { drainSoon } from "@/services/wa-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -28,6 +29,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     body = JSON.parse(raw);
   } catch {}
   const msgs = cloudParse(body);
-  if (msgs.length) after(async () => { for (const m of msgs) await handleInbound(t, { jid: m.from, name: m.name, text: m.text, externalId: m.id, fromMe: false }).catch((e) => console.error("[geovana cloud]", e)); });
+  if (msgs.length)
+    after(async () => {
+      for (const m of msgs) await handleInbound(t, { jid: m.from, name: m.name, text: m.text, externalId: m.id, fromMe: false }).catch((e) => console.error("[geovana cloud]", e));
+      await drainSoon();
+    });
   return NextResponse.json({ ok: true });
 }

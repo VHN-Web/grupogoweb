@@ -7,6 +7,7 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { Simulator } from "@/components/geovana/Simulator";
 import { SubmitButton } from "@/components/crm/SubmitButton";
 import { channelStatus, cloudHookUrl, evolutionHookUrl, evolutionQr, geovanaOf, recentChats, whatsappPlatform } from "@/services/geovana";
+import { storeGuardSummary } from "@/services/wa-guard";
 import { applyPresetAction, connectCloudAction, connectEvolutionAction, disconnectAction, pauseChatAction, saveGeovanaAction, simulateAction } from "../geovana-actions";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default async function GeovanaPage({ params, searchParams }: { params: Pr
     );
   }
 
-  const [st, plat, chats] = await Promise.all([channelStatus(t), whatsappPlatform(), recentChats(t.id)]);
+  const [st, plat, chats, guard] = await Promise.all([channelStatus(t), whatsappPlatform(), recentChats(t.id), storeGuardSummary(t.id)]);
   const qr = sp.qr && cfg.channel === "evolution" && !st.connected ? await evolutionQr(t).catch(() => null) : null;
   const tab = sp.canal === "oficial" || (cfg.channel === "cloud" && sp.canal !== "qr") ? "cloud" : "evolution";
   const waiting = chats.filter((c) => c.needsHuman).length;
@@ -38,6 +39,16 @@ export default async function GeovanaPage({ params, searchParams }: { params: Pr
   return (
     <div className="max-w-5xl space-y-6">
       {qr && <AutoRefresh ms={8000} />}
+      {guard.stopped && (
+        <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {T("Envíos de la Geovana en pausa por protección del número", "Envios da Geovana pausados para proteger o número")}: {guard.reason}. {T("Los mensajes quedan en fila y salen cuando se normalice.", "As mensagens ficam na fila e saem quando normalizar.")}
+        </p>
+      )}
+      {cfg.channel !== "none" && (
+        <p className="text-xs text-muted">
+          {T("Hoy", "Hoje")}: {guard.sent} {T("mensajes enviados", "mensagens enviadas")} ({T("límite", "limite")} {guard.perDay}/24 h){guard.pending ? ` · ${guard.pending} ${T("en fila", "na fila")}` : ""} · IA {guard.tokenPct}% {T("del límite diario", "do limite diário")}. {T("Los clientes que escriban \"parar\" dejan de recibir avisos.", "Clientes que escreverem \"parar\" deixam de receber avisos.")}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold">{cfg.name} · {T("IA en tu WhatsApp", "IA no seu WhatsApp")}</h1>

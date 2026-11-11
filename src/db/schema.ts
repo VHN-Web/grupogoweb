@@ -376,6 +376,7 @@ export const platformSettings = pgTable("platform_settings", {
   whatsappConfig: text("whatsapp_config").notNull().default("{}"), // Geovana: servidor Evolution (chave selada) + IA (chave Gemini selada, modelo) // Asaas: ambiente, chave da conta principal (selada), walletId, token do webhook, split padrão
   odConfig: text("od_config").notNull().default("{}"),
   gwBotConfig: text("gw_bot_config").notNull().default("{}"),
+  waGuardConfig: text("wa_guard_config").notNull().default("{}"), // proteção da Geovana: limites de envio e de IA (core/wa-guard.ts)
   contentIdeas: text("content_ideas"), // última geração de ideias de posts/Reels (JSON) — core/content-ideas.ts // Geovana da GoWeb (WhatsApp da própria GoWeb) — core/goweb-bot.ts // Apps de delivery (Open Delivery): credenciais padrão da GoWeb por app (segredo selado)
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -1231,6 +1232,7 @@ export const waChats = pgTable(
     pausedUntil: timestamp("paused_until", { withTimezone: true }), // humano assumiu: IA quieta até
     needsHuman: boolean("needs_human").notNull().default(false),
     closedNoticeAt: timestamp("closed_notice_at", { withTimezone: true }), // último aviso "estamos fechados"
+    optOut: boolean("opt_out").notNull().default(false), // cliente pediu para não receber mensagens (avisos param; escrever de novo libera)
     lastAt: timestamp("last_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
   },
@@ -1318,6 +1320,56 @@ export const gwChats = pgTable("gw_chats", {
   optOut: boolean("opt_out").notNull().default(false), // pediu para não receber mensagens
   createdAt: createdAt(),
 });
+// ---------------------------------------------------------------- proteção da Geovana (core/wa-guard.ts + services/wa-guard.ts)
+/** Registro de tudo que passa pela proteção: mensagens recebidas/enviadas/com falha/seguradas e chamadas à IA.
+ *  Os limites contam daqui (janelas móveis). channel = "goweb" | "store:<tenantId>". Limpo após 40 dias. */
+export const geovanaLog = pgTable(
+  "geovana_log",
+  {
+    id: id(),
+    channel: text("channel").notNull(),
+    tenantId: text("tenant_id"),
+    type: text("type").$type<"in" | "out" | "fail" | "blocked" | "queued" | "ai">().notNull(),
+    kind: text("kind"), // reply | staff | support | notice | internal | proactive
+    contact: text("contact"), // E.164
+    textHash: text("text_hash"),
+    reason: text("reason"),
+    tokensIn: integer("tokens_in").notNull().default(0),
+    tokensOut: integer("tokens_out").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("geovana_log_ch_idx").on(t.channel, t.type, t.createdAt), index("geovana_log_contact_idx").on(t.contact, t.createdAt), index("geovana_log_type_idx").on(t.type, t.createdAt)],
+);
+
+/** Fila de envio: o que não pôde sair na hora (limite, horário, número pausado) ou falhou de forma passageira. */
+export const waOutbox = pgTable(
+  "wa_outbox",
+  {
+    id: id(),
+    channel: text("channel").notNull(),
+    tenantId: text("tenant_id"),
+    to: text("to").notNull(),
+    text: text("text").notNull(),
+    kind: text("kind").notNull(),
+    priority: integer("priority").notNull().default(1), // 0 = resposta em conversa, 1 = aviso, 2 = iniciada pela empresa
+    dedupeKey: text("dedupe_key"),
+    status: text("status").$type<"pending" | "sending" | "sent" | "failed" | "cancelled">().notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAt: timestamp("next_at", { withTimezone: true }).notNull().defaultNow(),
+    lastError: text("last_error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("wa_outbox_dedupe_uq").on(t.dedupeKey), index("wa_outbox_due_idx").on(t.status, t.nextAt)],
+);
+
+/** Estado do circuit breaker / pausa por número ("goweb", "store:<id>") e geral ("*", com a emergência). JSON de BreakerState. */
+export const waGuardState = pgTable("wa_guard_state", {
+  channel: text("channel").primaryKey(),
+  state: text("state").notNull().default("{}"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const gwMessages = pgTable(
   "gw_messages",
   {

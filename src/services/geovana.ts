@@ -6,7 +6,7 @@ import "server-only";
 // Regras puras e prompt em core/geovana.ts.
 // =============================================================================
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, gte, like } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, like } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Tenant } from "@/db/schema";
 import { CLOSED_NOTICE_EVERY_MS, buildSystemPrompt, closedNotice, geovanaAnswers, jidToE164, orderNotice, parseGeovana, parseReply, wantsHuman, type GeovanaConfig, type GeovanaContext } from "@/core/geovana";
@@ -15,11 +15,13 @@ import { formatMoney } from "@/core/money";
 import { getRegion, tr } from "@/core/region";
 import type { Currency } from "@/core/types";
 import { parsePaymentConfig, publicPaymentConfig } from "@/core/tenant-config";
-import { GEMINI_DEFAULT_MODEL, geminiChat, geminiModel, AiError, type ChatTurn } from "@/adapters/ai/gemini";
+import { GEMINI_DEFAULT_MODEL, geminiChat, geminiModel, AiError, type ChatTurn, type OnUsage } from "@/adapters/ai/gemini";
 import { EvolutionError, evoConnect, evoCreateInstance, evoDelete, evoLogout, evoSendText, evoSetWebhook, evoState } from "@/adapters/whatsapp/evolution";
 import { CloudError, cloudCheck, cloudSendText } from "@/adapters/whatsapp/cloud";
 import { openSecret, sealSecret } from "@/lib/secrets";
 import { appUrl, tenantPublicUrl } from "@/lib/urls";
+import { STORE_OPT_OUT, aiFallbackText, isRepeat, trimHistory, type SendKind } from "@/core/wa-guard";
+import { aiGate, aiMeter, guardedSend, isOwnRecentSend, logEvent, noteInbound, storeChannel, type Outcome } from "@/services/wa-guard";
 
 export class GeovanaError extends Error {}
 export { EvolutionError, CloudError, AiError };
@@ -154,18 +156,29 @@ export async function connectCloud(t: Tenant, f: { phoneId: string; token: strin
 }
 
 // ---------------------------------------------------------------- envio
-async function sendText(t: Tenant, cfg: GeovanaConfig, phone: string, text: string): Promise<string | null> {
+/** Envio direto pelo canal da loja, SEM proteção — só a fila da proteção (services/wa-guard.ts) chama isto. */
+export async function storeRawSend(t: Tenant, cfg: GeovanaConfig, phone: string, text: string): Promise<string | null> {
   if (t.demo) return null;
   if (cfg.channel === "evolution" && cfg.instance) {
     const r = await evoSendText(await evoServer(), cfg.instance, phone, text);
     return r?.key?.id ?? null;
   }
   if (cfg.channel === "cloud" && cfg.cloudPhoneId) {
-    await cloudSendText(cfg.cloudPhoneId, openSecret(cfg.cloudTokenSealed), phone, text);
-    return null;
+    return cloudSendText(cfg.cloudPhoneId, openSecret(cfg.cloudTokenSealed), phone, text);
   }
   return null;
 }
+
+/** Envio com a proteção da Geovana (limites, horário, fila, circuit breaker). Demo e loja sem canal nunca enviam. */
+async function sendText(t: Tenant, cfg: GeovanaConfig, phone: string, text: string, kind: SendKind = "reply"): Promise<Outcome> {
+  if (t.demo || cfg.channel === "none" || (cfg.channel === "evolution" && !cfg.instance) || (cfg.channel === "cloud" && !cfg.cloudPhoneId)) return { status: "blocked", reason: "sem canal" };
+  return guardedSend(
+    { channel: storeChannel(t.id), tenantId: t.id, to: phone, text, kind, officialApi: cfg.channel === "cloud" },
+    () => storeRawSend(t, cfg, phone, text),
+    { waitMs: kind === "reply" ? 8_000 : 0 },
+  );
+}
+const sentId = (o: Outcome) => (o.status === "sent" ? o.id : null);
 
 // ---------------------------------------------------------------- contexto e cérebro
 export async function aiKey(cfg: GeovanaConfig) {
@@ -178,12 +191,12 @@ export async function aiKey(cfg: GeovanaConfig) {
 export const storeUrl = (t: Tenant) => tenantPublicUrl(t);
 const trackUrl = (t: Tenant, id: string) => (t.customDomain ? `https://${t.customDomain}/pedido/${id}` : `${appUrl()}/${t.slug}/pedido/${id}`);
 
-async function buildContext(t: Tenant, phone: string | null, name: string | null): Promise<GeovanaContext> {
+async function buildContext(t: Tenant, phone: string | null, name: string | null, catalogLimit = 150): Promise<GeovanaContext> {
   const region = getRegion(t.country);
   const L = getLabels(region.locale);
   const fm = (v: number) => formatMoney(v, t.currency as Currency);
   const [products, cats, orders, booking] = await Promise.all([
-    db.query.products.findMany({ where: and(eq(schema.products.tenantId, t.id), eq(schema.products.active, true)), orderBy: [schema.products.sortOrder], limit: 150 }),
+    db.query.products.findMany({ where: and(eq(schema.products.tenantId, t.id), eq(schema.products.active, true)), orderBy: [schema.products.sortOrder], limit: catalogLimit }),
     db.query.categories.findMany({ where: eq(schema.categories.tenantId, t.id) }),
     phone
       ? db.query.orders.findMany({ where: and(eq(schema.orders.tenantId, t.id), eq(schema.orders.customerPhone, phone), gte(schema.orders.createdAt, new Date(Date.now() - 30 * 86_400_000))), orderBy: desc(schema.orders.createdAt), limit: 3 })
@@ -211,10 +224,10 @@ async function buildContext(t: Tenant, phone: string | null, name: string | null
 }
 
 /** Gera a resposta da Geovana (sem enviar). Ids curtos (8) no prompt; aqui viram os ids reais. */
-export async function geovanaReply(t: Tenant, cfg: GeovanaConfig, history: ChatTurn[], phone: string | null, name: string | null) {
-  const ctx = await buildContext(t, phone, name);
+export async function geovanaReply(t: Tenant, cfg: GeovanaConfig, history: ChatTurn[], phone: string | null, name: string | null, opts: { maxTokens?: number; catalogLimit?: number; onUsage?: OnUsage } = {}) {
+  const ctx = await buildContext(t, phone, name, opts.catalogLimit);
   const { key, model } = await aiKey(cfg);
-  const raw = await geminiChat({ key, model, system: buildSystemPrompt(cfg, ctx), history: history.slice(-14) });
+  const raw = await geminiChat({ key, model, system: buildSystemPrompt(cfg, ctx), history: history.slice(-14), maxTokens: opts.maxTokens, onUsage: opts.onUsage });
   const products = await db.query.products.findMany({ where: and(eq(schema.products.tenantId, t.id), eq(schema.products.active, true)), columns: { id: true, name: true, pricePyg: true, promoPricePyg: true, promoEndsAt: true } });
   const byShort = new Map(products.map((p) => [p.id.slice(0, 8), p]));
   const r = parseReply(raw, new Set(byShort.keys()));
@@ -255,22 +268,46 @@ export async function handleInbound(t: Tenant, m: { jid: string; name: string | 
   const phone = jidToE164(m.jid);
   if (!phone || !m.text.trim()) return "ignored";
   const cfg = geovanaOf(t);
+  const ch = storeChannel(t.id);
   const chat = await chatFor(t.id, phone, m.fromMe ? null : m.name);
   if (m.fromMe) {
+    // eco de algo que a fila da proteção enviou depois: anota o id na mensagem guardada e NÃO pausa a IA
+    if (m.externalId && (await isOwnRecentSend(ch, phone, m.text))) {
+      const pend = await db.query.waMessages.findFirst({ where: and(eq(schema.waMessages.chatId, chat.id), eq(schema.waMessages.role, "ai"), isNull(schema.waMessages.externalId), eq(schema.waMessages.text, m.text.slice(0, 4000))), orderBy: desc(schema.waMessages.createdAt) });
+      if (pend) await db.update(schema.waMessages).set({ externalId: m.externalId }).where(eq(schema.waMessages.id, pend.id)).catch(() => null);
+      return "echo";
+    }
     // mensagem que a própria Geovana enviou chega de volta com o mesmo id → já guardada
     const fresh = await store(t.id, chat.id, "staff", m.text, m.externalId);
     if (fresh) await db.update(schema.waChats).set({ pausedUntil: new Date(Date.now() + cfg.pauseMinutes * 60_000), needsHuman: false }).where(eq(schema.waChats.id, chat.id));
     return fresh ? "staff" : "echo";
   }
   if (!(await store(t.id, chat.id, "user", m.text, m.externalId))) return "duplicate";
+  const inbound = t.demo ? { flood: false, pauseMinutes: 0 } : await noteInbound(ch, phone);
+  // descadastro: "parar"/"baja" → sem avisos da loja até o cliente escrever de novo
+  if (STORE_OPT_OUT.test(m.text)) {
+    await db.update(schema.waChats).set({ optOut: true }).where(eq(schema.waChats.id, chat.id));
+    if (cfg.enabled && t.tier === "pro" && !t.demo) {
+      const text = tr(getRegion(t.country).locale)("Listo, no te mando más avisos por acá. Si necesitás algo, escribinos. 👋", "Pronto, não vou mais te mandar avisos por aqui. Se precisar, é só chamar! 👋");
+      const o = await sendText(t, cfg, phone, text, "reply");
+      if (o.status !== "blocked") await store(t.id, chat.id, "ai", text, sentId(o));
+    }
+    return "opt-out";
+  }
+  if (chat.optOut) await db.update(schema.waChats).set({ optOut: false }).where(eq(schema.waChats.id, chat.id));
   if (!cfg.enabled || t.tier !== "pro" || t.demo) return "disabled";
   if (chat.pausedUntil && chat.pausedUntil > new Date()) return "paused";
+  if (inbound.flood) {
+    // muitas mensagens em 1 min (robô respondendo robô, loop): a IA fica quieta nessa conversa por um tempo
+    await db.update(schema.waChats).set({ pausedUntil: new Date(Date.now() + inbound.pauseMinutes * 60_000) }).where(eq(schema.waChats.id, chat.id));
+    return "flood";
+  }
   if (!geovanaAnswers(cfg.when, t.isOpen)) {
     // fora do horário escolhido: avisa uma vez (a cada 6 h) que a loja está fechada; a mensagem fica para a equipe
     if (cfg.when === "open" && cfg.closedMessage && (!chat.closedNoticeAt || Date.now() - chat.closedNoticeAt.getTime() > CLOSED_NOTICE_EVERY_MS)) {
       const text = closedNotice(t.name, cfg.hours, getRegion(t.country).locale === "pt");
-      const extId = await sendText(t, cfg, phone, text);
-      await store(t.id, chat.id, "ai", text, extId);
+      const o = await sendText(t, cfg, phone, text, "reply");
+      if (o.status !== "blocked") await store(t.id, chat.id, "ai", text, sentId(o));
       await db.update(schema.waChats).set({ closedNoticeAt: new Date() }).where(eq(schema.waChats.id, chat.id));
       return "closed-notice";
     }
@@ -282,20 +319,53 @@ export async function handleInbound(t: Tenant, m: { jid: string; name: string | 
   if (wantsHuman(m.text, cfg.handoffWords)) {
     reply = { text: T("Perfecto, ya llamo a alguien del equipo para atenderte. 🙌", "Certo! Já chamei alguém da equipe para te atender. 🙌"), handoff: true };
   } else {
-    const hist = await db.query.waMessages.findMany({ where: eq(schema.waMessages.chatId, chat.id), orderBy: desc(schema.waMessages.createdAt), limit: 14 });
-    const turns: ChatTurn[] = hist.reverse().filter((h) => h.role !== "system").map((h) => ({ role: h.role === "user" ? "user" : "model", text: h.text }));
+    // proteção da IA: orçamento, chamadas por minuto, conversa que já gastou demais, emergência
+    const gate = await aiGate(ch, phone);
+    if (gate.mode === "blocked") {
+      if (gate.emergency) return "emergency";
+      await db.update(schema.waChats).set({ needsHuman: true }).where(eq(schema.waChats.id, chat.id));
+      await store(t.id, chat.id, "system", `IA em economia: ${gate.reason}`, null);
+      // o cliente recebe 1 aviso (no máx. a cada 6 h) e a conversa vai para a equipe
+      const fallback = aiFallbackText("store", getRegion(t.country).locale === "pt");
+      const recent = await db.query.waMessages.findFirst({ where: and(eq(schema.waMessages.chatId, chat.id), eq(schema.waMessages.role, "ai"), eq(schema.waMessages.text, fallback), gte(schema.waMessages.createdAt, new Date(Date.now() - 6 * 3600_000))) });
+      if (!recent) {
+        const o = await sendText(t, cfg, phone, fallback, "reply");
+        if (o.status !== "blocked") await store(t.id, chat.id, "ai", fallback, sentId(o));
+      }
+      return "ai-limit";
+    }
+    const hist = await db.query.waMessages.findMany({ where: eq(schema.waMessages.chatId, chat.id), orderBy: desc(schema.waMessages.createdAt), limit: 30 });
+    const turns = trimHistory(
+      [...hist].reverse().filter((h) => h.role !== "system").map((h) => ({ role: h.role === "user" ? ("user" as const) : ("model" as const), text: h.text })),
+      gate.params.turns,
+      gate.turnChars,
+    );
+    const meter = aiMeter(ch, phone);
     try {
-      reply = await geovanaReply(t, cfg, turns, phone, chat.name);
+      reply = await geovanaReply(t, cfg, turns, phone, chat.name, { maxTokens: gate.params.maxTokens, catalogLimit: gate.params.catalogLimit, onUsage: meter.onUsage });
+      await meter.save();
     } catch (e) {
+      await meter.save();
       console.error("[geovana]", e instanceof Error ? e.message : e);
       await db.update(schema.waChats).set({ needsHuman: true }).where(eq(schema.waChats.id, chat.id));
       await store(t.id, chat.id, "system", `IA indisponível: ${e instanceof Error ? e.message : "erro"}`, null);
       return "ai-error";
     }
   }
+  if (reply.text && !reply.handoff) {
+    // trava contra loop: a IA repetindo a mesma resposta → não manda de novo, chama a equipe
+    const lastBot = (await db.query.waMessages.findMany({ where: and(eq(schema.waMessages.chatId, chat.id), eq(schema.waMessages.role, "ai")), orderBy: desc(schema.waMessages.createdAt), limit: 3 })).map((h) => h.text);
+    if (isRepeat(reply.text, lastBot)) {
+      await logEvent({ channel: ch, type: "blocked", kind: "reply", contact: phone, reason: "resposta repetida da IA" });
+      await db.update(schema.waChats).set({ needsHuman: true }).where(eq(schema.waChats.id, chat.id));
+      await store(t.id, chat.id, "system", "IA repetiu a resposta — conversa passada para a equipe", null);
+      return "repeat";
+    }
+  }
   if (reply.text) {
-    const extId = await sendText(t, cfg, phone, reply.text);
-    await store(t.id, chat.id, "ai", reply.text, extId);
+    const o = await sendText(t, cfg, phone, reply.text, "reply");
+    if (o.status !== "blocked") await store(t.id, chat.id, "ai", reply.text, sentId(o));
+    else await store(t.id, chat.id, "system", `Não enviado: ${o.reason}`, null);
   }
   if (reply.handoff) {
     await db.update(schema.waChats).set({ needsHuman: true, pausedUntil: new Date(Date.now() + cfg.pauseMinutes * 60_000) }).where(eq(schema.waChats.id, chat.id));
@@ -314,9 +384,10 @@ export async function notifyOrderStatus(tenantId: string, orderId: string, statu
   const text = orderNotice(status, { number: o.number, storeName: t.name, trackUrl: trackUrl(t, o.id), type: o.type }, getRegion(t.country).locale);
   if (!text) return;
   try {
-    const extId = await sendText(t, cfg, o.customerPhone, text);
     const chat = await chatFor(t.id, o.customerPhone, o.customerName);
-    await store(t.id, chat.id, "ai", text, extId);
+    if (chat.optOut) return; // cliente pediu para não receber avisos
+    const r = await sendText(t, cfg, o.customerPhone, text, "notice");
+    if (r.status !== "blocked") await store(t.id, chat.id, "ai", text, sentId(r));
   } catch (e) {
     console.error("[geovana aviso]", e instanceof Error ? e.message : e);
   }
@@ -347,5 +418,14 @@ export async function simulate(t: Tenant, history: ChatTurn[]) {
     const note = pt ? "(Simulação: agora ela NÃO responde — fora do horário escolhido.)" : "(Simulación: ahora NO responde — fuera del horario elegido.)";
     return { text: cfg.when === "open" && cfg.closedMessage ? `${closedNotice(t.name, cfg.hours, pt)}\n\n${note}` : note, handoff: false };
   }
-  return geovanaReply(t, cfg, history, null, null);
+  // o simulador também gasta IA: entra no orçamento da loja
+  const ch = storeChannel(t.id);
+  const gate = await aiGate(ch, null);
+  if (gate.mode === "blocked") return { text: `(${gate.reason})`, handoff: false };
+  const meter = aiMeter(ch, null);
+  try {
+    return await geovanaReply(t, cfg, history, null, null, { maxTokens: gate.params.maxTokens, catalogLimit: gate.params.catalogLimit, onUsage: meter.onUsage });
+  } finally {
+    await meter.save();
+  }
 }
