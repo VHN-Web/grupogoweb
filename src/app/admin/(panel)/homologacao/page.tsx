@@ -118,7 +118,7 @@ export default async function HomologacaoPage({ searchParams }: { searchParams: 
       <section className="card p-4 text-sm">
         <h2 className="font-semibold">Histórico</h2>
         {events.length ? (
-          <table className="mt-2 w-full text-left text-xs">
+          <div className="mt-2 overflow-x-auto"><table className="w-full text-left text-xs">
             <thead><tr className="text-muted"><th className="py-1">Quando</th><th>PR</th><th>Decisão</th><th>Quem</th><th>Motivo</th></tr></thead>
             <tbody>
               {events.map((e) => (
@@ -131,7 +131,7 @@ export default async function HomologacaoPage({ searchParams }: { searchParams: 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         ) : (
           <p className="mt-2 text-xs text-muted">Nenhuma decisão registrada ainda.</p>
         )}

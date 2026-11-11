@@ -80,7 +80,7 @@ export default async function AdminInstagramPage({ searchParams }: { searchParam
         <h2 className="font-semibold">Consumo de IA por canal (mês)</h2>
         <p className="mt-1 text-muted">Controle central: WhatsApp e Instagram da mesma loja somam na franquia dela. Custo estimado pelos tokens reais e pelo preço configurado na Proteção.</p>
         {usage.length ? (
-          <table className="mt-3 w-full text-left text-xs">
+          <div className="mt-2 overflow-x-auto"><table className="w-full text-left text-xs">
             <thead><tr className="text-muted"><th className="py-1">Canal</th><th>Respostas</th><th>Tokens (entrada / saída)</th><th>Custo</th></tr></thead>
             <tbody>
               {usage.map((r) => (
@@ -93,7 +93,7 @@ export default async function AdminInstagramPage({ searchParams }: { searchParam
               ))}
               <tr className="border-t border-line font-semibold"><td className="py-1.5">Total</td><td>{fmtN(usage.reduce((a, r) => a + r.calls, 0))}</td><td /><td>{usd(total)}</td></tr>
             </tbody>
-          </table>
+          </table></div>
         ) : (
           <p className="mt-3 text-muted">Nenhuma resposta de IA neste mês ainda.</p>
         )}
