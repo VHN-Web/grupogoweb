@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { testPushAction } from "@/app/crm/actions";
+import { nativeApp } from "@/lib/native-bridge";
 
 function b64ToBytes(b64: string) {
   const pad = "=".repeat((4 - (b64.length % 4)) % 4);
@@ -11,9 +12,10 @@ function b64ToBytes(b64: string) {
 
 /** Liga as notificações neste aparelho (precisa do app instalado no iPhone). */
 export function PushSetup() {
-  const [state, setState] = useState<"loading" | "unsupported" | "ios-install" | "denied" | "off" | "on">("loading");
+  const [state, setState] = useState<"loading" | "unsupported" | "ios-install" | "denied" | "off" | "on" | "native">("loading");
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
+    if (nativeApp()) return setState("native"); // app Android: quem cuida é o CrmNativePanel
     (async () => {
       const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
       const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone;
@@ -53,6 +55,7 @@ export function PushSetup() {
     setState("off");
   };
 
+  if (state === "native") return null;
   return (
     <div>
       {state === "loading" && <p className="text-sm text-[var(--s-muted)]">Verificando…</p>}

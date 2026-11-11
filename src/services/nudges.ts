@@ -60,7 +60,7 @@ export async function runNudges(now = new Date()) {
       }
     }
   }
-  if (idleStores.length) await notifyPartners(`${idleStores.length} loja(s) parada(s)`, `Sem pedidos há 7+ dias: ${idleStores.slice(0, 6).join(", ")}${idleStores.length > 6 ? "…" : ""}. A Geovana já mandou dicas; vale uma ligação.`, "/admin/clientes");
+  if (idleStores.length) await notifyPartners(`${idleStores.length} loja(s) parada(s)`, `Sem pedidos há 7+ dias: ${idleStores.slice(0, 6).join(", ")}${idleStores.length > 6 ? "…" : ""}. A Geovana já mandou dicas; vale uma ligação.`, "/admin/clientes", "vendas");
 
   // ---- 12. cobrança gentil (faturas em aberto de clientes do Brasil)
   if (cfg.billingNudges) {

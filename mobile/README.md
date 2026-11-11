@@ -1,4 +1,16 @@
-# App Android do entregador (APK)
+# Apps Android (APK): entregador e CRM
+
+Dois módulos no mesmo projeto Gradle (`mobile/android`):
+
+- `app/` — **Entregas GoWeb** (`com.goweboficial.entregador`), abre `/entregador`. Detalhes abaixo.
+- `crm/` — **GoWeb CRM** (`com.goweboficial.crm`), abre `/crm` com o login do admin (e-mail e senha). Tem:
+  - um canal de notificação por tipo de aviso (vendas, suporte, leads, retornos, demos, WhatsApp, afiliados, acessos): cada sócio escolhe som/vibração em CRM → App e notificações;
+  - avisos na hora pelo Firebase (se o `google-services.json` tiver o app `com.goweboficial.crm`) e, sempre, uma conferência a cada 15 min (`SyncWorker` → `/api/crm/app`) que respeita as preferências de cada sócio;
+  - widgets **Hoje no CRM** (retornos, leads novos, contatos/meta, demos, avisos não lidos) e **Acessos** (site oficial, página e links de afiliados hoje × ontem);
+  - download do CSV com a sessão do app e envio de arquivos.
+  - APK publicado em Releases → `crm-latest` (link em CRM → App e notificações).
+
+## App do entregador
 
 Casco nativo do `/entregador`. **Não duplica nada do sistema**: o app abre as mesmas telas do site num
 WebView (mesma sessão `gw_cour`, mesmas Server Actions, mesmas APIs) e acrescenta só o que o navegador

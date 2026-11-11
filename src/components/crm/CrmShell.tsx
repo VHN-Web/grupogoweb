@@ -3,9 +3,20 @@ import { GoWebLogo } from "@/components/brand/GoWebLogo";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { CrmNav } from "./CrmNav";
 import { SwRegister } from "./SwRegister";
+import { Icon } from "@/components/ui/Icon";
 
 /** Moldura do app: barra lateral no computador, abas embaixo no celular. */
-export function CrmShell({ me, children }: { me: { id: string; name: string }; children: React.ReactNode }) {
+/** Sininho da central de avisos com o número de não lidos. */
+function Bell({ unread, className }: { unread: number; className?: string }) {
+  return (
+    <Link href="/crm/avisos" className={`relative grid h-10 w-10 place-items-center rounded-xl bg-white/10 ${className ?? ""}`} aria-label={unread ? `${unread} avisos novos` : "Avisos"}>
+      <Icon name="bell" size={18} />
+      {unread > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#3CC46B] px-1 text-[10px] font-black text-[#0E0E10]">{unread > 99 ? "99+" : unread}</span>}
+    </Link>
+  );
+}
+
+export function CrmShell({ me, unread = 0, children }: { me: { id: string; name: string }; unread?: number; children: React.ReactNode }) {
   return (
     <div className="site aff crm min-h-dvh md:flex" style={{ ["--brand" as string]: "#2FAE5F" }}>
       <SwRegister />
@@ -19,6 +30,7 @@ export function CrmShell({ me, children }: { me: { id: string; name: string }; c
         </div>
         <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-3 text-sm">
           <span className="truncate text-[#B9B3A7]">{me.name.split(" ")[0]}</span>
+          <Bell unread={unread} className="ml-auto" />
           <ThemeToggle locale="pt" variant="compact" />
         </div>
         <Link href="/admin" className="mt-2 rounded-lg px-2 py-1.5 text-xs text-[#8a857b] hover:bg-white/5">Abrir o admin completo →</Link>
@@ -30,6 +42,7 @@ export function CrmShell({ me, children }: { me: { id: string; name: string }; c
             <span className="rounded-full bg-[#3CC46B]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#3CC46B]">CRM</span>
           </Link>
           <div className="flex-1" />
+          <Bell unread={unread} />
           <ThemeToggle locale="pt" variant="compact" />
           <Link href="/crm/mais" className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-sm font-bold" aria-label="Mais opções">{me.name.slice(0, 1).toUpperCase()}</Link>
         </header>

@@ -1110,6 +1110,48 @@ export const crmPushSubs = pgTable(
   (t) => [uniqueIndex("crm_push_endpoint_uq").on(t.endpoint)],
 );
 
+/** Central de avisos do CRM (/crm/avisos) — tudo que vai por push fica aqui, por sócio. O app Android busca daqui a cada 15 min. */
+export const crmNotifications = pgTable(
+  "crm_notifications",
+  {
+    id: id(),
+    actorId: text("actor_id").notNull(),
+    category: text("category"), // core/crm-notify.ts#NotifyCategory
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    url: text("url"),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("crm_notifications_actor_idx").on(t.actorId, t.createdAt)],
+);
+
+/** Preferências de notificação de cada sócio (JSON de core/crm-notify.ts#NotifyPrefs). */
+export const crmNotifyPrefs = pgTable("crm_notify_prefs", {
+  actorId: text("actor_id").primaryKey(),
+  prefs: text("prefs").notNull().default("{}"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Acessos ao site oficial e à página de afiliados: 1 linha por visitante por área por dia (core/visits.ts). */
+export const siteVisits = pgTable(
+  "site_visits",
+  {
+    id: id(),
+    day: text("day").notNull(), // "2026-11-11" (Brasília)
+    area: text("area").notNull(), // site | afiliados | link
+    visitor: text("visitor").notNull(), // hash de IP + navegador + dia
+    path: text("path").notNull(), // primeira página vista
+    source: text("source").notNull().default("Direto"),
+    device: text("device").notNull().default("celular"),
+    country: text("country"),
+    views: integer("views").notNull().default(1),
+    createdAt: createdAt(),
+    lastAt: timestamp("last_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("site_visits_uq").on(t.day, t.area, t.visitor), index("site_visits_day_idx").on(t.day, t.area)],
+);
+
 export const crmHuntRuns = pgTable("crm_hunt_runs", {
   id: id(),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),

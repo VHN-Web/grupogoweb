@@ -257,7 +257,7 @@ export async function saveSettingsAction(f: FormData) {
 
 export async function testPushAction() {
   const me = await requireCrm();
-  const n = await sendPush([me.id], { title: "Notificações ligadas ✅", body: "É assim que o CRM vai te avisar de retornos, leads novos e contratos.", url: "/crm" });
+  const n = await sendPush([me.id], { title: "Notificações ligadas ✅", body: "É assim que o CRM vai te avisar de retornos, leads novos e contratos.", url: "/crm/avisos", force: true });
   return n;
 }
 
@@ -265,4 +265,28 @@ export async function crmLogout() {
   const { clearSession } = await import("@/lib/auth");
   await clearSession();
   redirect("/admin/login?next=/crm");
+}
+
+// ---------------------------------------------------------------- notificações personalizadas e central de avisos
+export async function saveNotifyPrefsAction(f: FormData) {
+  const me = await requireCrm();
+  const { NOTIFY_CATEGORIES } = await import("@/core/crm-notify");
+  const { saveNotifyPrefs } = await import("@/services/crm-notify");
+  const quiet = f.get("quiet") === "on";
+  await saveNotifyPrefs(me.id, {
+    off: NOTIFY_CATEGORIES.filter((c) => f.get(`cat_${c.id}`) !== "on").map((c) => c.id),
+    quietFrom: quiet ? String(f.get("quietFrom") ?? "") : null,
+    quietTo: quiet ? String(f.get("quietTo") ?? "") : null,
+    urgentInQuiet: f.get("urgentInQuiet") === "on",
+  });
+  revalidatePath("/crm/config");
+  redirect("/crm/config?ok=" + encodeURIComponent("Preferências de notificação salvas ✓") + "#avisos");
+}
+
+export async function markAllReadAction() {
+  const me = await requireCrm();
+  const { markAllRead } = await import("@/services/crm-notify");
+  await markAllRead(me.id);
+  revalidatePath("/crm", "layout");
+  redirect("/crm/avisos");
 }

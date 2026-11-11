@@ -1,3 +1,4 @@
+import type { NotifyCategory } from "@/core/crm-notify";
 import "server-only";
 // Geovana da GoWeb — IA no WhatsApp DA PRÓPRIA GoWeb: vendas (planos, links, agenda com sócio),
 // CRM (cada conversa vira lead com origem do panfleto), suporte (chamado para lojas clientes),
@@ -109,8 +110,8 @@ export async function gwSend(toE164: string, text: string): Promise<string | nul
 
 // ---------------------------------------------------------------- avisos aos sócios
 /** Push no app do CRM + WhatsApp dos sócios cadastrados. Nunca lança erro. */
-export async function notifyPartners(title: string, body: string, url = "/crm") {
-  await sendPush("all", { title, body, url, tag: `gw-${Date.now()}` }).catch(() => 0);
+export async function notifyPartners(title: string, body: string, url = "/crm", category: NotifyCategory = "whatsapp") {
+  await sendPush("all", { title, body, url, tag: `gw-${Date.now()}`, category }).catch(() => 0);
   const cfg = await gwBotConfig();
   for (const p of cfg.partnerPhones) await gwSend(p, `*${title}*\n${body}${url.startsWith("http") ? `\n${url}` : `\n${appUrl()}${url}`}`).catch(() => null);
 }
@@ -225,7 +226,7 @@ async function applyReply(chat: GwChat, r: GwReply): Promise<string> {
     }
     if (created) {
       await db.update(schema.crmLeads).set({ status: "CONTACT", contactAt: new Date(), lastContactAt: new Date() }).where(eq(schema.crmLeads.id, lead.id));
-      await notifyPartners("Novo lead no WhatsApp", `${name}${r.lead.cidade ? ` · ${r.lead.cidade}` : ""} — origem: ${origin}`, `/crm/leads/${lead.id}`);
+      await notifyPartners("Novo lead no WhatsApp", `${name}${r.lead.cidade ? ` · ${r.lead.cidade}` : ""} — origem: ${origin}`, `/crm/leads/${lead.id}`, "leads");
     }
   }
   // ---- agenda com sócio
@@ -239,7 +240,7 @@ async function applyReply(chat: GwChat, r: GwReply): Promise<string> {
       await activity(chat.leadId, GW_ACTOR, "demo", "whatsapp", `Conversa marcada pela Geovana: ${when}`);
     }
     const cal = googleCalendarLink(`GoWeb · conversa com ${leadName}`, r.schedule, `WhatsApp: ${chat.phone}\nMarcado pela Geovana.\n${appUrl()}/crm`);
-    await notifyPartners("Conversa marcada", `${leadName} — ${when}. WhatsApp ${chat.phone}`, cal);
+    await notifyPartners("Conversa marcada", `${leadName} — ${when}. WhatsApp ${chat.phone}`, cal, "demos");
   }
   // ---- suporte (só lojas clientes)
   if (r.support && chat.tenantId) {

@@ -1,4 +1,4 @@
-// Ponte com o app Android do entregador (mobile/android). Dentro do app o WebView expõe `window.AtlasApp`;
+// Ponte com os apps Android (mobile/android: entregador e CRM). Dentro do app o WebView expõe `window.AtlasApp`;
 // no navegador comum ela não existe e as telas seguem como PWA. Só use em componentes de cliente.
 
 export type NativeStatus = {
@@ -28,6 +28,10 @@ type Bridge = {
   requestBatteryExemption(): void;
   requestOverlay?(): void;
   requestFullScreen?(): void;
+  /** app do CRM */
+  app?(): string;
+  openChannelSettings?(category: string): void;
+  syncNow?(): void;
   beforeLogout(): void;
 };
 

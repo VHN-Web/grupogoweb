@@ -55,6 +55,18 @@ export function assetLinks(fingerprints: string | null | undefined) {
   ];
 }
 
+/** App Android do CRM dos sócios (mobile/android/crm): mesmo /crm num WebView + widgets e avisos nativos. */
+export const CRM_APP = {
+  packageId: "com.goweboficial.crm",
+  uaMark: "GoWebCRM",
+  apkUrl: "https://github.com/eulazacruz/Atlas/releases/download/crm-latest/goweb-crm.apk",
+} as const;
+
+/** Algum dos apps Android da GoWeb (entregador ou CRM)? */
+export function isGoWebAppUA(ua: string | null | undefined) {
+  return !!ua && (ua.includes(COURIER_APP.uaMark) || ua.includes(CRM_APP.uaMark));
+}
+
 /** Corrida oferecida ao entregador: vira a tela cheia "Nova entrega" no app Android (estilo iFood). */
 export type CourierOffer = {
   /** mine = passada para ele (atribuída); open = livre, quem aceitar primeiro leva */

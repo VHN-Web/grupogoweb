@@ -18,7 +18,7 @@ export async function joinWaitlist(f: FormData) {
   if (!business || phone.length < 10) back("erro");
   try {
     await upsertLead({ name: business, phone, city: city || null, notes: `Lista de espera do lançamento${v ? ` (panfleto: ${v})` : ""} — contato: ${name || "—"}`, pain: "Pediu aviso do lançamento (12/11)" }, "site");
-    await sendPush("all", { title: "Novo lead na lista de espera 🚀", body: `${business}${city ? ` · ${city}` : ""}`, url: "/crm/leads", tag: "waitlist" }).catch(() => null);
+    await sendPush("all", { title: "Novo lead na lista de espera 🚀", body: `${business}${city ? ` · ${city}` : ""}`, url: "/crm/leads", tag: "waitlist", category: "leads" }).catch(() => null);
   } catch {
     back("erro");
   }
