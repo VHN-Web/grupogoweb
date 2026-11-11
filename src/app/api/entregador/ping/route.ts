@@ -22,8 +22,8 @@ export async function POST(req: Request) {
     // o app compara com o que está na tela e recarrega quando chega entrega nova
     deliveries: mine.map((o) => `${o.id}:${o.status}`).join(","),
     // dados da corrida para a tela cheia "Nova entrega" do app Android
-    mine: mine.map((o) => ({ ...offerData({ type: "mine", orderId: o.id, number: o.number, address: o.address, km: o.distanceKm, fee: fee(o.deliveryFeePyg), store, auto: o.autoAssigned }), id: o.id, s: o.status })),
-    open: open.map((o) => ({ ...offerData({ type: "open", orderId: o.id, number: o.number, address: o.address, km: o.distanceKm, fee: fee(o.deliveryFeePyg), store }), id: o.id })),
+    mine: mine.map((o) => ({ ...offerData({ type: "mine", orderId: o.id, number: o.number, address: o.address, neighborhood: o.neighborhood, km: o.distanceKm, fee: fee(o.deliveryFeePyg), store, auto: o.autoAssigned }), id: o.id, s: o.status })),
+    open: open.map((o) => ({ ...offerData({ type: "open", orderId: o.id, number: o.number, address: o.address, neighborhood: o.neighborhood, km: o.distanceKm, fee: fee(o.deliveryFeePyg), store }), id: o.id })),
     // idioma escolhido pelo entregador (pt/es/en): textos nativos do app Android (avisos, tela da corrida)
     lang: courierLang(s.courier, s.tenant.country),
   });

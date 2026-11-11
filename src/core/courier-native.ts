@@ -74,6 +74,8 @@ export type CourierOffer = {
   orderId: string;
   number: string | number;
   address?: string | null;
+  /** bairro da entrega (destaque para o motoboy) */
+  neighborhood?: string | null;
   km?: number | null;
   /** quanto o entregador ganha, já formatado na moeda da loja */
   fee?: string | null;
@@ -90,6 +92,7 @@ export function offerData(o: CourierOffer): Record<string, string> {
     orderId: o.orderId,
     n: String(o.number),
     addr: (o.address ?? "").slice(0, 200),
+    bairro: (o.neighborhood ?? "").slice(0, 60),
     km: o.km != null && Number.isFinite(o.km) ? o.km.toFixed(1) : "",
     fee: (o.fee ?? "").slice(0, 40),
     store: (o.store ?? "").slice(0, 80),

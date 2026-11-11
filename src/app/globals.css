@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* "dark:" segue o tema escolhido no site (classe dark no <html>, components/theme), não só o do aparelho */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;

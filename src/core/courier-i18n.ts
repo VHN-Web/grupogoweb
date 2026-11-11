@@ -60,12 +60,12 @@ export const COURIER_ERRORS: Record<CourierErrorCode, Record<CourierLang, string
 // ---------------------------------------------------------------- avisos enviados pelo servidor
 export type CourierPushKind = "new" | "available" | "cancelled";
 
-export function courierPushText(lang: CourierLang, kind: CourierPushKind, v: { number: string | number; store?: string | null; address?: string | null; km?: number | null }) {
+export function courierPushText(lang: CourierLang, kind: CourierPushKind, v: { number: string | number; store?: string | null; address?: string | null; neighborhood?: string | null; km?: number | null }) {
   const T = courierT(lang);
   const n = String(v.number);
   if (kind === "new") {
     const km = v.km != null && Number.isFinite(v.km) ? v.km.toFixed(1) : null;
-    const parts = [v.store, v.address, km ? T(`${km.replace(".", ",")} km de la tienda`, `${km.replace(".", ",")} km da loja`, `${km} km from the store`) : null].filter(Boolean);
+    const parts = [v.store, v.neighborhood ? T(`Barrio ${v.neighborhood}`, `Bairro ${v.neighborhood}`, `${v.neighborhood} area`) : null, v.address, km ? T(`${km.replace(".", ",")} km de la tienda`, `${km.replace(".", ",")} km da loja`, `${km} km from the store`) : null].filter(Boolean);
     return { title: T(`Nueva entrega #${n}`, `Nova entrega #${n}`, `New delivery #${n}`), body: parts.join(" · ") };
   }
   if (kind === "available") {

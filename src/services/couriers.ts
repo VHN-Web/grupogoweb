@@ -22,6 +22,7 @@ export function deliveryMessage(t: Tenant, o: Order & { items: OrderItem[] }) {
       customerName: o.customerName,
       customerPhone: o.customerPhone ? formatPhone(o.customerPhone) : null,
       address: o.address,
+      neighborhood: o.neighborhood,
       lat: o.lat,
       lng: o.lng,
       items: o.items.map((i) => ({ name: i.name, quantity: i.quantity })),

@@ -77,7 +77,7 @@ export function myActiveDeliveries(c: Courier) {
 export function openDeliveries(c: Courier) {
   return db.query.orders.findMany({
     where: and(eq(schema.orders.tenantId, c.tenantId), isNull(schema.orders.courierId), eq(schema.orders.type, "DELIVERY"), eq(schema.orders.marketplaceDelivery, false), inArray(schema.orders.status, ["PREPARING", "READY"])),
-    columns: { id: true, number: true, address: true, lat: true, lng: true, distanceKm: true, deliveryFeePyg: true, status: true, createdAt: true },
+    columns: { id: true, number: true, address: true, neighborhood: true, lat: true, lng: true, distanceKm: true, deliveryFeePyg: true, status: true, createdAt: true },
     orderBy: [schema.orders.createdAt],
     limit: 20,
   });
@@ -165,7 +165,7 @@ export function courierLang(c: { lang: string | null }, country: string): Courie
   return resolveCourierLang({ saved: c.lang, store: getRegion(country).locale });
 }
 
-type PushVars = { number: string | number; store?: string | null; address?: string | null; km?: number | null };
+type PushVars = { number: string | number; store?: string | null; address?: string | null; neighborhood?: string | null; km?: number | null };
 
 /** Avisa o entregador no idioma dele. Com `offer`, o app Android abre a tela cheia da corrida; `cancelOrderId` fecha essa tela. */
 export async function notifyCourier(courierId: string, kind: CourierPushKind, v: PushVars, extra?: { offer?: CourierOffer; cancelOrderId?: string }) {
@@ -294,7 +294,7 @@ export async function autoAssign(tenantId: string, onlyOrderId?: string) {
       inArray(schema.orders.status, ["PREPARING", "READY"]),
       ...(onlyOrderId ? [eq(schema.orders.id, onlyOrderId)] : []),
     ),
-    columns: { id: true, number: true, address: true, declinedCourierIds: true, deliveryFeePyg: true },
+    columns: { id: true, number: true, address: true, neighborhood: true, declinedCourierIds: true, deliveryFeePyg: true },
     orderBy: [schema.orders.createdAt],
     limit: 20,
   });
@@ -324,8 +324,8 @@ export async function autoAssign(tenantId: string, onlyOrderId?: string) {
     load.set(best.id, (load.get(best.id) ?? 0) + 1);
     n++;
     const fee = courierFeeLabel(o.deliveryFeePyg, list.find((c) => c.id === best.id)?.feePerDelivery ?? 0, t.currency);
-    await notifyCourier(best.id, "new", { number: o.number, store: t.name, address: o.address, km: best.km }, {
-      offer: { type: "mine", orderId: o.id, number: o.number, address: o.address, km: best.km, fee, store: t.name, auto: true },
+    await notifyCourier(best.id, "new", { number: o.number, store: t.name, address: o.address, neighborhood: o.neighborhood, km: best.km }, {
+      offer: { type: "mine", orderId: o.id, number: o.number, address: o.address, neighborhood: o.neighborhood, km: best.km, fee, store: t.name, auto: true },
     }).catch(() => null);
   }
   return n;
@@ -342,7 +342,7 @@ export async function declineDelivery(c: Courier, orderId: string) {
     .set({ courierId: null, autoAssigned: false, declinedCourierIds: JSON.stringify(list), updatedAt: new Date() })
     .where(and(eq(schema.orders.id, o.id), eq(schema.orders.courierId, c.id)));
   const again = await autoAssign(c.tenantId, o.id);
-  if (!again) await notifyOnlineCouriers(c.tenantId, { number: o.number, address: o.address, km: o.distanceKm }, { type: "open", orderId: o.id, number: o.number, address: o.address, km: o.distanceKm }).catch(() => null);
+  if (!again) await notifyOnlineCouriers(c.tenantId, { number: o.number, address: o.address, neighborhood: o.neighborhood, km: o.distanceKm }, { type: "open", orderId: o.id, number: o.number, address: o.address, neighborhood: o.neighborhood, km: o.distanceKm }).catch(() => null);
 }
 
 export async function saveDispatchConfig(tenantId: string, cfg: { autoAssign: boolean; maxKm: number; maxLoad: number }) {

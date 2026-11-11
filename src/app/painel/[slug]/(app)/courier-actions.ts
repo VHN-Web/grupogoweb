@@ -71,8 +71,8 @@ export async function assignCourier(slug: string, orderId: string, f: FormData) 
   await audit(t.id, await actorName(slug), "order.courier", `#${o!.number}`);
   if (courierId && courierId !== o!.courierId) {
     const cour = await db.query.couriers.findFirst({ where: and(eq(schema.couriers.id, courierId), eq(schema.couriers.tenantId, t.id)), columns: { feePerDelivery: true } });
-    await notifyCourier(courierId, "new", { number: o!.number, store: t.name, address: o!.address, km: o!.distanceKm }, {
-      offer: { type: "mine", orderId: o!.id, number: o!.number, address: o!.address, km: o!.distanceKm, fee: courierFeeLabel(o!.deliveryFeePyg, cour?.feePerDelivery ?? 0, t.currency), store: t.name, auto: false },
+    await notifyCourier(courierId, "new", { number: o!.number, store: t.name, address: o!.address, neighborhood: o!.neighborhood, km: o!.distanceKm }, {
+      offer: { type: "mine", orderId: o!.id, number: o!.number, address: o!.address, neighborhood: o!.neighborhood, km: o!.distanceKm, fee: courierFeeLabel(o!.deliveryFeePyg, cour?.feePerDelivery ?? 0, t.currency), store: t.name, auto: false },
     });
   }
   revalidatePath(path);

@@ -39,7 +39,7 @@ public class IncomingActivity extends Activity {
     private boolean busy;
     private final Handler h = new Handler(Looper.getMainLooper());
 
-    private TextView title, store, fee, km, addr, countdown, msg;
+    private TextView title, store, fee, km, bairro, addr, countdown, msg;
     private ProgressBar bar;
     private Button accept, decline;
 
@@ -70,6 +70,7 @@ public class IncomingActivity extends Activity {
         store = findViewById(R.id.offer_store);
         fee = findViewById(R.id.offer_fee);
         km = findViewById(R.id.offer_km);
+        bairro = findViewById(R.id.offer_bairro);
         addr = findViewById(R.id.offer_addr);
         countdown = findViewById(R.id.offer_countdown);
         msg = findViewById(R.id.offer_msg);
@@ -107,6 +108,8 @@ public class IncomingActivity extends Activity {
         String kmText = "en".equals(L.lang(this)) ? o.km : o.km.replace('.', ',');
         km.setText(o.km.isEmpty() ? "" : L.t(this, "km_from_store").replace("{km}", kmText));
         km.setVisibility(o.km.isEmpty() ? View.GONE : View.VISIBLE);
+        bairro.setText(o.bairro);
+        bairro.setVisibility(o.bairro.isEmpty() ? View.GONE : View.VISIBLE);
         addr.setText(o.addr);
         addr.setVisibility(o.addr.isEmpty() ? View.GONE : View.VISIBLE);
         msg.setVisibility(View.GONE);
