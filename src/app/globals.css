@@ -271,6 +271,17 @@ html.dark .keep-light { background-color: #fff !important; }
 html.dark .text-emerald-800, html.dark .text-amber-900, html.dark .text-amber-950, html.dark .text-red-700, html.dark .text-blue-900 { color: inherit; }
 html.dark .ring-line, html.dark .ring-black\/5, html.dark .ring-black\/10 { --tw-ring-color: #263044; }
 html.dark .bg-black\/5 { background-color: rgb(255 255 255 / .06); }
+/* áreas operacionais (painel, admin, CRM, afiliados, entregador): cores que ainda ficavam claras ou escuras demais
+   no tema escuro. Nenhuma destas classes é usada no site institucional (conferido em 11/11/2026). */
+html.dark .bg-amber-200 { background-color: rgb(146 84 0 / .55); color: #fde3b0 !important; }
+html.dark .bg-pink-100 { background-color: rgb(157 23 77 / .4); color: #fbcfe8 !important; }
+html.dark .bg-zinc-100 { background-color: rgb(255 255 255 / .08); }
+html.dark .text-emerald-700, html.dark .text-emerald-900 { color: #86efac; }
+html.dark .text-amber-700, html.dark .text-amber-800 { color: #fcd34d; }
+html.dark .text-red-800, html.dark .text-red-900 { color: #fca5a5; }
+html.dark .text-blue-800 { color: #93c5fd; }
+html.dark .text-pink-800 { color: #f9a8d4; }
+html.dark .border-amber-300 { border-color: #b7791f; }
 html.dark .hover\:bg-black\/5:hover { background-color: rgb(255 255 255 / .08); }
 html.dark .border-black\/10, html.dark .border-black\/15 { border-color: #263044; }
 /* painel */

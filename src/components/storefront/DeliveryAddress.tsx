@@ -129,7 +129,10 @@ export function DeliveryAddress({ slug, country, subtotal, T, money, ghostBtn, o
     <div className="space-y-3">
       <p className="label !mb-0">{T("Dirección de entrega", "Endereço de entrega")}</p>
       <button type="button" onClick={locate} className={`${ghostBtn} w-full py-3`}>
-        {gps ? T("📍 Ubicación compartida — actualizar", "📍 Localização compartilhada — atualizar") : T("📍 Usar mi ubicación (más preciso)", "📍 Usar minha localização (mais preciso)")}
+        <span className="inline-flex items-center justify-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+          {gps ? T("Ubicación compartida — actualizar", "Localização compartilhada — atualizar") : T("Usar mi ubicación (más preciso)", "Usar minha localização (mais preciso)")}
+        </span>
       </button>
       {locMsg && <p className="th-muted text-[13px]">{locMsg}</p>}
 
