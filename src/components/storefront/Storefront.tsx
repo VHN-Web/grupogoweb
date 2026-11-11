@@ -16,6 +16,7 @@ import { PhoneInput } from "@/components/forms/PhoneInput";
 import { GoWebLogo } from "@/components/brand/GoWebLogo";
 import { DeliveryAddress, type DeliveryValue, type Quote } from "@/components/storefront/DeliveryAddress";
 import { EMPTY_ADDRESS } from "@/core/address";
+import { ProductGallery, type GalleryItem } from "@/components/storefront/ProductGallery";
 
 export type StoreProduct = {
   id: string;
@@ -29,6 +30,8 @@ export type StoreProduct = {
   durationMin: number | null; // serviço agendável
   soldOut: boolean;
   maxQty: number;
+  /** galeria: fotos extras e vídeo, na ordem do lojista (a principal é imageUrl) */
+  media?: GalleryItem[];
 };
 
 export type StoreData = {
@@ -78,7 +81,7 @@ export type StoreData = {
 type Cart = Record<string, number>;
 
 // Idioma e moeda do estabelecimento disponíveis para todos os componentes do site
-type Ctx = { T: (es: string, pt: string) => string; money: (v: number) => string; L: ReturnType<typeof getLabels>; data: StoreData; book: (p: StoreProduct) => void };
+type Ctx = { T: (es: string, pt: string) => string; money: (v: number) => string; L: ReturnType<typeof getLabels>; data: StoreData; book: (p: StoreProduct) => void; open: (p: StoreProduct) => void };
 const StoreCtx = createContext<Ctx>(null as unknown as Ctx);
 const useStore = () => useContext(StoreCtx);
 type View = "menu" | "cart" | "checkout";
@@ -152,6 +155,7 @@ export function Storefront({ data }: { data: StoreData }) {
 
   const [suggestFor, setSuggestFor] = useState<string | null>(null);
   const [booking, setBooking] = useState<StoreProduct | null>(null);
+  const [detail, setDetail] = useState<StoreProduct | null>(null);
   const [cartId, setCartId] = useState<string | null>(null);
   const [initialCoupon, setInitialCoupon] = useState<string>("");
 
@@ -241,7 +245,7 @@ export function Storefront({ data }: { data: StoreData }) {
   const tileFor = (i: number) => theme.colors.tiles[i % theme.colors.tiles.length];
   const featured = theme.featured ? all.filter((p) => !p.soldOut).slice(0, 6) : [];
 
-  const ctx: Ctx = { T: tr(data.locale), money: (v: number) => formatMoney(v, data.currency), L: getLabels(data.locale), data, book: (p) => setBooking(p) };
+  const ctx: Ctx = { T: tr(data.locale), money: (v: number) => formatMoney(v, data.currency), L: getLabels(data.locale), data, book: (p) => setBooking(p), open: (p) => setDetail(p) };
   const { T, money } = ctx;
 
   return (
@@ -394,6 +398,7 @@ export function Storefront({ data }: { data: StoreData }) {
       )}
 
       {booking && <BookingSheet product={booking} onClose={() => setBooking(null)} />}
+      {detail && <ProductDetail p={detail} theme={theme} qty={cart[detail.id] ?? 0} onQty={(q) => setQty(detail.id, q)} canOrder={data.isOpen} onClose={() => setDetail(null)} />}
 
       {/* Barra do carrinho */}
       {count > 0 && view === "menu" && (
@@ -836,9 +841,14 @@ function Qty({ p, qty, onQty, canOrder, round, small }: { p: StoreProduct; qty: 
 function ProductRow({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
   return (
     <li data-reveal className={`product-row th-surface flex items-center gap-3.5 p-3 ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
-      <ProductImage p={p} tile={tile} className="h-[84px] w-[84px]" radius={theme.radius - 4} size={70} />
+      <OpenButton p={p} className="relative shrink-0">
+        <ProductImage p={p} tile={tile} className="h-[84px] w-[84px]" radius={theme.radius - 4} size={70} />
+        <MediaBadge p={p} />
+      </OpenButton>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <h3 className={`th-h leading-tight ${theme.fonts.headingUpper ? "text-[19px] uppercase tracking-wide" : "text-[15.5px] font-bold"}`}>{p.name}</h3>
+        <OpenButton p={p} className="text-left">
+          <h3 className={`th-h leading-tight ${theme.fonts.headingUpper ? "text-[19px] uppercase tracking-wide" : "text-[15.5px] font-bold"}`}>{p.name}</h3>
+        </OpenButton>
         {p.description && <p className="th-muted line-clamp-2 text-[12.5px] leading-snug">{p.description}</p>}
         <Price p={p} className={`mt-1 text-[15px] font-bold ${theme.dark ? "th-accent-text" : ""}`} />
       </div>
@@ -850,9 +860,14 @@ function ProductRow({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct;
 function ProductCard({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct; theme: Theme; tile: string; qty: number; onQty: (q: number) => void; canOrder: boolean }) {
   return (
     <div data-reveal className={`product-card th-surface flex flex-col overflow-hidden border th-line ${p.soldOut ? "opacity-50" : ""}`} style={{ borderRadius: theme.radius }}>
-      <ProductImage p={p} tile={tile} className="h-[130px] w-full" radius={0} size={110} />
+      <OpenButton p={p} className="relative block w-full">
+        <ProductImage p={p} tile={tile} className="h-[130px] w-full" radius={0} size={110} />
+        <MediaBadge p={p} />
+      </OpenButton>
       <div className="flex flex-1 flex-col gap-1.5 p-3">
-        <h3 className="th-h text-[15.5px] font-bold leading-tight">{p.name}</h3>
+        <OpenButton p={p} className="text-left">
+          <h3 className="th-h text-[15.5px] font-bold leading-tight">{p.name}</h3>
+        </OpenButton>
         {p.description && <p className="th-muted line-clamp-2 text-[12px] leading-snug">{p.description}</p>}
         <div className="mt-auto flex items-center justify-between gap-2 pt-1">
           <Price p={p} className="text-[13.5px] font-bold" />
@@ -860,6 +875,58 @@ function ProductCard({ p, theme, tile, qty, onQty, canOrder }: { p: StoreProduct
         </div>
       </div>
     </div>
+  );
+}
+
+/** Toque na foto ou no nome abre os detalhes do produto (galeria). */
+function OpenButton({ p, className, children }: { p: StoreProduct; className?: string; children: ReactNode }) {
+  const { open, T } = useStore();
+  return (
+    <button type="button" onClick={() => open(p)} className={className} aria-label={`${T("Ver detalles de", "Ver detalhes de")} ${p.name}`}>
+      {children}
+    </button>
+  );
+}
+
+/** Selo discreto quando o produto tem mais fotos ou vídeo. */
+function MediaBadge({ p }: { p: StoreProduct }) {
+  const extra = p.media?.length ?? 0;
+  if (!extra) return null;
+  const video = p.media!.some((m) => m.kind === "video");
+  return (
+    <span className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-bold text-white" aria-hidden="true">
+      {video ? <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg> : null}
+      +{extra}
+    </span>
+  );
+}
+
+/** Detalhes do produto: galeria (fotos + vídeo), preço, descrição, disponibilidade e o mesmo botão de compra. */
+function ProductDetail({ p, theme, qty, onQty, canOrder, onClose }: { p: StoreProduct; theme: Theme; qty: number; onQty: (q: number) => void; canOrder: boolean; onClose: () => void }) {
+  const { T } = useStore();
+  const items: GalleryItem[] = [...(p.imageUrl ? [{ kind: "image" as const, url: p.imageUrl }] : []), ...(p.media ?? []).filter((m) => m.url !== p.imageUrl)];
+  const fallback = p.illustration ? <Illustration name={p.illustration} size={180} /> : <span className="th-h text-5xl font-bold opacity-40">{initials(p.name)}</span>;
+  return (
+    <Sheet title={p.name} onClose={onClose}>
+      <div className="space-y-4">
+        <ProductGallery items={items} alt={p.name} tile={theme.colors.surface} T={T} fallback={fallback} />
+        <div className="space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className={`th-h leading-tight ${theme.fonts.headingUpper ? "text-[22px] uppercase tracking-wide" : "text-xl font-bold"}`}>{p.name}</h3>
+            <Price p={p} className={`shrink-0 text-lg font-bold ${theme.dark ? "th-accent-text" : ""}`} />
+          </div>
+          {p.promoEndsAt && <p className="text-xs font-semibold text-emerald-600">{T("Oferta por tiempo limitado", "Oferta por tempo limitado")}</p>}
+          <p className={`text-[13px] font-semibold ${p.soldOut ? "text-red-500" : "th-muted"}`}>
+            {p.soldOut ? T("Agotado por ahora", "Esgotado no momento") : p.durationMin ? `${T("Servicio con turno", "Serviço com agendamento")} · ${p.durationMin} min` : p.maxQty < 99 ? `${T("Disponible", "Disponível")} · ${p.maxQty} ${T("en stock", "em estoque")}` : T("Disponible", "Disponível")}
+          </p>
+          {p.description && <p className="whitespace-pre-line text-[14px] leading-relaxed">{p.description}</p>}
+        </div>
+        <div className="flex items-center justify-end gap-3 pt-1">
+          {!canOrder && !p.durationMin && <span className="th-muted text-xs">{T("La tienda está cerrada ahora.", "A loja está fechada agora.")}</span>}
+          <Qty p={p} qty={qty} onQty={onQty} canOrder={canOrder} />
+        </div>
+      </div>
+    </Sheet>
   );
 }
 

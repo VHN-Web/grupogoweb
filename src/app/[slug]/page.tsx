@@ -14,6 +14,7 @@ import { getTheme, readableOn } from "@/core/themes";
 import { getRegion, tenantRates } from "@/core/region";
 import type { Currency } from "@/core/types";
 import { appUrl, tenantPublicUrl } from "@/lib/urls";
+import { mediaByProduct } from "@/services/product-media";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +94,8 @@ export default async function StorePage({
     }
   });
 
+  // galeria (fotos extras + vídeo) de todos os produtos visíveis numa consulta só
+  const media = await mediaByProduct(tenant.id, prods.map((p) => p.id));
   const groups = [
     ...cats.map((c) => ({ id: c.id, name: c.name, products: prods.filter((p) => p.categoryId === c.id) })),
     { id: "_other", name: region0.locale === "pt" ? "Outros" : "Otros", products: prods.filter((p) => !p.categoryId || !cats.some((c) => c.id === p.categoryId)) },
@@ -169,6 +172,7 @@ export default async function StorePage({
         durationMin: agendaOn && booking.enabled ? p.durationMin : null,
         soldOut: p.trackStock && p.stock <= 0,
         maxQty: p.trackStock ? p.stock : 99,
+        media: (media.get(p.id) ?? []).map((m) => ({ kind: m.kind, url: m.url })),
       })),
     })),
   };

@@ -10,6 +10,8 @@ const csp = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
   "connect-src 'self' https:",
+  // vídeos da galeria dos produtos: tocados direto do CDN do Vercel Blob (URL assinada)
+  "media-src 'self' blob: https://*.blob.vercel-storage.com",
   "frame-src 'self'",
   "frame-ancestors 'self'", // ninguém pode embutir o site para enganar o cliente (clickjacking)
   "base-uri 'self'",

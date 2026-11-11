@@ -15,7 +15,7 @@ type Props = {
 
 const MAX_INPUT = 20 * 1024 * 1024; // aceita fotos grandes do celular; o envio final fica bem menor
 
-async function compress(file: File, maxSide: number): Promise<File> {
+export async function compress(file: File, maxSide: number): Promise<File> {
   if (file.type === "image/gif") return file; // mantém animação
   const bmp = await createImageBitmap(file).catch(() => null);
   if (!bmp) throw new Error("decode");

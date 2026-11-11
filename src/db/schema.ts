@@ -168,6 +168,31 @@ export const products = pgTable(
   (t) => [index("products_tenant_idx").on(t.tenantId)],
 );
 
+/**
+ * Galeria do produto (core/media.ts): fotos extras e vídeo, na ordem do lojista. A foto principal continua em
+ * products.image_url (retrocompatível: produto sem linhas aqui = só a foto de sempre).
+ */
+export const productMedia = pgTable(
+  "product_media",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"image" | "video">().notNull(),
+    url: text("url").notNull(), // /uploads/<caminho> (Blob privado) ou URL pública do Blob
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    contentType: text("content_type"),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("product_media_product_idx").on(t.productId, t.position), index("product_media_tenant_idx").on(t.tenantId)],
+);
+export type ProductMedia = typeof productMedia.$inferSelect;
+
 export const stockMovements = pgTable("stock_movements", {
   id: id(),
   tenantId: text("tenant_id")
