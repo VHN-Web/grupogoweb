@@ -7,6 +7,8 @@ import { GoogleButton } from "@/components/brand/GoogleButton";
 import { googleEnabled } from "@/lib/google";
 import { audit, clearLimit, clientIp, isLimited, rateLimit } from "@/lib/security";
 import { AuthShell } from "@/components/brand/AuthShell";
+import { headers } from "next/headers";
+import { isGoWebAppUA } from "@/core/courier-native";
 
 export const metadata = { title: "GoWeb — Administração", robots: { index: false } };
 
@@ -48,6 +50,8 @@ async function login(f: FormData) {
 
 export default async function AdminLogin({ searchParams }: { searchParams: Promise<{ e?: string; m?: string; next?: string }> }) {
   const { e, m, next } = await searchParams;
+  // o Google não deixa entrar por dentro de apps (WebView): no app Android do CRM, só e-mail e senha
+  const inApp = isGoWebAppUA((await headers()).get("user-agent"));
   const crm = !!next && (next === "/crm" || next.startsWith("/crm/"));
   return (
     <AuthShell eyebrow={crm ? "App dos sócios" : "Plataforma"} title={crm ? "CRM GoWeb" : "Admin"}>
@@ -60,7 +64,8 @@ export default async function AdminLogin({ searchParams }: { searchParams: Promi
         {e && e !== "google" && <p className="text-sm text-red-400">{e === "bloq" ? "Muitas tentativas. Aguarde 30 minutos." : "Senha incorreta"}</p>}
         <button className="btn-primary w-full py-3">Entrar</button>
       </form>
-      {googleEnabled() && (
+      {inApp && <p className="mt-5 text-center text-xs text-[#8D877C]">No app, entre com e-mail e senha. Login com Google só pelo navegador.</p>}
+      {googleEnabled() && !inApp && (
         <div className="mt-5 space-y-3">
           <div className="flex items-center gap-3 text-xs text-[#8D877C]"><span className="h-px flex-1 bg-[#2C2C31]" />ou<span className="h-px flex-1 bg-[#2C2C31]" /></div>
           <GoogleButton href="/api/auth/google?para=admin" label="Entrar com Google" />

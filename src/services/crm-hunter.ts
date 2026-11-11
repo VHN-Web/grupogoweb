@@ -138,7 +138,7 @@ export async function runHunt(trigger: "cron" | "manual", only?: { city: string;
   if (added > 0) {
     const ouro = await db.query.crmLeads.findMany({ where: eq(schema.crmLeads.source, "hunter"), orderBy: desc(schema.crmLeads.createdAt), limit: added, columns: { score: true } });
     const gold = ouro.filter((l) => l.score === "OURO").length;
-    await sendPush("all", { title: `${added} ${added === 1 ? "lead novo" : "leads novos"}${gold ? ` · ${gold} Ouro` : ""}`, body: addedNames.slice(0, 3).join(", ") + (addedNames.length > 3 ? "…" : ""), url: "/crm/leads?fonte=hunter", tag: "hunt" });
+    await sendPush("all", { title: `${added} ${added === 1 ? "lead novo" : "leads novos"}${gold ? ` · ${gold} Ouro` : ""}`, body: addedNames.slice(0, 3).join(", ") + (addedNames.length > 3 ? "…" : ""), url: "/crm/leads?fonte=hunter", tag: "hunt", category: "leads" });
   }
   return { skipped: false as const, targets, found, added, errors };
 }

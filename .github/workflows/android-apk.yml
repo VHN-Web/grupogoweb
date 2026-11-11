@@ -1,11 +1,11 @@
-# Gera o APK do app Android do entregador (mobile/android).
+# Gera os APKs Android: app do entregador (mobile/android/app) e app do CRM (mobile/android/crm).
 # - Pull Request: gera e deixa o APK em "Artifacts" da execução (para testar).
-# - main / manual: gera, assina com a chave própria e publica na versão "entregador-latest" (Releases).
+# - main / manual: gera, assina com a chave própria e publica em Releases: "entregador-latest" e "crm-latest".
 # Secrets (Settings → Secrets and variables → Actions):
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD  (assinatura fixa)
-#   GOOGLE_SERVICES_JSON  (opcional: Firebase — avisos com o app fechado e o motoboy offline)
+#   GOOGLE_SERVICES_JSON  (opcional: Firebase — avisos na hora com o app fechado; o JSON pode ter os dois apps)
 # Variables: ATLAS_URL (padrão https://goweboficial.com), COMMIT_APK=true (opcional: grava o APK em public/entregador/entregas.apk)
-name: App do entregador (APK Android)
+name: Apps Android (entregador e CRM)
 
 on:
   push:
@@ -47,9 +47,11 @@ jobs:
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             printf '%s' "$GOOGLE_SERVICES_JSON" > mobile/android/app/google-services.json
-            echo "Firebase ligado."
+            printf '%s' "$GOOGLE_SERVICES_JSON" > mobile/android/crm/google-services.json
+            grep -q com.goweboficial.entregador mobile/android/app/google-services.json && echo "Firebase ligado no app do entregador." || echo "::notice::google-services.json sem o app com.goweboficial.entregador."
+            grep -q com.goweboficial.crm mobile/android/crm/google-services.json && echo "Firebase ligado no app do CRM." || echo "::notice::google-services.json sem o app com.goweboficial.crm (CRM avisa a cada 15 min)."
           else
-            echo "::notice::Sem GOOGLE_SERVICES_JSON: os avisos nativos funcionam enquanto o motoboy está online."
+            echo "::notice::Sem GOOGLE_SERVICES_JSON: entregador avisa enquanto online; CRM confere a cada 15 min."
           fi
 
       - name: Chave de assinatura
@@ -77,7 +79,7 @@ jobs:
             echo "::error::Os secrets de assinatura não abrem a chave (senha ou alias não batem com ANDROID_KEYSTORE_BASE64). Gerando com chave temporária — confira os 4 secrets ANDROID_*."
           fi
 
-      - name: Gerar APK
+      - name: Gerar APKs
         working-directory: mobile/android
         env:
           ATLAS_URL: ${{ inputs.atlas_url || vars.ATLAS_URL || 'https://goweboficial.com' }}
@@ -86,8 +88,9 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          gradle --no-daemon --stacktrace assembleRelease
+          gradle --no-daemon --stacktrace :app:assembleRelease :crm:assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/entregas.apk"
+          cp crm/build/outputs/apk/release/crm-release.apk "$RUNNER_TEMP/goweb-crm.apk"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -95,7 +98,13 @@ jobs:
           path: ${{ runner.temp }}/entregas.apk
           retention-days: 30
 
-      - name: Publicar em Releases (entregador-latest)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: goweb-crm-apk
+          path: ${{ runner.temp }}/goweb-crm.apk
+          retention-days: 30
+
+      - name: Publicar em Releases (entregador-latest e crm-latest)
         if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -104,6 +113,11 @@ jobs:
           gh release create entregador-latest "$RUNNER_TEMP/entregas.apk" \
             --title "App do entregador (Android) · build ${{ github.run_number }}" \
             --notes "APK gerado de ${{ github.sha }}. Link para os motoboys: /entregador/baixar no site." \
+            --latest=false
+          gh release delete crm-latest --yes --cleanup-tag || true
+          gh release create crm-latest "$RUNNER_TEMP/goweb-crm.apk" \
+            --title "GoWeb CRM (Android) · build ${{ github.run_number }}" \
+            --notes "APK do CRM dos sócios gerado de ${{ github.sha }}. Link no CRM em App e notificações." \
             --latest=false
 
       - name: Gravar no site (public/entregador/entregas.apk)

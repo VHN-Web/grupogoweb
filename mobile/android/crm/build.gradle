@@ -1,0 +1,69 @@
+// App Android do CRM dos sócios: abre o /crm do site (mesma sessão do admin) + widgets e avisos nativos.
+plugins {
+    id "com.android.application"
+}
+
+// Firebase (avisos na hora, mesmo com o app fechado) só entra se o google-services.json tiver este app
+if (file("google-services.json").exists() && file("google-services.json").text.contains("com.goweboficial.crm")) {
+    apply plugin: "com.google.gms.google-services"
+}
+
+def atlasUrl = (project.findProperty("atlasUrl") ?: System.getenv("ATLAS_URL") ?: "https://goweboficial.com").toString().replaceAll('/+$', '')
+def atlasHost = new URI(atlasUrl).host
+def vCode = (project.findProperty("versionCode") ?: System.getenv("VERSION_CODE") ?: "1").toString().toInteger()
+def vName = (project.findProperty("versionName") ?: System.getenv("VERSION_NAME") ?: "1.0.0").toString()
+def keystore = System.getenv("ANDROID_KEYSTORE_FILE")
+
+android {
+    namespace "com.goweboficial.crm"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.goweboficial.crm"
+        minSdk 24
+        targetSdk 35
+        versionCode vCode
+        versionName vName
+        buildConfigField "String", "BASE_URL", "\"${atlasUrl}\""
+        manifestPlaceholders = [atlasHost: atlasHost]
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        release {
+            if (keystore) {
+                storeFile file(keystore)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keystore ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    implementation "androidx.core:core:1.13.1"
+    implementation "androidx.work:work-runtime:2.9.1"
+    implementation "com.google.firebase:firebase-messaging:24.1.0"
+    implementation "com.google.android.gms:play-services-tasks:18.2.0"
+}

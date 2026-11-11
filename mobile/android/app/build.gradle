@@ -4,7 +4,7 @@ plugins {
 
 // Firebase (notificações com o app fechado e o motoboy offline) só entra se existir app/google-services.json
 // — o workflow cria o arquivo a partir do secret GOOGLE_SERVICES_JSON.
-if (file("google-services.json").exists()) {
+if (file("google-services.json").exists() && file("google-services.json").text.contains("com.goweboficial.entregador")) {
     apply plugin: "com.google.gms.google-services"
 }
 

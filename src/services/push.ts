@@ -7,6 +7,7 @@ import { db, schema } from "@/db";
 import { parseCrmConfig } from "@/core/crm";
 import { openSecret, sealSecret } from "@/lib/secrets";
 import { fcmConfigured, sendFcm } from "@/adapters/push/fcm";
+import { DEFAULT_NOTIFY, parseNotifyPrefs, shouldPush, type NotifyCategory } from "@/core/crm-notify";
 
 /** Aparelhos do app Android (Firebase) ficam na mesma tabela, com endpoint "fcm:<token>". */
 export const FCM_PREFIX = "fcm:";
@@ -55,13 +56,50 @@ export async function removePushSub(endpoint: string) {
   await db.delete(schema.crmPushSubs).where(eq(schema.crmPushSubs.endpoint, endpoint));
 }
 
-export type PushPayload = { title: string; body: string; url?: string; tag?: string; icon?: string; /** só app Android (Firebase): ex. oferta de corrida */ data?: Record<string, string> };
+export type PushPayload = {
+  title: string;
+  body: string;
+  url?: string;
+  tag?: string;
+  icon?: string;
+  /** só app Android (Firebase): ex. oferta de corrida */
+  data?: Record<string, string>;
+  /** categoria do CRM (core/crm-notify.ts): respeita as preferências e o silêncio de cada sócio */
+  category?: NotifyCategory;
+  /** ignora preferências/silêncio (botão "Testar") */
+  force?: boolean;
+};
+
+/** Sócios do CRM: "platform" (senha-mestra) + admins ativos. */
+async function crmActorIds() {
+  const admins = await db.query.platformAdmins.findMany({ where: eq(schema.platformAdmins.active, true), columns: { id: true } });
+  return ["platform", ...admins.map((a) => a.id)];
+}
 
 /** Envia para alguns sócios (ids) ou para todos ("all"). Nunca lança erro. */
 export async function sendPush(to: string[] | "all", p: PushPayload) {
   try {
+    // central de avisos do CRM: tudo fica guardado, mesmo o que não toca (categoria desligada ou silêncio)
+    const crmTargets = to === "all" ? await crmActorIds() : to.filter((id) => !id.startsWith("courier:"));
+    const nid = new Map<string, string>();
+    if (crmTargets.length) {
+      const rows = await db
+        .insert(schema.crmNotifications)
+        .values(crmTargets.map((actorId) => ({ actorId, category: p.category ?? null, title: p.title.slice(0, 140), body: p.body.slice(0, 400), url: p.url ?? "/crm" })))
+        .returning({ id: schema.crmNotifications.id, actorId: schema.crmNotifications.actorId })
+        .catch((e) => {
+          console.error("[push] central", e);
+          return [] as { id: string; actorId: string }[];
+        });
+      for (const r of rows) nid.set(r.actorId, r.id);
+    }
+    const prefRows = crmTargets.length ? await db.query.crmNotifyPrefs.findMany({ where: inArray(schema.crmNotifyPrefs.actorId, crmTargets) }) : [];
+    const prefs = new Map(prefRows.map((r) => [r.actorId, parseNotifyPrefs(r.prefs)]));
+    const muted = (actorId: string) => !p.force && !actorId.startsWith("courier:") && !shouldPush(prefs.get(actorId) ?? DEFAULT_NOTIFY, p.category);
+
     // "all" = todos os sócios do CRM (aparelhos de entregadores usam actorId "courier:<id>")
-    const subs = to === "all" ? await db.query.crmPushSubs.findMany({ where: notLike(schema.crmPushSubs.actorId, "courier:%") }) : to.length ? await db.query.crmPushSubs.findMany({ where: inArray(schema.crmPushSubs.actorId, to) }) : [];
+    const all = to === "all" ? await db.query.crmPushSubs.findMany({ where: notLike(schema.crmPushSubs.actorId, "courier:%") }) : to.length ? await db.query.crmPushSubs.findMany({ where: inArray(schema.crmPushSubs.actorId, to) }) : [];
+    const subs = all.filter((s) => !muted(s.actorId));
     if (!subs.length) return 0;
     const k = await vapidKeys();
     webpush.setVapidDetails("mailto:suporte@goweboficial.com", k.pub, k.priv);
@@ -70,7 +108,7 @@ export async function sendPush(to: string[] | "all", p: PushPayload) {
     await Promise.all(
       subs.map(async (s) => {
         if (s.endpoint.startsWith(FCM_PREFIX)) {
-          const r = await sendFcm(s.endpoint.slice(FCM_PREFIX.length), { ...p.data, title: p.title, body: p.body, url: p.url ?? "/crm", tag: p.tag ?? "" });
+          const r = await sendFcm(s.endpoint.slice(FCM_PREFIX.length), { ...p.data, title: p.title, body: p.body, url: p.url ?? "/crm", tag: p.tag ?? "", category: p.category ?? "", nid: nid.get(s.actorId) ?? "" });
           if (r === "ok") ok++;
           else if (r === "gone") await removePushSub(s.endpoint);
           return;

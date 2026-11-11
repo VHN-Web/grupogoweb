@@ -291,7 +291,7 @@ export async function setOwner(actor: CrmActor, leadId: string, ownerId: string 
   await db.update(schema.crmLeads).set({ ownerId, updatedAt: new Date() }).where(eq(schema.crmLeads.id, l.id));
   const who = ownerId ? (await partners()).find((p) => p.id === ownerId)?.name ?? "—" : "ninguém";
   await activity(l.id, actor.id, "system", null, `Responsável: ${who}`);
-  if (ownerId && ownerId !== actor.id) await sendPush([ownerId], { title: "Lead para você", body: `${firstName(actor.name)} passou ${l.name} para você.`, url: `/crm/leads/${l.id}`, tag: `lead-${l.id}` });
+  if (ownerId && ownerId !== actor.id) await sendPush([ownerId], { title: "Lead para você", body: `${firstName(actor.name)} passou ${l.name} para você.`, url: `/crm/leads/${l.id}`, tag: `lead-${l.id}`, category: "leads" });
 }
 
 export async function updateLeadFields(leadId: string, i: LeadInput) {
@@ -471,6 +471,7 @@ export async function onAffiliateLead(l: { id: string; businessName: string; con
       body: `${l.businessName} (${firstName(affiliateName)})${l.scheduledAt ? ` · ${fmtBr(l.scheduledAt)}` : ""}`,
       url: `/crm/leads/${lead.id}`,
       tag: `lead-${lead.id}`,
+      category: l.scheduledAt ? "demos" : "afiliados",
     });
   } catch (e) {
     console.error("[crm]", e);
@@ -492,7 +493,7 @@ export async function onCustomerCreated(c: typeof schema.customers.$inferSelect)
       await db.update(schema.crmLeads).set({ customerId: c.id, status: "PROPOSAL", followUpAt: new Date(Date.now() + 86400_000), followUpNotifiedAt: null, updatedAt: new Date() }).where(eq(schema.crmLeads.id, l.id));
       await activity(l.id, l.ownerId ?? "platform", "system", null, "Contratou pelo site — aguardando o pagamento da implantação");
     }
-    await sendPush("all", { title: "Novo contrato no site", body: `${c.businessName} contratou — aguardando o pagamento da implantação.`, url: l ? `/crm/leads/${l.id}` : "/crm", tag: `cust-${c.id}` });
+    await sendPush("all", { title: "Novo contrato no site", body: `${c.businessName} contratou — aguardando o pagamento da implantação.`, url: l ? `/crm/leads/${l.id}` : "/crm", tag: `cust-${c.id}`, category: "vendas" });
   } catch (e) {
     console.error("[crm]", e);
   }
@@ -508,7 +509,7 @@ export async function onSetupPaid(customerId: string) {
       await db.update(schema.crmLeads).set({ customerId: c.id, status: "WON", followUpAt: null, updatedAt: new Date() }).where(eq(schema.crmLeads.id, l.id));
       await activity(l.id, l.ownerId ?? "platform", "won", null, "Implantação paga — cliente fechado");
     }
-    await sendPush("all", { title: "Implantação paga!", body: `${c.businessName} pagou a implantação. Hora de montar o sistema.`, url: "/crm", tag: `paid-${c.id}` });
+    await sendPush("all", { title: "Implantação paga!", body: `${c.businessName} pagou a implantação. Hora de montar o sistema.`, url: "/crm", tag: `paid-${c.id}`, category: "vendas" });
   } catch (e) {
     console.error("[crm]", e);
   }
@@ -531,6 +532,7 @@ export async function notifyDueFollowUps() {
       body: list.length === 1 ? `${CRM_STATUS_LABEL[first.status]} · ${fmtBr(first.followUpAt!)}` : list.slice(0, 3).map((l) => l.name).join(", ") + (list.length > 3 ? "…" : ""),
       url: list.length === 1 ? `/crm/leads/${first.id}` : "/crm",
       tag: "followups",
+      category: "retornos",
     });
   }
   if (due.length) await db.update(schema.crmLeads).set({ followUpNotifiedAt: now }).where(inArray(schema.crmLeads.id, due.map((l) => l.id)));

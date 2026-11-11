@@ -2,11 +2,14 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { requireCrm } from "@/services/crm";
 import { crmLogout } from "../actions";
+import { CrmLogoutForm } from "@/components/crm/CrmLogoutForm";
 
 export const metadata = { title: "Mais" };
 
 const ITEMS = [
-  { href: "/crm/equipe", label: "Equipe e metas", desc: "Contatos, demos e fechamentos por sócio", icon: "growth" },
+  { href: "/crm/acessos", label: "Acessos", desc: "Quantas pessoas abriram o site oficial, a página e os links de afiliados", icon: "growth" },
+  { href: "/crm/avisos", label: "Avisos", desc: "Todas as notificações, mesmo as que chegaram no silêncio", icon: "bell" },
+  { href: "/crm/equipe", label: "Equipe e metas", desc: "Contatos, demos e fechamentos por sócio", icon: "team" },
   { href: "/crm/ferramentas", label: "Scripts e detector", desc: "Mensagens prontas e detector de concorrente", icon: "chat" },
   { href: "/crm/config", label: "App e notificações", desc: "Instalar, notificações, metas e planilha", icon: "settings" },
   { href: "/admin", label: "Admin completo", desc: "Clientes, faturas, afiliados e suporte", icon: "store" },
@@ -29,7 +32,7 @@ export default async function More() {
         ))}
       </ul>
       <p className="text-center text-sm text-[var(--s-muted)]">Conectado como {me.name}</p>
-      <form action={crmLogout} className="text-center"><button className="text-sm font-semibold text-red-600 dark:text-red-300">Sair</button></form>
+      <CrmLogoutForm action={crmLogout} />
     </div>
   );
 }

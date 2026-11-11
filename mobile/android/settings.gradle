@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "GoWebEntregador"
-include ":app"
+include ":app", ":crm"

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GoWeb CRM</string>
+    <string name="widget_summary">Hoje no CRM</string>
+    <string name="widget_visits">Acessos do site</string>
+    <string name="widget_summary_desc">Retornos, leads novos, contatos e demos de hoje</string>
+    <string name="widget_visits_desc">Quantas pessoas abriram o site e a página de afiliados hoje</string>
+</resources>

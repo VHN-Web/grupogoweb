@@ -10,7 +10,9 @@ const MAIN = [
   { href: "/crm/busca", label: "Busca", icon: "search" },
 ];
 const MORE = [
-  { href: "/crm/equipe", label: "Equipe e metas", icon: "growth" },
+  { href: "/crm/acessos", label: "Acessos", icon: "growth" },
+  { href: "/crm/avisos", label: "Avisos", icon: "bell" },
+  { href: "/crm/equipe", label: "Equipe e metas", icon: "team" },
   { href: "/crm/ferramentas", label: "Scripts e detector", icon: "chat" },
   { href: "/crm/config", label: "App e notificações", icon: "settings" },
 ];

@@ -3,6 +3,7 @@ import { notifyDueFollowUps } from "@/services/crm";
 import { runHunt } from "@/services/crm-hunter";
 import { runGwFollowUps } from "@/services/goweb-bot";
 import { runNudges } from "@/services/nudges";
+import { notifyVisitsSummary, pruneInbox } from "@/services/crm-notify";
 
 export const maxDuration = 300;
 
@@ -13,6 +14,9 @@ export async function GET(req: Request) {
   const followUps = await notifyDueFollowUps().catch((e) => ({ error: String(e) }));
   const gwFollowUps = await runGwFollowUps().catch((e) => ({ error: String(e) }));
   const nudges = await runNudges().catch((e) => ({ error: String(e) }));
+  // resumo de acessos do dia (só no horário do fim da tarde) + limpeza da central de avisos
+  const visits = await notifyVisitsSummary().catch((e) => ({ error: String(e) }));
+  await pruneInbox().catch(() => null);
   const hunt = await runHunt("cron").catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ followUps, gwFollowUps, nudges, hunt });
+  return NextResponse.json({ followUps, gwFollowUps, nudges, visits, hunt });
 }
