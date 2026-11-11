@@ -2,6 +2,7 @@
 // Token OAuth2 client_credentials (form-urlencoded), escopo único "od.all"; Keeta exige X-App-Signature
 // (HMAC-SHA256 do corpo com o client secret) em toda chamada — ligado por canal em `signRequests`.
 import { odSign } from "@/core/opendelivery";
+import { sandboxBlocks } from "@/lib/sandbox";
 
 export class OdHttpError extends Error {
   constructor(public status: number, message: string) {
@@ -27,6 +28,7 @@ async function readError(res: Response) {
 
 /** POST /oauth/token → { token, expiresIn (s) } */
 export async function odToken(c: OdCreds): Promise<{ token: string; expiresIn: number }> {
+  if (sandboxBlocks("delivery", null, "oauth")) throw new OdHttpError(503, "Ambiente de teste: apps de delivery desligados (99Food/Keeta reais não são chamados).");
   const body = new URLSearchParams({ client_id: c.clientId, client_secret: c.clientSecret, grant_type: "client_credentials" }).toString();
   const res = await fetch(`${trim(c.baseUrl)}/oauth/token`, {
     method: "POST",
@@ -49,6 +51,7 @@ export async function odCall<T = unknown>(
   path: string,
   opts: { body?: unknown; headers?: Record<string, string> } = {},
 ): Promise<{ status: number; data: T | null }> {
+  if (sandboxBlocks("delivery", null, `${method} ${path.split("?")[0]}`)) throw new OdHttpError(503, "Ambiente de teste: apps de delivery desligados (99Food/Keeta reais não são chamados).");
   const body = opts.body === undefined ? (method === "GET" ? undefined : "") : JSON.stringify(opts.body);
   const headers: Record<string, string> = {
     authorization: `Bearer ${token}`,

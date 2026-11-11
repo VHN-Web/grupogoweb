@@ -11,6 +11,7 @@
 // =============================================================================
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { BillingProvider } from "./BillingProvider";
+import { assertTestCredential } from "@/lib/sandbox";
 
 const API = "https://api.mercadopago.com";
 
@@ -47,6 +48,7 @@ export const mercadoPagoProvider: BillingProvider = {
 
   async createCheckout(input) {
     if (input.currency !== "BRL") throw new Error("Mercado Pago (conta BR) só cobra em BRL");
+    assertTestCredential("mercadopago", token()); // prévia: só token de teste (TEST-…)
     const res = await fetch(`${API}/checkout/preferences`, {
       method: "POST",
       headers: {

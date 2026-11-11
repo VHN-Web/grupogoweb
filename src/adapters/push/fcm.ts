@@ -4,6 +4,7 @@ import "server-only";
 // enquanto o motoboy está online, pelo retorno do /api/entregador/ping).
 // FCM_SERVICE_ACCOUNT = JSON da conta de serviço do Firebase (texto puro ou em base64).
 import { createSign } from "node:crypto";
+import { sandboxBlocks } from "@/lib/sandbox";
 
 type Account = { projectId: string; email: string; key: string };
 let account: Account | null | undefined;
@@ -49,6 +50,7 @@ export type FcmResult = "ok" | "gone" | "error";
 
 /** Mensagem só de dados com prioridade alta: o app mostra a notificação mesmo fechado. */
 export async function sendFcm(deviceToken: string, data: Record<string, string>): Promise<FcmResult> {
+  if (sandboxBlocks("push", null, data.title)) return "ok"; // prévia: aparelhos reais não tocam
   const a = readAccount();
   if (!a) return "error";
   try {

@@ -4,6 +4,7 @@ import { VisitBeacon } from "@/components/analytics/VisitBeacon";
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { detectLocale } from "@/core/region";
+import { isSandbox } from "@/lib/sandbox";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,6 +35,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ThemeBoot />
       </head>
       <body className="min-h-dvh font-sans antialiased">
+        {isSandbox() && (
+          // prévia (homologação): deixa claro em toda tela que nada aqui é real
+          <div role="status" className="keep-light sticky top-0 z-[9999] bg-[#F2C14E] px-3 py-1.5 text-center text-xs font-bold text-[#0E0E10]">
+            {lang === "es" ? "AMBIENTE DE PRUEBA — nada aquí es real: no se envían mensajes ni cobros" : "AMBIENTE DE TESTE — nada aqui é real: mensagens e cobranças não saem"}
+          </div>
+        )}
         {children}
         <VisitBeacon />
       </body>

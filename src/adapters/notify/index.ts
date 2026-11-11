@@ -11,9 +11,12 @@
 //   sem URL -> apenas registra no log
 // =============================================================================
 
+import { sandboxBlocks } from "@/lib/sandbox";
+
 export type SendResult = { status: "SENT" | "LOGGED" | "FAILED"; error?: string };
 
 export async function sendEmail(to: string, subject: string, text: string): Promise<SendResult> {
+  if (sandboxBlocks("email", to, subject)) return { status: "LOGGED" }; // prévia (homologação): nada sai
   const key = process.env.RESEND_API_KEY;
   if (!key) return { status: "LOGGED" };
   try {
@@ -30,6 +33,7 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
 }
 
 export async function sendWhatsApp(to: string, message: string): Promise<SendResult> {
+  if (sandboxBlocks("whatsapp", to, message)) return { status: "LOGGED" };
   const url = process.env.WHATSAPP_WEBHOOK_URL;
   if (!url) return { status: "LOGGED" };
   try {

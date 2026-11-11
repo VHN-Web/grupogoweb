@@ -6,6 +6,7 @@
 // Nunca registrar a chave em log.
 // =============================================================================
 import { ASAAS_BASE, type AsaasEnv } from "@/core/asaas";
+import { assertTestCredential } from "@/lib/sandbox";
 
 export class AsaasError extends Error {
   constructor(
@@ -23,6 +24,12 @@ const base = (env: AsaasEnv) => (process.env.ASAAS_API_BASE ?? ASAAS_BASE[env]).
 
 export async function asaas<T = Record<string, unknown>>(auth: AsaasAuth, path: string, init: { method?: string; body?: unknown; timeoutMs?: number } = {}): Promise<T> {
   if (!auth.apiKey) throw new AsaasError("Asaas não configurado", 0, "not_configured");
+  // prévia (homologação): só conta sandbox do Asaas — nunca cobra nem cria subconta de verdade
+  try {
+    assertTestCredential("asaas", auth.env);
+  } catch {
+    throw new AsaasError("Ambiente de teste: use uma conta sandbox do Asaas (a da produção fica bloqueada).", 0, "sandbox");
+  }
   let res: Response;
   try {
     res = await fetch(`${base(auth.env)}${path}`, {
