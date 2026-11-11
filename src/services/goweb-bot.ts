@@ -4,7 +4,7 @@ import "server-only";
 // CRM (cada conversa vira lead com origem do panfleto), suporte (chamado para lojas clientes),
 // afiliados, leads esquentando e retorno automático. Regras puras em core/goweb-bot.ts.
 import { randomBytes } from "node:crypto";
-import { and, asc, desc, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { GwChat } from "@/db/schema";
 import {
@@ -25,7 +25,7 @@ import { isPreLaunch } from "@/core/launch";
 import { MODULES, MODULE_INFO, CORE_INFO, parseModulePrices } from "@/core/modules";
 import { sortPlansByPrice } from "@/core/plans";
 import { jidToE164 } from "@/core/geovana";
-import { geminiChat, type ChatTurn } from "@/adapters/ai/gemini";
+import { geminiChat, type ChatTurn, type OnUsage } from "@/adapters/ai/gemini";
 import { EvolutionError, evoMediaBase64, evoConnect, evoCreateInstance, evoLogout, evoSendText, evoSetWebhook, evoState } from "@/adapters/whatsapp/evolution";
 import { evoServer, whatsappPlatform } from "@/services/geovana";
 import { upsertLead, activity } from "@/services/crm";
@@ -38,6 +38,8 @@ import { setupForPrompt } from "@/core/setup";
 import { storeSetup } from "@/services/setup";
 import { openSecret, sealSecret } from "@/lib/secrets";
 import { appUrl } from "@/lib/urls";
+import { aiFallbackText, isRepeat, trimHistory, type SendKind } from "@/core/wa-guard";
+import { GOWEB, aiGate, aiMeter, guardedSend, isOwnRecentSend, logEvent, noteInbound, type Outcome } from "@/services/wa-guard";
 
 export class GwBotError extends Error {}
 const INSTANCE = "gw-goweb-oficial";
@@ -100,12 +102,26 @@ export async function gwByHook(token: string) {
   return cfg.hookToken && cfg.hookToken === token ? cfg : null;
 }
 
-/** Envia texto pelo WhatsApp da GoWeb. Devolve o id da mensagem (para não duplicar no webhook). */
-export async function gwSend(toE164: string, text: string): Promise<string | null> {
+/** Envio direto pelo número da GoWeb, SEM proteção — só a fila da proteção (services/wa-guard.ts) chama isto. */
+export async function gwRawSend(toE164: string, text: string): Promise<string | null> {
   const cfg = await gwBotConfig();
   if (!cfg.instance) throw new GwBotError("WhatsApp da GoWeb não conectado.");
   const r = (await evoSendText(await evoServer(), cfg.instance, toE164, text)) as { key?: { id?: string } } | null;
   return r?.key?.id ?? null;
+}
+
+/** Envia pelo WhatsApp da GoWeb com a proteção (limites, horário comercial, fila, circuit breaker). */
+export async function gwDeliver(toE164: string, text: string, kind: SendKind): Promise<Outcome> {
+  const cfg = await gwBotConfig();
+  if (!cfg.instance) throw new GwBotError("WhatsApp da GoWeb não conectado.");
+  return guardedSend({ channel: GOWEB, to: toE164, text, kind }, () => gwRawSend(toE164, text), { waitMs: kind === "reply" || kind === "staff" ? 8_000 : 0 });
+}
+
+/** Envia e devolve o id (null se ficou na fila). Barrado pela proteção = erro com o motivo. */
+export async function gwSend(toE164: string, text: string, kind: SendKind = "reply"): Promise<string | null> {
+  const o = await gwDeliver(toE164, text, kind);
+  if (o.status === "blocked") throw new GwBotError(`Não enviado: ${o.reason}`);
+  return o.status === "sent" ? o.id : null;
 }
 
 // ---------------------------------------------------------------- avisos aos sócios
@@ -113,7 +129,7 @@ export async function gwSend(toE164: string, text: string): Promise<string | nul
 export async function notifyPartners(title: string, body: string, url = "/crm", category: NotifyCategory = "whatsapp") {
   await sendPush("all", { title, body, url, tag: `gw-${Date.now()}`, category }).catch(() => 0);
   const cfg = await gwBotConfig();
-  for (const p of cfg.partnerPhones) await gwSend(p, `*${title}*\n${body}${url.startsWith("http") ? `\n${url}` : `\n${appUrl()}${url}`}`).catch(() => null);
+  for (const p of cfg.partnerPhones) await gwSend(p, `*${title}*\n${body}${url.startsWith("http") ? `\n${url}` : `\n${appUrl()}${url}`}`, "internal").catch(() => null);
 }
 
 // ---------------------------------------------------------------- conversa
@@ -200,10 +216,10 @@ async function aiKey() {
 }
 
 /** Gera a resposta (sem enviar). Usado pelo webhook e pelo simulador do admin. */
-export async function gwReply(chat: GwChat, cfg: GwBotConfig, turns: ChatTurn[]): Promise<GwReply> {
+export async function gwReply(chat: GwChat, cfg: GwBotConfig, turns: ChatTurn[], opts: { maxTokens?: number; onUsage?: OnUsage } = {}): Promise<GwReply> {
   const { key, model } = await aiKey();
   const system = buildGwPrompt(await contextFor(chat, cfg));
-  const raw = await geminiChat({ key, model, system, history: turns, maxTokens: 700, temperature: 0.5 });
+  const raw = await geminiChat({ key, model, system, history: turns, maxTokens: opts.maxTokens ?? 700, temperature: 0.5, onUsage: opts.onUsage });
   return parseGwReply(raw, new Date());
 }
 
@@ -261,12 +277,19 @@ export async function handleGwInbound(m: { jid: string; name: string | null; tex
   const cfg = await gwBotConfig();
   const chat = await chatFor(phone, m.fromMe ? null : m.name);
   if (m.fromMe) {
+    // eco de algo que a fila da proteção enviou depois: anota o id e NÃO pausa a IA
+    if (m.externalId && (await isOwnRecentSend(GOWEB, phone, m.text))) {
+      const pend = await db.query.gwMessages.findFirst({ where: and(eq(schema.gwMessages.chatId, chat.id), eq(schema.gwMessages.role, "ai"), isNull(schema.gwMessages.externalId), eq(schema.gwMessages.text, m.text.slice(0, 4000))), orderBy: desc(schema.gwMessages.createdAt) });
+      if (pend) await db.update(schema.gwMessages).set({ externalId: m.externalId }).where(eq(schema.gwMessages.id, pend.id)).catch(() => null);
+      return "echo";
+    }
     // mensagem enviada pelo celular da GoWeb (sócio) → pausa a IA nessa conversa
     const fresh = await store(chat.id, "staff", m.text, m.externalId);
     if (fresh) await db.update(schema.gwChats).set({ pausedUntil: new Date(Date.now() + cfg.pauseMinutes * 60_000), needsHuman: false, lastBotAt: new Date() }).where(eq(schema.gwChats.id, chat.id));
     return fresh ? "staff" : "echo";
   }
   if (!(await store(chat.id, "user", m.text, m.externalId))) return "duplicate";
+  const inbound = await noteInbound(GOWEB, phone);
   const flyer = chat.flyer ? null : flyerFromText(m.text);
   await db.update(schema.gwChats).set({ lastUserAt: new Date(), followUpsSent: 0, ...(flyer ? { flyer } : {}) }).where(eq(schema.gwChats.id, chat.id));
   if (flyer) chat.flyer = flyer;
@@ -280,6 +303,11 @@ export async function handleGwInbound(m: { jid: string; name: string | null; tex
   if (!cfg.enabled) return "disabled";
   if (chat.pausedUntil && chat.pausedUntil > new Date()) return "paused";
   if (chat.needsHuman) return "waiting-human";
+  if (inbound.flood) {
+    // muitas mensagens em 1 min (robô respondendo robô, loop): a IA fica quieta nessa conversa por um tempo
+    await db.update(schema.gwChats).set({ pausedUntil: new Date(Date.now() + inbound.pauseMinutes * 60_000) }).where(eq(schema.gwChats.id, chat.id));
+    return "flood";
+  }
 
   // leads esquentando
   const hist = await db.query.gwMessages.findMany({ where: eq(schema.gwMessages.chatId, chat.id), orderBy: desc(schema.gwMessages.createdAt), limit: 20 });
@@ -300,19 +328,40 @@ export async function handleGwInbound(m: { jid: string; name: string | null; tex
     return "handoff";
   }
 
-  const turns: ChatTurn[] = hist
-    .reverse()
-    .filter((h) => h.role !== "system")
-    .map((h) => ({ role: h.role === "user" ? "user" : "model", text: h.text }));
+  // proteção da IA: orçamento, chamadas por minuto, conversa que já gastou demais, emergência
+  const gate = await aiGate(GOWEB, phone);
+  if (gate.mode === "blocked") {
+    if (gate.emergency) return "emergency";
+    await store(chat.id, "system", `IA em economia: ${gate.reason}`, null);
+    await db.update(schema.gwChats).set({ needsHuman: true }).where(eq(schema.gwChats.id, chat.id));
+    const fallback = aiFallbackText("goweb", true);
+    const recent = await db.query.gwMessages.findFirst({ where: and(eq(schema.gwMessages.chatId, chat.id), eq(schema.gwMessages.role, "ai"), eq(schema.gwMessages.text, fallback), gte(schema.gwMessages.createdAt, new Date(Date.now() - 6 * 3600_000))) });
+    if (!recent) await sendAndStore(chat, fallback);
+    return "ai-limit";
+  }
+  const turns: ChatTurn[] = trimHistory(
+    [...hist].reverse().filter((h) => h.role !== "system").map((h) => ({ role: h.role === "user" ? ("user" as const) : ("model" as const), text: h.text })),
+    gate.params.turns,
+    gate.turnChars,
+  );
+  const meter = aiMeter(GOWEB, phone);
   let r: GwReply;
   try {
-    r = await gwReply(chat, cfg, turns);
+    r = await gwReply(chat, cfg, turns, { maxTokens: gate.params.maxTokens, onUsage: meter.onUsage });
+    await meter.save();
   } catch (e) {
+    await meter.save();
     console.error("[gw-bot]", e instanceof Error ? e.message : e);
     await store(chat.id, "system", `IA indisponível: ${e instanceof Error ? e.message : "erro"}`, null);
     await db.update(schema.gwChats).set({ needsHuman: true }).where(eq(schema.gwChats.id, chat.id));
     await notifyPartners("Geovana sem IA agora", `${chat.name || chat.phone} mandou mensagem e a IA não respondeu. Responda pelo WhatsApp da GoWeb.`, "/admin/geovana");
     return "ai-error";
+  }
+  // trava contra loop: a IA repetindo a mesma resposta → não manda de novo, chama um sócio
+  if (r.text && isRepeat(r.text, hist.filter((h) => h.role === "ai").map((h) => h.text))) {
+    await logEvent({ channel: GOWEB, type: "blocked", kind: "reply", contact: phone, reason: "resposta repetida da IA" });
+    await store(chat.id, "system", "IA repetiu a resposta — conversa passada para um sócio", null);
+    r = { ...r, text: "", human: true };
   }
   const extra = await applyReply(chat, r).catch((e) => {
     console.error("[gw-bot apply]", e);
@@ -344,23 +393,32 @@ async function menuFromWhatsapp(chat: GwChat, messageId: string, mime: string) {
   }
 }
 
-/** Mensagem iniciada pela GoWeb (lembretes): registra na conversa do número e envia. */
-export async function gwProactive(phone: string, text: string, link: { tenantId?: string | null } = {}) {
+/**
+ * Mensagem iniciada pela GoWeb (lembretes, cobrança, afiliados, resposta de chamado): registra na conversa e envia
+ * com a proteção. `kind` "support" = resposta a chamado aberto pelo lojista (sai a qualquer hora, com limite).
+ * true = enviada ou agendada na fila; false = não vai sair (pediu para parar, limite, horário, restrição).
+ */
+export async function gwProactive(phone: string, text: string, link: { tenantId?: string | null } = {}, kind: SendKind = "proactive") {
   const chat = await chatFor(phone, null);
   if (chat.optOut) return false;
   if (link.tenantId && !chat.tenantId) await db.update(schema.gwChats).set({ tenantId: link.tenantId }).where(eq(schema.gwChats.id, chat.id));
-  const id = await gwSend(phone, text);
-  await store(chat.id, "ai", text, id);
+  const o = await gwDeliver(phone, text, kind);
+  if (o.status === "blocked") return false;
+  await store(chat.id, "ai", text, o.status === "sent" ? o.id : null);
   await db.update(schema.gwChats).set({ lastBotAt: new Date() }).where(eq(schema.gwChats.id, chat.id));
   return true;
 }
 
-async function sendAndStore(chat: GwChat, text: string) {
-  const id = await gwSend(chat.phone, text).catch((e) => {
+async function sendAndStore(chat: GwChat, text: string, kind: SendKind = "reply") {
+  const o: Outcome = await gwDeliver(chat.phone, text, kind).catch((e) => {
     console.error("[gw-bot send]", e instanceof Error ? e.message : e);
-    return null;
+    return { status: "blocked", reason: e instanceof Error ? e.message : "erro" } as Outcome;
   });
-  await store(chat.id, "ai", text, id);
+  if (o.status === "blocked") {
+    await store(chat.id, "system", `Não enviado: ${o.reason}`, null);
+    return;
+  }
+  await store(chat.id, "ai", text, o.status === "sent" ? o.id : null);
   await db.update(schema.gwChats).set({ lastBotAt: new Date() }).where(eq(schema.gwChats.id, chat.id));
 }
 
@@ -376,7 +434,11 @@ export async function gwSimulate(turns: ChatTurn[], as: "lead" | "store" | "affi
     const a = await db.query.affiliates.findFirst();
     fake.affiliateId = a?.id ?? null;
   }
-  const r = await gwReply(fake, cfg, turns);
+  // o simulador também gasta IA: entra no orçamento da Geovana da GoWeb
+  const gate = await aiGate(GOWEB, null);
+  if (gate.mode === "blocked") return { text: `(${gate.reason})`, tags: [] as string[] };
+  const meter = aiMeter(GOWEB, null);
+  const r = await gwReply(fake, cfg, turns, { maxTokens: gate.params.maxTokens, onUsage: meter.onUsage }).finally(() => meter.save());
   const tags = [r.lead ? `LEAD ${JSON.stringify(r.lead)}` : "", r.schedule ? `AGENDAR ${r.schedule.toISOString()}` : "", r.support ? `SUPORTE ${r.support.priority}: ${r.support.subject}` : "", r.human ? "HUMANO" : ""].filter(Boolean);
   return { text: r.text, tags };
 }
@@ -393,7 +455,7 @@ export async function gwStaffReply(chatId: string, text: string, by: string) {
   const chat = await db.query.gwChats.findFirst({ where: eq(schema.gwChats.id, chatId) });
   if (!chat) throw new GwBotError("Conversa não encontrada.");
   const cfg = await gwBotConfig();
-  const id = await gwSend(chat.phone, text);
+  const id = await gwSend(chat.phone, text, "staff");
   await store(chat.id, "staff", `${text}`, id);
   await db.update(schema.gwChats).set({ pausedUntil: new Date(Date.now() + cfg.pauseMinutes * 60_000), needsHuman: false, lastBotAt: new Date() }).where(eq(schema.gwChats.id, chat.id));
   if (chat.leadId) await activity(chat.leadId, by, "contact", "whatsapp", text.slice(0, 300));
@@ -419,6 +481,9 @@ export async function runGwFollowUps(now = new Date()) {
     ),
     limit: 40,
   });
+  // retorno automático é opcional: no modo economia/sem orçamento da IA, não roda
+  const gate = await aiGate(GOWEB, null);
+  if (gate.mode !== "normal") return { sent: 0, skipped: gate.reason };
   let sent = 0;
   for (const chat of chats) {
     const step = followUpDue(chat.lastUserAt, chat.lastBotAt, chat.followUpsSent, cfg.followUpHours, now);
@@ -428,10 +493,15 @@ export async function runGwFollowUps(now = new Date()) {
     const hist = await db.query.gwMessages.findMany({ where: eq(schema.gwMessages.chatId, chat.id), orderBy: desc(schema.gwMessages.createdAt), limit: 12 });
     const turns: ChatTurn[] = hist.reverse().filter((h) => h.role !== "system").map((h) => ({ role: h.role === "user" ? "user" : "model", text: h.text }));
     turns.push({ role: "user", text: `[INSTRUÇÃO INTERNA, não é o cliente] O cliente parou de responder há ${Math.round((now.getTime() - (chat.lastBotAt?.getTime() ?? now.getTime())) / 3600_000)} h. Escreva UM retorno curto (até 2 linhas), simpático, retomando o ponto da conversa e terminando com uma pergunta fácil de responder. ${step === cfg.followUpHours.length - 1 ? "É o último retorno: diga que fica à disposição." : ""} Não use marcações.` });
+    const meter = aiMeter(GOWEB, chat.phone);
     try {
-      const r = await gwReply(chat, cfg, turns);
+      const r = await gwReply(chat, cfg, turns, { maxTokens: gate.params.maxTokens, onUsage: meter.onUsage });
+      await meter.save();
       if (!r.text) continue;
-      await sendAndStore(chat, r.text);
+      const o = await gwDeliver(chat.phone, r.text, "proactive");
+      if (o.status === "blocked") continue; // horário/limite/contato sem resposta: tenta na próxima rodada
+      await store(chat.id, "ai", r.text, o.status === "sent" ? o.id : null);
+      await db.update(schema.gwChats).set({ lastBotAt: new Date() }).where(eq(schema.gwChats.id, chat.id));
       await db.update(schema.gwChats).set({ followUpsSent: step + 1 }).where(eq(schema.gwChats.id, chat.id));
       await activity(chat.leadId!, GW_ACTOR, "contact", "whatsapp", `Retorno automático ${step + 1}: ${r.text.slice(0, 200)}`);
       sent++;

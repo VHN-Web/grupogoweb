@@ -7,7 +7,15 @@
 // =============================================================================
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export class CloudError extends Error {}
+export class CloudError extends Error {
+  constructor(
+    message: string,
+    readonly status = 0,
+    readonly code: number | null = null,
+  ) {
+    super(message);
+  }
+}
 const GRAPH = () => process.env.GRAPH_API_BASE ?? "https://graph.facebook.com/v21.0";
 
 export async function cloudSendText(phoneId: string, token: string, toE164: string, text: string) {
@@ -18,9 +26,12 @@ export async function cloudSendText(phoneId: string, token: string, toE164: stri
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
-    const j = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-    throw new CloudError(`WhatsApp oficial: ${j?.error?.message ?? res.status}`);
+    const j = (await res.json().catch(() => null)) as { error?: { message?: string; code?: number } } | null;
+    // o código da Meta vai no texto (#131048…) para a proteção da Geovana classificar (core/wa-guard.ts#classifyError)
+    throw new CloudError(`WhatsApp oficial: ${j?.error?.code ? `(#${j.error.code}) ` : ""}${j?.error?.message ?? res.status}`, res.status, j?.error?.code ?? null);
   }
+  const ok = (await res.json().catch(() => null)) as { messages?: { id?: string }[] } | null;
+  return ok?.messages?.[0]?.id ?? null;
 }
 
 export async function cloudCheck(phoneId: string, token: string) {

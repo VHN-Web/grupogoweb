@@ -88,10 +88,15 @@ export const evoMediaBase64 = (server: Srv, instance: string, messageId: string)
   call<{ base64?: string; mimetype?: string }>(server, `/chat/getBase64FromMediaMessage/${encodeURIComponent(instance)}`, { body: { message: { key: { id: messageId } }, convertToMp4: false } });
 
 /** Mensagem recebida/enviada no webhook (texto); null = outro evento. */
-export function evoParse(body: unknown): { kind: "message"; msg: Inbound } | { kind: "connection"; state: string } | null {
+export function evoParse(body: unknown): { kind: "message"; msg: Inbound } | { kind: "connection"; state: string; reason: number | null } | null {
   const b = body as { event?: string; data?: Record<string, unknown> } | null;
   const ev = (b?.event ?? "").toLowerCase().replace(/_/g, ".");
-  if (ev === "connection.update") return { kind: "connection", state: String((b?.data as { state?: string })?.state ?? "") };
+  if (ev === "connection.update") {
+    const d = (b?.data ?? {}) as { state?: string; statusReason?: number | string };
+    const r = Number(d.statusReason);
+    // statusReason 401/403 ao fechar = número deslogado/banido pelo WhatsApp (sinal de restrição)
+    return { kind: "connection", state: String(d.state ?? ""), reason: Number.isFinite(r) ? r : null };
+  }
   if (ev !== "messages.upsert" || !b?.data) return null;
   const d = (Array.isArray(b.data) ? b.data[0] : b.data) as { key?: { id?: string; remoteJid?: string; fromMe?: boolean }; pushName?: string; message?: Record<string, unknown> };
   const m = d?.message ?? {};

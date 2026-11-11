@@ -28,7 +28,17 @@ export function geminiGenConfig(model: string, temperature: number, maxTokens: n
 
 export type ChatTurn = { role: "user" | "model"; text: string };
 
-export async function geminiChat(o: { key: string; model: string; system: string; history: ChatTurn[]; maxTokens?: number; temperature?: number; timeoutMs?: number; retries?: number }) {
+/** Tokens gastos numa chamada (a API devolve em usageMetadata). `output` inclui o "raciocínio" (cobrado como saída). */
+export type AiUsage = { input: number; output: number; model: string };
+export type OnUsage = (u: AiUsage) => void;
+
+function usageOf(j: unknown, model: string): AiUsage | null {
+  const m = (j as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } } | null)?.usageMetadata;
+  if (!m) return null;
+  return { input: m.promptTokenCount ?? 0, output: (m.candidatesTokenCount ?? 0) + (m.thoughtsTokenCount ?? 0), model };
+}
+
+export async function geminiChat(o: { key: string; model: string; system: string; history: ChatTurn[]; maxTokens?: number; temperature?: number; timeoutMs?: number; retries?: number; onUsage?: OnUsage }) {
   if (!o.key) throw new AiError("IA sem chave configurada", "key");
   // a API exige alternância começando por "user": junta mensagens seguidas do mesmo papel
   const contents: { role: string; parts: { text: string }[] }[] = [];
@@ -49,7 +59,7 @@ export async function geminiChat(o: { key: string; model: string; system: string
   let last: unknown;
   for (const m of chain) {
     try {
-      return await geminiOnce(o.key, m, body.replace(`"__MODEL_CFG__"`, JSON.stringify(geminiGenConfig(m, o.temperature ?? 0.5, o.maxTokens ?? 600))), o.timeoutMs ?? 20_000);
+      return await geminiOnce(o.key, m, body.replace(`"__MODEL_CFG__"`, JSON.stringify(geminiGenConfig(m, o.temperature ?? 0.5, o.maxTokens ?? 600))), o.timeoutMs ?? 20_000, o.onUsage);
     } catch (e) {
       last = e;
       if (!(e instanceof AiError) || (e.kind !== "busy" && e.kind !== "model")) throw e;
@@ -59,7 +69,7 @@ export async function geminiChat(o: { key: string; model: string; system: string
 }
 
 /** Lê uma imagem (ex.: foto do cardápio) e responde em JSON. Usa a mesma lista de modelos reservas. */
-export async function geminiVision(o: { key: string; model: string; prompt: string; imageBase64: string; mime: string; maxTokens?: number; timeoutMs?: number }) {
+export async function geminiVision(o: { key: string; model: string; prompt: string; imageBase64: string; mime: string; maxTokens?: number; timeoutMs?: number; onUsage?: OnUsage }) {
   if (!o.key) throw new AiError("IA sem chave configurada", "key");
   const model = geminiModel(o.model);
   const chain = [model, ...GEMINI_FALLBACKS.filter((m) => m !== model)];
@@ -70,7 +80,7 @@ export async function geminiVision(o: { key: string; model: string; prompt: stri
       generationConfig: { ...geminiGenConfig(m, 0.1, o.maxTokens ?? 8192), responseMimeType: "application/json" },
     });
     try {
-      return await geminiOnce(o.key, m, body, o.timeoutMs ?? 55_000);
+      return await geminiOnce(o.key, m, body, o.timeoutMs ?? 55_000, o.onUsage);
     } catch (e) {
       last = e;
       if (!(e instanceof AiError) || (e.kind !== "busy" && e.kind !== "model")) throw e;
@@ -79,7 +89,7 @@ export async function geminiVision(o: { key: string; model: string; prompt: stri
   throw last;
 }
 
-async function geminiOnce(key: string, model: string, body: string, timeoutMs: number) {
+async function geminiOnce(key: string, model: string, body: string, timeoutMs: number, onUsage?: OnUsage) {
   const res = await fetch(`${process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com"}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": key },
@@ -99,6 +109,12 @@ async function geminiOnce(key: string, model: string, body: string, timeoutMs: n
     if (res.status === 429) throw new AiError("Limite do Gemini atingido por agora.", "quota");
     throw new AiError(`Gemini: ${msg}`);
   }
+  const u = onUsage ? usageOf(j, model) : null;
+  if (u) {
+    try {
+      onUsage!(u);
+    } catch {}
+  }
   return (j?.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
 }
 
@@ -106,7 +122,7 @@ async function geminiOnce(key: string, model: string, body: string, timeoutMs: n
  * Pesquisa com a ferramenta "Google Search" do Gemini (sem modo JSON — a busca não aceita).
  * Devolve o texto e as páginas que o Google usou (groundingMetadata), para mostrar as fontes.
  */
-export async function geminiSearch(o: { key: string; model: string; prompt: string; maxTokens?: number; timeoutMs?: number }) {
+export async function geminiSearch(o: { key: string; model: string; prompt: string; maxTokens?: number; timeoutMs?: number; onUsage?: OnUsage }) {
   if (!o.key) throw new AiError("IA sem chave configurada", "key");
   const model = geminiModel(o.model);
   const chain = [model, ...GEMINI_FALLBACKS.filter((m) => m !== model)];
@@ -138,6 +154,12 @@ export async function geminiSearch(o: { key: string; model: string; prompt: stri
         if (res.status === 503 || /high demand|overloaded|unavailable/i.test(msg)) throw new AiError("O Gemini está sobrecarregado agora (passageiro).", "busy");
         if (res.status === 429) throw new AiError("Limite do Gemini atingido por agora.", "quota");
         throw new AiError(`Gemini: ${msg}`);
+      }
+      const u = o.onUsage ? usageOf(j, m) : null;
+      if (u) {
+        try {
+          o.onUsage!(u);
+        } catch {}
       }
       const c = j?.candidates?.[0];
       const text = (c?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();

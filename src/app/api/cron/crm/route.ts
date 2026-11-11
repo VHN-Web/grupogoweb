@@ -4,6 +4,7 @@ import { runHunt } from "@/services/crm-hunter";
 import { runGwFollowUps } from "@/services/goweb-bot";
 import { runNudges } from "@/services/nudges";
 import { notifyVisitsSummary, pruneInbox } from "@/services/crm-notify";
+import { drainOutbox, pruneGuard } from "@/services/wa-guard";
 
 export const maxDuration = 300;
 
@@ -17,6 +18,9 @@ export async function GET(req: Request) {
   // resumo de acessos do dia (só no horário do fim da tarde) + limpeza da central de avisos
   const visits = await notifyVisitsSummary().catch((e) => ({ error: String(e) }));
   await pruneInbox().catch(() => null);
+  // proteção da Geovana: envia o que ficou na fila (lembretes do horário comercial, reenvios) e limpa registros antigos
+  const waQueue = await drainOutbox(40, 60_000).catch((e) => ({ error: String(e) }));
+  await pruneGuard().catch(() => null);
   const hunt = await runHunt("cron").catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ followUps, gwFollowUps, nudges, visits, hunt });
+  return NextResponse.json({ followUps, gwFollowUps, nudges, visits, waQueue, hunt });
 }
