@@ -1153,6 +1153,18 @@ export const siteVisits = pgTable(
   (t) => [uniqueIndex("site_visits_uq").on(t.day, t.area, t.visitor), index("site_visits_day_idx").on(t.day, t.area)],
 );
 
+/** Pesquisa da Geovana para montar uma demonstração (Admin → Demonstrações → Montar com a Geovana). */
+export const demoDrafts = pgTable("demo_drafts", {
+  id: id(),
+  input: text("input").notNull(), // JSON core/store-research.ts#ResearchInput
+  profile: text("profile"), // JSON core/store-research.ts#StoreProfile (null = falhou)
+  error: text("error"),
+  leadId: text("lead_id"), // lead do CRM de onde veio (recebe a nota com o link da demo)
+  createdBy: text("created_by").notNull(),
+  tenantId: text("tenant_id"), // demo criada a partir deste rascunho
+  createdAt: createdAt(),
+});
+
 export const crmHuntRuns = pgTable("crm_hunt_runs", {
   id: id(),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),

@@ -6,11 +6,14 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { fmtDate } from "@/core/billing";
 import { tenantPublicUrl } from "@/lib/urls";
 import { demoTemplates } from "@/services/demo";
-import { deleteDemo, newDemo, resetDemoPassword } from "../demo-actions";
+import { deleteDemo, geovanaResearchAction, newDemo, resetDemoPassword } from "../demo-actions";
+import { GeovanaResearchForm } from "./GeovanaResearchForm";
 
 export const dynamic = "force-dynamic";
+// a pesquisa da Geovana (busca no Google + leitura das fotos) pode levar 1–2 minutos
+export const maxDuration = 300;
 
-export default async function DemosPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+export default async function DemosPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string; lead?: string }> }) {
   await requirePlatformAdmin();
   const sp = await searchParams;
   let flash: { slug: string; password: string } | null = null;
@@ -22,6 +25,9 @@ export default async function DemosPage({ searchParams }: { searchParams: Promis
     db.query.tenants.findMany({ where: and(eq(schema.tenants.demo, true), isNotNull(schema.tenants.demoNote)), orderBy: desc(schema.tenants.createdAt) }),
   ]);
   const models = templates.filter((t) => !mine.some((m) => m.id === t.id));
+  // veio do CRM ("Montar demo com a Geovana" na ficha do lead): já preenche
+  const lead = sp.lead ? await db.query.crmLeads.findFirst({ where: eq(schema.crmLeads.id, sp.lead) }) : null;
+  const drafts = await db.query.demoDrafts.findMany({ orderBy: desc(schema.demoDrafts.createdAt), limit: 6 });
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
@@ -38,8 +44,36 @@ export default async function DemosPage({ searchParams }: { searchParams: Promis
         </div>
       )}
 
+      <section id="geovana" className="card scroll-mt-6 border-2 border-[#3CC46B] p-5">
+        <h2 className="font-semibold">Montar com a Geovana</h2>
+        <p className="mt-1 text-sm text-muted">Diga qual é o estabelecimento: a Geovana pesquisa no Google Maps, Instagram, Facebook, iFood e site, e monta a demo com o nome, o visual do nicho, o cardápio de verdade e ela mesma configurada como atendente da loja. Você confere tudo antes de criar. Leva de 30 segundos a 2 minutos.</p>
+        <GeovanaResearchForm
+          action={geovanaResearchAction}
+          initial={lead ? { name: lead.name, city: lead.city ?? "", links: [lead.instagram ? `@${lead.instagram.replace(/^@/, "")}` : "", lead.website ?? ""].filter(Boolean).join("\n"), lead: lead.id } : null}
+        />
+        {drafts.length > 0 && (
+          <div className="mt-4 border-t border-line pt-3 text-sm">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted">Pesquisas recentes</p>
+            <ul className="mt-2 space-y-1">
+              {drafts.map((d) => {
+                let n = "";
+                try {
+                  n = (JSON.parse(d.input) as { name: string }).name;
+                } catch {}
+                return (
+                  <li key={d.id}>
+                    <Link href={`/admin/demos/geovana/${d.id}`} className="underline">{n || "Pesquisa"}</Link>
+                    <span className="text-muted"> · {fmtDate(d.createdAt)}{d.tenantId ? " · demo criada" : d.error && !d.profile ? " · falhou" : ""}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </section>
+
       <section className="card p-5">
-        <h2 className="font-semibold">Nova demonstração</h2>
+        <h2 className="font-semibold">Nova demonstração (modelo pronto)</h2>
         <form action={newDemo} className="mt-3 grid gap-3 sm:grid-cols-2">
           <input name="name" className="input" placeholder="Nome da loja (ex.: Pizzaria do João)" required maxLength={60} />
           <select name="template" className="input" required>
