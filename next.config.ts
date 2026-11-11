@@ -33,6 +33,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // fontes das artes geradas no servidor (lidas com fs)
   outputFileTracingIncludes: { "/api/afiliados/arte": ["./assets/fonts/**"] },
+  // App Links do app Android do entregador (abre o link de acesso direto no app)
+  async rewrites() {
+    return [{ source: "/.well-known/assetlinks.json", destination: "/api/assetlinks" }];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
