@@ -1,0 +1,32 @@
+# Testes das regras de negócio e checagem de tipos em todo PR e push no main.
+# Base da Central de Homologação: a proteção do main pode exigir este check ("Testes e tipos") antes do merge.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Testes e tipos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Testes (vitest)
+        run: npm test
+      - name: Tipos (tsc)
+        run: npm run typecheck

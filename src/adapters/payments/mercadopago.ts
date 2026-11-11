@@ -11,6 +11,8 @@
 import type { PaymentProvider } from "./PaymentProvider";
 import { verifyMercadoPagoSignature } from "@/adapters/billing/mercadopago";
 
+import { assertTestCredential } from "@/lib/sandbox";
+
 const API = "https://api.mercadopago.com";
 
 export class MercadoPagoConfigError extends Error {}
@@ -41,6 +43,7 @@ export const mercadoPagoPaymentProvider: PaymentProvider = {
   async createPayment(ctx) {
     const token = ctx.credentials.accessToken;
     if (!token) throw new MercadoPagoConfigError("Mercado Pago não configurado neste estabelecimento.");
+    assertTestCredential("mercadopago", token); // prévia: só token de teste (TEST-…)
     // Pix → só Pix; Cartão → só cartões
     const excluded =
       ctx.method === "PIX"

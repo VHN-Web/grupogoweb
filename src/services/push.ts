@@ -8,6 +8,7 @@ import { parseCrmConfig } from "@/core/crm";
 import { openSecret, sealSecret } from "@/lib/secrets";
 import { fcmConfigured, sendFcm } from "@/adapters/push/fcm";
 import { DEFAULT_NOTIFY, parseNotifyPrefs, shouldPush, type NotifyCategory } from "@/core/crm-notify";
+import { sandboxBlocks } from "@/lib/sandbox";
 
 /** Aparelhos do app Android (Firebase) ficam na mesma tabela, com endpoint "fcm:<token>". */
 export const FCM_PREFIX = "fcm:";
@@ -113,6 +114,7 @@ export async function sendPush(to: string[] | "all", p: PushPayload) {
           else if (r === "gone") await removePushSub(s.endpoint);
           return;
         }
+        if (sandboxBlocks("push", null, p.title)) return void ok++; // prévia: aparelhos reais não tocam
         try {
           await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 3600 * 12 });
           ok++;

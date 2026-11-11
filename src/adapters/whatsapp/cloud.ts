@@ -6,6 +6,7 @@
 // GRAPH_API_BASE (env) só para testes.
 // =============================================================================
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { sandboxBlocks } from "@/lib/sandbox";
 
 export class CloudError extends Error {
   constructor(
@@ -19,6 +20,7 @@ export class CloudError extends Error {
 const GRAPH = () => process.env.GRAPH_API_BASE ?? "https://graph.facebook.com/v21.0";
 
 export async function cloudSendText(phoneId: string, token: string, toE164: string, text: string) {
+  if (sandboxBlocks("whatsapp", toE164, text)) return `sandbox-${Date.now()}`; // prévia: simula o envio
   const res = await fetch(`${GRAPH()}/${encodeURIComponent(phoneId)}/messages`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },

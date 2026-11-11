@@ -4,6 +4,8 @@
 // Webhook de cada instância: /api/whatsapp/evolution/{hookToken}
 // Obs.: conexão por QR (WhatsApp Web, não oficial) — risco de bloqueio do número se houver abuso.
 // =============================================================================
+import { isSandbox, sandboxBlocks } from "@/lib/sandbox";
+
 export class EvolutionError extends Error {
   constructor(
     message: string,
@@ -16,6 +18,16 @@ export class EvolutionError extends Error {
 type Srv = { url: string; key: string };
 
 async function call<T>(s: Srv, path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  // prévia (homologação): o servidor Evolution é o da produção — envio vira log (simula sucesso),
+  // leitura de status/mídia passa, e nada que mude instância ou webhook é permitido
+  if (isSandbox()) {
+    if (path.startsWith("/message/send")) {
+      const to = (init.body as { number?: string } | undefined)?.number;
+      if (sandboxBlocks("whatsapp", to, path)) return { key: { id: `sandbox-${Date.now()}` } } as T;
+    } else if (!/^\/(instance\/connectionState|chat\/getBase64FromMediaMessage)\//.test(path)) {
+      throw new EvolutionError("Ambiente de teste: o WhatsApp da produção não pode ser alterado daqui.");
+    }
+  }
   let res: Response;
   try {
     res = await fetch(`${s.url.replace(/\/$/, "")}${path}`, {
