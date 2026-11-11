@@ -19,6 +19,7 @@ import { getExchangeRateProvider } from "@/adapters/exchange-rates";
 import { maybeAutoIssueFiscal } from "./fiscal";
 import { openCredentials } from "@/lib/security";
 import { featureOn, normalizeSource, parseBirthday } from "@/core/growth";
+import { campaignOf } from "@/core/advisory";
 import { hasModule } from "@/core/modules";
 import { growthOf, onOrderCompleted, resolveReferral, upsertShopper } from "./growth";
 
@@ -307,6 +308,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
         changeDuePyg: change,
         cashSessionId: openSession?.id ?? null,
         source,
+        campaign: input.type === "DINE_IN" ? null : campaignOf(input.source),
         referrerShopperId,
       })
       .returning();

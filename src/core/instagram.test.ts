@@ -10,6 +10,7 @@ import {
   igVerifySignature,
   igWindowOpen,
   instagramAllowed,
+  loginScopes,
   makeState,
   missingScopes,
   parseIgWebhook,
@@ -47,6 +48,9 @@ describe("Instagram: login", () => {
     expect(readState({ ...s, tenantId: null }, NOW)).toBeNull();
     expect(readState(makeState("goweb", "platform", NOW, "n"), NOW)).toMatchObject({ scope: "goweb", tenantId: null });
     expect(readState("lixo", NOW)).toBeNull();
+    expect(readState(s, NOW)?.purpose).toBe("messages");
+    expect(readState(makeState({ tenantId: "t1" }, "dono", NOW, "n", "publish"), NOW)?.purpose).toBe("publish");
+    expect(readState(makeState("goweb", "platform", NOW, "n", "publish"), NOW)?.purpose).toBe("messages");
   });
   it("tokens: com e sem envelope, validade e permissões faltando", () => {
     expect(parseShortToken({ data: [{ access_token: "s", user_id: 99, permissions: "instagram_business_basic" }] })).toEqual({ token: "s", userId: "99", permissions: ["instagram_business_basic"] });
@@ -54,6 +58,8 @@ describe("Instagram: login", () => {
     expect(parseShortToken({ error: "x" })).toBeNull();
     expect(parseLongToken({ access_token: "L", expires_in: 5184000 }, NOW)?.expiresAt.getTime()).toBe(NOW + 60 * DAY);
     expect(missingScopes(["instagram_business_basic"])).toEqual(["instagram_business_manage_messages"]);
+    expect(missingScopes(["instagram_business_basic"], loginScopes({ messages: false, publish: true }))).toEqual(["instagram_business_content_publish"]);
+    expect(loginScopes({ messages: true, publish: true })).toEqual(["instagram_business_basic", "instagram_business_manage_messages", "instagram_business_content_publish"]);
   });
   it("renova com 10 dias de folga, nunca antes de 24 h nem depois de vencer", () => {
     expect(tokenNeedsRefresh({ expiresAt: new Date(NOW + 30 * DAY), issuedAt: new Date(NOW - 30 * DAY) }, NOW)).toBe(false);

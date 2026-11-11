@@ -10,6 +10,7 @@ import { A11yMenu } from "@/components/a11y/A11yMenu";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Assistant } from "@/components/assistant/Assistant";
 import { assistantEnabled } from "@/services/assistant";
+import { advisoryVisible } from "@/services/advisory";
 import { GoWebLogo } from "@/components/brand/GoWebLogo";
 import { toggleOpen, logout } from "./actions";
 import { AutoPrinter } from "@/components/ThermalPrint";
@@ -77,7 +78,7 @@ export default async function PanelLayout({ children, params }: { children: Reac
     </div>
   );
   return (
-    <PanelShell slug={slug} locale={locale} areas={[...access.areas]} pro={tenant.tier === "pro"} modules={parseModules(tenant.modules)} store={store} actions={actions} footer={footer}>
+    <PanelShell slug={slug} locale={locale} areas={[...access.areas]} pro={tenant.tier === "pro"} modules={parseModules(tenant.modules)} advisory={await advisoryVisible(tenant).catch(() => false)} store={store} actions={actions} footer={footer}>
       {tenant.suspended && (
         <div className="no-print mb-4 rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white">
           {T("Tu servicio está suspendido por falta de pago: el menú no está visible para tus clientes.", "Seu serviço está suspenso por falta de pagamento: o cardápio não está visível para seus clientes.")}{" "}

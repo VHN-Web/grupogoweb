@@ -6,6 +6,7 @@ const ITEMS = [
   { href: "/admin", label: "Visão geral" },
   { href: "/admin/clientes", label: "Clientes" },
   { href: "/admin/planos", label: "Planos" },
+  { href: "/admin/assessoria", label: "Assessoria" },
   { href: "/admin/contratos", label: "Contratos" },
   { href: "/admin/notas", label: "Notas e recibos" },
   { href: "/admin/suporte", label: "Suporte" },

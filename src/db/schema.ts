@@ -309,6 +309,7 @@ export const orders = pgTable(
     odFlags: text("od_flags"), // JSON: quais status o app quer receber (sendPreparing/sendDelivered/sendPickedUp)
     cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }), // app/cliente pediu para cancelar (loja decide)
     source: text("source"),
+    campaign: text("campaign"), // Assessoria: código do anúncio/post rastreado (?origem=anuncio-s1-sex) — core/advisory.ts#campaignOf
     referrerShopperId: text("referrer_shopper_id"),
     growthDone: boolean("growth_done").notNull().default(false), // recompensas já processadas (uma vez só)
     cashSessionId: text("cash_session_id").references(() => cashSessions.id, { onDelete: "set null" }),
@@ -405,6 +406,7 @@ export const platformSettings = pgTable("platform_settings", {
   gwBotConfig: text("gw_bot_config").notNull().default("{}"),
   waGuardConfig: text("wa_guard_config").notNull().default("{}"), // proteção da Geovana: limites de envio e de IA (core/wa-guard.ts)
   igConfig: text("ig_config").notNull().default("{}"), // Instagram: app da Meta (id, secret selado, verify token)
+  advisoryConfig: text("advisory_config").notNull().default("{}"), // Assessoria GoWeb: preços, liga/desliga, publicação automática (core/advisory.ts)
   contentIdeas: text("content_ideas"), // última geração de ideias de posts/Reels (JSON) — core/content-ideas.ts // Geovana da GoWeb (WhatsApp da própria GoWeb) — core/goweb-bot.ts // Apps de delivery (Open Delivery): credenciais padrão da GoWeb por app (segredo selado)
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -1450,6 +1452,7 @@ export const igAccounts = pgTable(
     tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
     status: text("status").$type<"active" | "paused" | "error">().notNull().default("active"),
     aiEnabled: boolean("ai_enabled").notNull().default(true), // Geovana responde (desligado = só caixa de entrada)
+    canPublish: boolean("can_publish").notNull().default(false), // login deu instagram_business_content_publish (Assessoria: autonomia)
     lastError: text("last_error"),
     connectedBy: text("connected_by"),
     createdAt: createdAt(),
@@ -1491,3 +1494,94 @@ export const igMessages = pgTable(
 );
 export type IgAccount = typeof igAccounts.$inferSelect;
 export type IgChat = typeof igChats.$inferSelect;
+
+// =============================================================================
+// Assessoria GoWeb (complemento de crescimento) — core/advisory.ts + services/advisory.ts
+// =============================================================================
+export const advisoryPlans = pgTable(
+  "advisory_plans",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    // simulated = só a prévia salva · requested = pediu para contratar · active · paused · ended · cancelled
+    status: text("status").$type<"simulated" | "requested" | "active" | "paused" | "ended" | "cancelled">().notNull().default("simulated"),
+    currency: text("currency").notNull(),
+    objectives: text("objectives").notNull().default("[]"), // JSON Objective[]
+    selfReport: text("self_report").notNull().default("{}"), // JSON SelfReport
+    monthlyTotal: integer("monthly_total").notNull(), // investimento total por mês (unidade menor da moeda base)
+    months: integer("months").notNull(),
+    fee: integer("fee").notNull(), // assessoria por mês (com desconto de prazo)
+    ads: integer("ads").notNull(), // verba sugerida de anúncios por mês (paga direto à Meta/Google)
+    diagnosis: text("diagnosis").notNull().default("{}"), // JSON Diagnosis (no momento da simulação)
+    baseline: text("baseline"), // JSON Period dos 90 dias antes da ativação ("antes")
+    plan: text("plan").notNull().default("[]"), // JSON MonthPlan[]
+    autonomy: text("autonomy").$type<"off" | "approved" | "all">().notNull().default("off"), // publicação automática
+    calendarToken: text("calendar_token"), // link .ics privado
+    leadId: text("lead_id"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }),
+    activatedAt: timestamp("activated_at", { withTimezone: true }),
+    activatedBy: text("activated_by"),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    lastDigestAt: timestamp("last_digest_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("advisory_plans_tenant_idx").on(t.tenantId, t.createdAt), index("advisory_plans_status_idx").on(t.status), uniqueIndex("advisory_plans_cal_uq").on(t.calendarToken)],
+);
+
+export const advisoryPosts = pgTable(
+  "advisory_posts",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => advisoryPlans.id, { onDelete: "cascade" }),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    theme: text("theme").notNull(),
+    productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+    imageUrl: text("image_url"), // foto escolhida (catálogo ou enviada)
+    jpegUrl: text("jpeg_url"), // cópia JPEG para a Meta (gerada no navegador na aprovação)
+    caption: text("caption").notNull().default(""),
+    code: text("code").notNull(), // ?origem=post-…
+    status: text("status").$type<"draft" | "approved" | "publishing" | "published" | "failed" | "done_manual" | "skipped">().notNull().default("draft"),
+    igMediaId: text("ig_media_id"),
+    error: text("error"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("advisory_posts_tenant_idx").on(t.tenantId, t.scheduledAt), index("advisory_posts_due_idx").on(t.status, t.scheduledAt)],
+);
+
+export const advisoryTasks = pgTable(
+  "advisory_tasks",
+  {
+    id: id(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => advisoryPlans.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"ad" | "action">().notNull(),
+    action: text("action"), // Action (core/advisory.ts) para kind = action
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    data: text("data").notNull().default("{}"), // JSON AdTask + textos
+    code: text("code"), // ?origem=anuncio-…
+    status: text("status").$type<"todo" | "done" | "skipped">().notNull().default("todo"),
+    spent: integer("spent"), // quanto o lojista gastou no anúncio (informado)
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("advisory_tasks_tenant_idx").on(t.tenantId, t.dueAt)],
+);
+
+export type AdvisoryPlan = typeof advisoryPlans.$inferSelect;
+export type AdvisoryPost = typeof advisoryPosts.$inferSelect;
+export type AdvisoryTask = typeof advisoryTasks.$inferSelect;

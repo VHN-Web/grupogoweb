@@ -10,7 +10,7 @@ import { randomBytes } from "node:crypto";
 import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { IgAccount, IgChat, Tenant } from "@/db/schema";
-import { igAuthUrl, igContact, igLogChannel, igVerifySignature, igWindowOpen, instagramAllowed, makeState, missingScopes, parseIgWebhook, readState, tokenNeedsRefresh, type IgEvent, type IgScope } from "@/core/instagram";
+import { IG_PUBLISH_SCOPE, igAuthUrl, igContact, igLogChannel, igVerifySignature, igWindowOpen, instagramAllowed, loginScopes, makeState, missingScopes, parseIgWebhook, readState, tokenNeedsRefresh, type IgEvent, type IgScope } from "@/core/instagram";
 import { geovanaAnswers, wantsHuman } from "@/core/geovana";
 import { aiFallbackText, costUsd, isRepeat, trimHistory } from "@/core/wa-guard";
 import { brMonthStart } from "@/core/crm";
@@ -68,16 +68,25 @@ export function assertTenantInstagram(t: Pick<Tenant, "tier" | "demo" | "country
 
 // ---------------------------------------------------------------- login
 /** URL do login oficial. Quem chama já conferiu a sessão (admin da plataforma ou dono da loja). */
-export async function igLoginUrl(scope: IgScope, actor: string) {
+/**
+ * purpose "publish" = Assessoria GoWeb com autonomia (qualquer plano, plano de assessoria ativo e publicação liberada no Admin).
+ * Loja GoInteligence continua pedindo as permissões de mensagem junto, para o token novo não tirar o Direct da Geovana.
+ */
+export async function igLoginUrl(scope: IgScope, actor: string, purpose: "messages" | "publish" = "messages") {
   const p = await igPlatform();
   if (!igConfigured(p)) throw new InstagramError("O app do Instagram ainda não foi cadastrado pela GoWeb (Admin → Geovana → Instagram).");
+  let scopes: string[] | undefined;
   if (scope !== "goweb") {
     const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.id, scope.tenantId) });
     if (!t) throw new InstagramError("Loja não encontrada.");
-    assertTenantInstagram(t);
+    if (purpose === "publish") {
+      const { assertPublishAllowed } = await import("@/services/advisory");
+      await assertPublishAllowed(t);
+      scopes = loginScopes({ messages: instagramAllowed({ tier: t.tier, demo: t.demo, country: t.country }).ok, publish: true });
+    } else assertTenantInstagram(t);
   }
-  const state = sealSecret(JSON.stringify(makeState(scope, actor, Date.now(), randomBytes(8).toString("hex"))));
-  return igAuthUrl({ appId: p.appId, redirectUri: igRedirectUri(), state });
+  const state = sealSecret(JSON.stringify(makeState(scope, actor, Date.now(), randomBytes(8).toString("hex"), scope === "goweb" ? "messages" : purpose)));
+  return igAuthUrl({ appId: p.appId, redirectUri: igRedirectUri(), state, scopes });
 }
 
 /** Volta do login: confere o state, o plano (de novo), troca o código, liga o webhook e guarda a conta. */
@@ -89,22 +98,28 @@ export async function igFinishLogin(code: string, stateRaw: string) {
   const st = readState(parsed, Date.now());
   if (!st) throw new InstagramError("Login expirado ou inválido. Tente conectar de novo.");
   let tenant: Tenant | null = null;
+  let messaging = true; // conta atende o Direct (Geovana)
   if (st.scope === "store") {
     tenant = (await db.query.tenants.findFirst({ where: eq(schema.tenants.id, st.tenantId!) })) ?? null;
     if (!tenant) throw new InstagramError("Loja não encontrada.");
-    assertTenantInstagram(tenant);
+    if (st.purpose === "publish") {
+      const { assertPublishAllowed } = await import("@/services/advisory");
+      await assertPublishAllowed(tenant);
+      messaging = instagramAllowed({ tier: tenant.tier, demo: tenant.demo, country: tenant.country }).ok;
+    } else assertTenantInstagram(tenant);
   }
   const p = await igPlatform();
   const secret = openSecret(p.appSecretSealed);
   const short = await igExchangeCode({ appId: p.appId, appSecret: secret, redirectUri: igRedirectUri(), code });
-  const missing = missingScopes(short.permissions);
+  const missing = missingScopes(short.permissions, st.purpose === "publish" ? loginScopes({ messages: messaging, publish: true }) : undefined);
   if (missing.length) throw new InstagramError(`Faltou autorizar: ${missing.join(", ")}. Conecte de novo e deixe as permissões marcadas.`);
   const long = await igLongToken(secret, short.token);
   const me = await igMe(long.token);
   // a mesma conta não pode atender duas lojas (os avisos da Meta chegam por conta)
   const other = await db.query.igAccounts.findFirst({ where: eq(schema.igAccounts.igUserId, me.userId) });
   if (other && other.tenantId !== (tenant?.id ?? null)) throw new InstagramError("Esta conta do Instagram já está conectada em outro lugar da GoWeb.");
-  await igSubscribe(long.token);
+  if (messaging) await igSubscribe(long.token); // só publicação: não liga os avisos de mensagens
+  const current = await accountFor(tenant ? { tenantId: tenant.id } : "goweb");
   const values = {
     tenantId: tenant?.id ?? null,
     igUserId: me.userId,
@@ -115,13 +130,15 @@ export async function igFinishLogin(code: string, stateRaw: string) {
     status: "active" as const,
     lastError: null,
     connectedBy: st.actor,
+    canPublish: short.permissions.includes(IG_PUBLISH_SCOPE),
+    // conta só de publicação (loja sem GoInteligence) nunca liga a IA do Direct
+    ...(messaging ? {} : { aiEnabled: false }),
     updatedAt: new Date(),
   };
-  const current = await accountFor(tenant ? { tenantId: tenant.id } : "goweb");
   if (current) await db.update(schema.igAccounts).set(values).where(eq(schema.igAccounts.id, current.id));
   else await db.insert(schema.igAccounts).values(values);
   await audit(tenant?.id ?? null, st.actor, "instagram.conectar", `@${me.username ?? me.userId}`);
-  return { scope: st.scope, tenant, username: me.username };
+  return { scope: st.scope, tenant, username: me.username, purpose: st.purpose };
 }
 
 export async function accountFor(scope: IgScope) {
@@ -149,7 +166,11 @@ export async function igMaintenance(now = Date.now()) {
     if (a.tenantId) {
       const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.id, a.tenantId), columns: { tier: true, demo: true, country: true } });
       const ok = t ? instagramAllowed({ tier: t.tier, demo: t.demo, country: t.country }).ok : false;
-      if (!ok && a.status === "active") await db.update(schema.igAccounts).set({ status: "paused", lastError: "Plano sem GoInteligence: Instagram pausado.", updatedAt: new Date() }).where(eq(schema.igAccounts.id, a.id));
+      // conta usada só para publicar o calendário da Assessoria: fica ativa, sem a IA do Direct
+      const { publishKeepsAccount } = await import("@/services/advisory");
+      if (!ok && a.canPublish && (await publishKeepsAccount(a.tenantId))) {
+        if (a.aiEnabled || (a.status === "paused" && a.lastError?.startsWith("Plano"))) await db.update(schema.igAccounts).set({ aiEnabled: false, ...(a.status === "paused" && a.lastError?.startsWith("Plano") ? { status: "active" as const, lastError: null } : {}), updatedAt: new Date() }).where(eq(schema.igAccounts.id, a.id));
+      } else if (!ok && a.status === "active") await db.update(schema.igAccounts).set({ status: "paused", lastError: "Plano sem GoInteligence: Instagram pausado.", updatedAt: new Date() }).where(eq(schema.igAccounts.id, a.id));
       if (ok && a.status === "paused" && a.lastError?.startsWith("Plano")) await db.update(schema.igAccounts).set({ status: "active", lastError: null, updatedAt: new Date() }).where(eq(schema.igAccounts.id, a.id));
     }
     if (!tokenNeedsRefresh({ expiresAt: a.tokenExpiresAt, issuedAt: a.tokenIssuedAt }, now)) continue;

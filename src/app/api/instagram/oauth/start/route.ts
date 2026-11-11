@@ -1,4 +1,5 @@
 // Início do login oficial do Instagram. ?escopo=goweb (admin da plataforma) ou ?loja=<slug> (dono/equipe da loja GoInteligence).
+// ?loja=<slug>&publicar=1 = Assessoria GoWeb (publicação automática do calendário; plano de assessoria ativo).
 // A sessão e o plano são conferidos aqui, no servidor, e de novo na volta (callback).
 import { NextResponse } from "next/server";
 import { getPanelAccess, getPlatformAdmin } from "@/lib/auth";
@@ -10,13 +11,14 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const u = new URL(req.url);
   const slug = u.searchParams.get("loja");
-  const back = slug ? `/painel/${encodeURIComponent(slug)}/instagram` : "/admin/geovana/instagram";
+  const publish = u.searchParams.get("publicar") === "1"; // Assessoria GoWeb: autonomia (publicar o calendário)
+  const back = slug ? `/painel/${encodeURIComponent(slug)}/${publish ? "crescer" : "instagram"}` : "/admin/geovana/instagram";
   try {
     if (slug) {
       const acc = await getPanelAccess(slug);
       if (!acc || !acc.areas.has("customers")) return NextResponse.redirect(`${appUrl()}/painel/${encodeURIComponent(slug)}/login`);
       const actor = acc.isPlatform ? "admin da plataforma" : acc.role === "owner" ? "dono" : `equipe: ${acc.staffName ?? acc.staffId}`;
-      return NextResponse.redirect(await igLoginUrl({ tenantId: acc.tenant.id }, actor));
+      return NextResponse.redirect(await igLoginUrl({ tenantId: acc.tenant.id }, actor, publish ? "publish" : "messages"));
     }
     const admin = await getPlatformAdmin();
     if (!admin) return NextResponse.redirect(`${appUrl()}/admin/login`);

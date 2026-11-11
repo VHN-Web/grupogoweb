@@ -9,7 +9,7 @@ import type { ModuleKey } from "@/core/modules";
 import { Icon } from "@/components/ui/Icon";
 
 type Group = "sales" | "catalog" | "customers" | "admin";
-type Item = { href: string; es: string; pt: string; area?: PanelArea; icon: string; group: Group; pro?: boolean; module?: ModuleKey; brOnly?: boolean };
+type Item = { href: string; es: string; pt: string; area?: PanelArea; icon: string; group: Group; pro?: boolean; module?: ModuleKey; brOnly?: boolean; advisory?: boolean };
 
 export const GROUPS: Record<Group, { es: string; pt: string; color: string; soft: string }> = {
   sales: { es: "Ventas", pt: "Vendas", color: "#2FAE5F", soft: "#E3F5EA" },
@@ -28,6 +28,7 @@ const ITEMS: Item[] = [
   { href: "/aparencia", es: "Apariencia del sitio", pt: "Aparência do site", area: "appearance", icon: "palette", group: "catalog" },
   { href: "/clientes", es: "Clientes", pt: "Clientes", area: "customers", icon: "customers", group: "customers" },
   { href: "/crescimento", es: "Crecimiento", pt: "Crescimento", area: "customers", icon: "growth", group: "customers" },
+  { href: "/crescer", es: "Asesoría GoWeb", pt: "Assessoria GoWeb", area: "customers", icon: "sparkle", group: "customers", advisory: true },
   { href: "/divulgacao", es: "Divulgación", pt: "Divulgação", area: "customers", icon: "megaphone", group: "customers" },
   { href: "/marketing", es: "Marketing", pt: "Marketing", area: "marketing", icon: "tag", group: "customers", pro: true },
   { href: "/geovana", es: "Geovana (WhatsApp IA)", pt: "Geovana (WhatsApp IA)", area: "customers", icon: "chat", group: "customers", pro: true },
@@ -50,18 +51,19 @@ type Props = {
   areas: PanelArea[];
   pro: boolean;
   modules?: ModuleKey[] | null;
+  advisory?: boolean; // Assessoria GoWeb ligada para esta loja (conferido no servidor)
   store: React.ReactNode; // nome/logo + "ver meu site"
   actions: React.ReactNode; // abrir/fechar
   footer: React.ReactNode; // sair, acessibilidade
   children: React.ReactNode;
 };
 
-export function PanelShell({ slug, locale, areas, pro, modules = null, store, actions, footer, children }: Props) {
+export function PanelShell({ slug, locale, areas, pro, modules = null, advisory = false, store, actions, footer, children }: Props) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const base = `/painel/${slug}`;
   const L = (o: { es: string; pt: string }) => (locale === "pt" ? o.pt : o.es);
-  const items = ITEMS.filter((i) => (!i.area || areas.includes(i.area)) && (!i.module || !modules || modules.includes(i.module)) && (!i.brOnly || locale === "pt"));
+  const items = ITEMS.filter((i) => (!i.area || areas.includes(i.area)) && (!i.module || !modules || modules.includes(i.module)) && (!i.brOnly || locale === "pt") && (!i.advisory || advisory));
   const isActive = (i: Item) => (i.href === "" ? path === base || path.startsWith(`${base}/pedidos`) : path.startsWith(base + i.href));
   const current = items.find(isActive);
   const g = GROUPS[current?.group ?? "sales"];
