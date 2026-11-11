@@ -32,6 +32,8 @@ type Bridge = {
   app?(): string;
   openChannelSettings?(category: string): void;
   syncNow?(): void;
+  /** app do entregador: idioma dos textos nativos */
+  setLang?(lang: string): void;
   beforeLogout(): void;
 };
 

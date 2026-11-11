@@ -776,6 +776,7 @@ export const couriers = pgTable(
     vehicle: text("vehicle"), // "Moto Honda CG — placa ABC1D23"
     pixKey: text("pix_key"), // para o lojista pagar as entregas
     feePerDelivery: integer("fee_per_delivery").notNull().default(0), // valor combinado por entrega (unidade menor da moeda base)
+    lang: text("lang"), // idioma do app do entregador: pt | es | en (null = idioma da loja) — core/courier-i18n.ts
     active: boolean("active").notNull().default(true),
     // App do entregador (/entregador): link de acesso (hash p/ busca + selado p/ reenviar), online e última posição
     accessHash: text("access_hash"),

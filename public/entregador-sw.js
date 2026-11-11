@@ -1,5 +1,5 @@
 // Service worker do app do entregador GoWeb (instalável + notificações).
-const VERSION = "entregador-v1";
+const VERSION = "entregador-v2";
 const OFFLINE = "/entregador/offline.html";
 
 self.addEventListener("install", (e) => {

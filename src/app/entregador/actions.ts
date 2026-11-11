@@ -6,18 +6,19 @@ import { requireCourier, clearCourierSession, setCourierSession } from "@/lib/co
 import { claimDelivery, completeDelivery, courierByToken, CourierError, declineDelivery, pickUpDelivery, setCourierOnline } from "@/services/courier-app";
 import { audit, clientIp, rateLimit } from "@/lib/security";
 import { extractAccessToken } from "@/core/courier-native";
-import { getRegion, tr } from "@/core/region";
+import type { CourierLang } from "@/core/courier-i18n";
+import { requestCourierT, saveCourierLang } from "@/lib/courier-lang";
 
 const done = (msg?: string, err?: boolean): never => {
   revalidatePath("/entregador");
   redirect(msg ? `/entregador?${err ? "err" : "ok"}=${encodeURIComponent(msg)}` : "/entregador");
 };
 
-async function run(fn: () => Promise<void>, ok?: string) {
+async function run(fn: () => Promise<void>, ok: string, lang: CourierLang) {
   try {
     await fn();
   } catch (e) {
-    if (e instanceof CourierError) done(e.message, true);
+    if (e instanceof CourierError) done(e.text(lang), true);
     throw e;
   }
   done(ok);
@@ -32,21 +33,21 @@ export async function toggleOnlineAction(f: FormData) {
 }
 
 export async function claimAction(orderId: string) {
-  const { courier, tenant } = await requireCourier();
-  const T = tr(getRegion(tenant.country).locale);
-  await run(() => claimDelivery(courier, orderId), T("¡Entrega tomada! Pasá a retirarla.", "Entrega é sua! Passe na loja para retirar."));
+  const { courier } = await requireCourier();
+  const { lang, T } = await requestCourierT();
+  await run(() => claimDelivery(courier, orderId), T("¡Entrega tomada! Pasá a retirarla.", "Entrega é sua! Passe na loja para retirar.", "It's yours! Go to the store to pick it up."), lang);
 }
 
 export async function pickupAction(orderId: string) {
-  const { courier, tenant } = await requireCourier();
-  const T = tr(getRegion(tenant.country).locale);
-  await run(() => pickUpDelivery(courier, orderId), T("En camino. El cliente ya te ve en el mapa.", "A caminho! O cliente já vê você no mapa."));
+  const { courier } = await requireCourier();
+  const { lang, T } = await requestCourierT();
+  await run(() => pickUpDelivery(courier, orderId), T("En camino. El cliente ya te ve en el mapa.", "A caminho! O cliente já vê você no mapa.", "On your way! The customer can see you on the map."), lang);
 }
 
 export async function deliverAction(orderId: string, f: FormData) {
-  const { courier, tenant } = await requireCourier();
-  const T = tr(getRegion(tenant.country).locale);
-  await run(() => completeDelivery(courier, orderId, f.get("collected") === "on"), T("Entrega confirmada ✓", "Entrega confirmada ✓"));
+  const { courier } = await requireCourier();
+  const { lang, T } = await requestCourierT();
+  await run(() => completeDelivery(courier, orderId, f.get("collected") === "on"), T("Entrega confirmada ✓", "Entrega confirmada ✓", "Delivery confirmed ✓"), lang);
 }
 
 export async function courierLogout() {
@@ -57,9 +58,9 @@ export async function courierLogout() {
 }
 
 export async function declineAction(orderId: string) {
-  const { courier, tenant } = await requireCourier();
-  const T = tr(getRegion(tenant.country).locale);
-  await run(() => declineDelivery(courier, orderId), T("Entrega rechazada. Pasó al siguiente repartidor.", "Entrega recusada. Ela foi para o próximo entregador."));
+  const { courier } = await requireCourier();
+  const { lang, T } = await requestCourierT();
+  await run(() => declineDelivery(courier, orderId), T("Entrega rechazada. Pasó al siguiente repartidor.", "Entrega recusada. Ela foi para o próximo entregador.", "Delivery declined. It went to the next courier."), lang);
 }
 
 /** Entrar colando o link de acesso (usado no app Android, onde o link do WhatsApp abre no navegador). */
@@ -70,4 +71,12 @@ export async function enterWithLinkAction(f: FormData) {
   if (!token || !s) redirect("/entregador/entrar?erro=link");
   await setCourierSession(token);
   redirect("/entregador?bemvindo=1");
+}
+
+/** Troca o idioma do app (Conta, tela de entrar e de download) e volta para a mesma tela. */
+export async function setCourierLangAction(f: FormData) {
+  await saveCourierLang(String(f.get("lang") ?? ""));
+  const back = String(f.get("back") ?? "/entregador");
+  revalidatePath("/entregador", "layout");
+  redirect(back.startsWith("/entregador") ? back : "/entregador");
 }
