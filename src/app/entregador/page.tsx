@@ -15,7 +15,7 @@ export const metadata = { title: "Entregas" };
 
 export default async function CourierHome({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string; bemvindo?: string }> }) {
   const sp = await searchParams;
-  const { courier: c, tenant, T, fm, fmtTime, shell } = await courierCtx();
+  const { courier: c, tenant, T, fm, fmtTime, shell, native, android } = await courierCtx();
   const [mine, open, earn] = await Promise.all([myActiveDeliveries(c), c.online ? openDeliveries(c) : Promise.resolve([]), courierEarnings(c, tenant)]);
   const sig = mine.map((o) => `${o.id}:${o.status}`).join(",");
   const STATUS: Record<string, string> = {
@@ -29,7 +29,25 @@ export default async function CourierHome({ searchParams }: { searchParams: Prom
     <CourierShell {...shell} tab="home">
       {sp.bemvindo && (
         <p className="mb-4 rounded-2xl bg-[var(--s-good-bg)] p-4 text-sm text-[var(--s-good-fg)]">
-          <b>{T(`¡Hola, ${c.name.split(" ")[0]}!`, `Olá, ${c.name.split(" ")[0]}!`)}</b> {T("Instalá esta app en tu celular (menú del navegador → Agregar a pantalla de inicio) para abrirla como una app.", "Instale este app no celular (menu do navegador → Adicionar à tela inicial) para abrir como um aplicativo.")}
+          <b>{T(`¡Hola, ${c.name.split(" ")[0]}!`, `Olá, ${c.name.split(" ")[0]}!`)}</b>{" "}
+          {native
+            ? T("Todo listo. Ponete online y permití la ubicación y las notificaciones: la app sigue enviando tu ubicación aunque la cierres.", "Tudo pronto. Fique online e permita a localização e as notificações: o app continua enviando sua localização mesmo fechado.")
+            : android
+              ? T("Instalá la app Android para enviar la ubicación con la pantalla apagada y recibir avisos.", "Instale o app Android para enviar a localização com a tela desligada e receber avisos.")
+              : T("Instalá esta app en tu celular (menú del navegador → Agregar a pantalla de inicio) para abrirla como una app.", "Instale este app no celular (menu do navegador → Adicionar à tela inicial) para abrir como um aplicativo.")}
+          {!native && android && (
+            <span className="mt-3 flex flex-wrap gap-2">
+              <a href="/entregador/baixar" className="btn-brand py-2 text-sm"><Icon name="download" size={16} /> {T("Descargar la app", "Baixar o app")}</a>
+              <a href="/entregador/abrir-app" className="btn-ghost py-2 text-sm">{T("Ya la tengo: abrir en la app", "Já tenho: abrir no app")}</a>
+            </span>
+          )}
+        </p>
+      )}
+      {!sp.bemvindo && !native && android && (
+        <p className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--s-line)] bg-[var(--s-card)] p-3 text-sm">
+          <span className="min-w-0 flex-1">{T("Con la app Android la ubicación sigue enviándose con la pantalla apagada.", "Com o app Android a localização continua sendo enviada com a tela desligada.")}</span>
+          <a href="/entregador/abrir-app" className="btn-ghost py-1.5 text-xs">{T("Abrir en la app", "Abrir no app")}</a>
+          <a href="/entregador/baixar" className="btn-brand py-1.5 text-xs">{T("Descargar", "Baixar")}</a>
         </p>
       )}
       {sp.ok && <p className="mb-4 rounded-2xl bg-[var(--s-good-bg)] px-4 py-3 text-sm font-semibold text-[var(--s-good-fg)]">{sp.ok}</p>}
@@ -66,11 +84,15 @@ export default async function CourierHome({ searchParams }: { searchParams: Prom
             waiting: T("Buscando GPS… permití la ubicación si el celular lo pide.", "Buscando GPS… permita a localização se o celular pedir."),
             ok: T("Ubicación en vivo", "Localização ao vivo"),
             ago: T("enviada hace {s}s", "enviada há {s}s"),
-            denied: T("Ubicación bloqueada: habilitala para este sitio en la configuración del navegador.", "Localização bloqueada: libere para este site nas configurações do navegador."),
+            denied: native ? T("Ubicación bloqueada: permitila para la app en la configuración del celular.", "Localização bloqueada: permita para o app nas configurações do celular.") : T("Ubicación bloqueada: habilitala para este sitio en la configuración del navegador.", "Localização bloqueada: libere para este site nas configurações do navegador."),
             unsupported: T("Este navegador no comparte ubicación.", "Este navegador não compartilha localização."),
             weak: T("Señal de GPS débil: salí al aire libre o activá el modo de alta precisión.", "Sinal de GPS fraco: vá para céu aberto ou ative a alta precisão."),
             screen: T("Dejá la app abierta durante la entrega", "Deixe o app aberto durante a entrega"),
             screenOn: T("Pantalla siempre encendida", "Tela sempre ligada"),
+            background: T("Funciona con la app cerrada y la pantalla bloqueada (aviso fijo en las notificaciones).", "Funciona com o app fechado e a tela bloqueada (aviso fixo nas notificações)."),
+            settings: T("Abrir configuración", "Abrir configurações"),
+            battery: T("Que Android no pause el GPS", "Não deixar o Android pausar o GPS"),
+            offlineNet: T("Sin internet: la ubicación se envía cuando vuelva la señal.", "Sem internet: a localização é enviada quando o sinal voltar."),
           }}
         />
       </div>

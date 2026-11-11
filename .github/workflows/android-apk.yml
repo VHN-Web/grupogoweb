@@ -1,0 +1,104 @@
+# Gera o APK do app Android do entregador (mobile/android).
+# - Pull Request: gera e deixa o APK em "Artifacts" da execução (para testar).
+# - main / manual: gera, assina com a chave própria e publica na versão "entregador-latest" (Releases).
+# Secrets (Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD  (assinatura fixa)
+#   GOOGLE_SERVICES_JSON  (opcional: Firebase — avisos com o app fechado e o motoboy offline)
+# Variables: ATLAS_URL (padrão https://goweboficial.com), COMMIT_APK=true (opcional: grava o APK em public/entregador/entregas.apk)
+name: App do entregador (APK Android)
+
+on:
+  push:
+    branches: [main]
+    paths: ["mobile/android/**", ".github/workflows/android-apk.yml"]
+  pull_request:
+    paths: ["mobile/android/**", ".github/workflows/android-apk.yml"]
+  workflow_dispatch:
+    inputs:
+      atlas_url:
+        description: "Endereço do site (vazio = ATLAS_URL ou https://goweboficial.com)"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Firebase (opcional)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > mobile/android/app/google-services.json
+            echo "Firebase ligado."
+          else
+            echo "::notice::Sem GOOGLE_SERVICES_JSON: os avisos nativos funcionam enquanto o motoboy está online."
+          fi
+
+      - name: Chave de assinatura
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/entregador-release.jks"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/entregador-release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Sem ANDROID_KEYSTORE_BASE64: APK assinado com chave temporária (para atualizar será preciso desinstalar o anterior)."
+          fi
+
+      - name: Gerar APK
+        working-directory: mobile/android
+        env:
+          ATLAS_URL: ${{ inputs.atlas_url || vars.ATLAS_URL || 'https://goweboficial.com' }}
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.0.${{ github.run_number }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          gradle --no-daemon --stacktrace assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/entregas.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: entregas-apk
+          path: ${{ runner.temp }}/entregas.apk
+          retention-days: 30
+
+      - name: Publicar em Releases (entregador-latest)
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete entregador-latest --yes --cleanup-tag || true
+          gh release create entregador-latest "$RUNNER_TEMP/entregas.apk" \
+            --title "App do entregador (Android) · build ${{ github.run_number }}" \
+            --notes "APK gerado de ${{ github.sha }}. Link para os motoboys: /entregador/baixar no site." \
+            --latest=false
+
+      - name: Gravar no site (public/entregador/entregas.apk)
+        if: github.event_name != 'pull_request' && vars.COMMIT_APK == 'true'
+        run: |
+          cp "$RUNNER_TEMP/entregas.apk" public/entregador/entregas.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add public/entregador/entregas.apk
+          git commit -m "App do entregador: APK build ${{ github.run_number }}" || exit 0
+          git push

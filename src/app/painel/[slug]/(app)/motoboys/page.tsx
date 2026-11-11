@@ -11,6 +11,7 @@ import type { Currency } from "@/core/types";
 import { courierAccessAction, deleteCourier, dispatchAction, saveCourier } from "../courier-actions";
 import { parseDispatch } from "@/core/couriers";
 import { courierAccessLink } from "@/services/courier-app";
+import { appUrl } from "@/lib/urls";
 import { isLive } from "@/core/couriers";
 import { FleetMap } from "@/components/maps/FleetMap";
 
@@ -118,7 +119,7 @@ export default async function MotoboysPage({ params, searchParams }: { params: P
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted">{T("App del repartidor", "App do motoboy")}</p>
                   {links.get(c.id) ? (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <a target="_blank" rel="noopener noreferrer" className="btn-brand rounded-lg px-3 py-1.5 text-xs font-semibold" href={waLink(c.phone, T(`Hola ${c.name.split(" ")[0]}! Este es tu acceso a la app de entregas de ${t.name}. Abrilo en el celular, instalalo (Agregar a pantalla de inicio) y ponete online: ${links.get(c.id)}`, `Oi ${c.name.split(" ")[0]}! Este é seu acesso ao app de entregas da ${t.name}. Abra no celular, instale (Adicionar à tela inicial) e fique online: ${links.get(c.id)}`))}>{T("Enviar acceso por WhatsApp", "Enviar acesso pelo WhatsApp")}</a>
+                      <a target="_blank" rel="noopener noreferrer" className="btn-brand rounded-lg px-3 py-1.5 text-xs font-semibold" href={waLink(c.phone, T(`Hola ${c.name.split(" ")[0]}! Este es tu acceso a la app de entregas de ${t.name}.\n\n1) Android: instalá la app → ${appUrl()}/entregador/baixar (iPhone: abrí el enlace en Safari → Agregar a inicio)\n2) Abrí tu enlace de acceso y ponete online: ${links.get(c.id)}`, `Oi ${c.name.split(" ")[0]}! Este é seu acesso ao app de entregas da ${t.name}.\n\n1) Android: instale o app → ${appUrl()}/entregador/baixar (iPhone: abra o link no Safari → Adicionar à Tela de Início)\n2) Abra seu link de acesso e fique online: ${links.get(c.id)}`))}>{T("Enviar acceso por WhatsApp", "Enviar acesso pelo WhatsApp")}</a>
                       <form action={courierAccessAction.bind(null, slug, c.id, true)}><button className="btn-ghost rounded-lg px-3 py-1.5 text-xs">{T("Generar enlace nuevo", "Gerar novo link")}</button></form>
                       <span className="w-full text-xs text-muted">{c.lastSeenAt ? `${T("Última ubicación", "Última localização")}: ${fmtDate(c.lastSeenAt)}` : T("Todavía no abrió la app.", "Ainda não abriu o app.")} · {T("Enlace nuevo = el celular anterior queda desconectado.", "Novo link = o celular anterior é desconectado.")}</span>
                     </div>

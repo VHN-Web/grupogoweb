@@ -2,10 +2,17 @@
 // GPS ao vivo do entregador: envia a posição enquanto ele está online e mantém a tela acesa.
 // Observação: navegadores (principalmente iPhone) pausam o GPS com o app fechado/tela bloqueada —
 // por isso pedimos a tela ligada (Wake Lock) durante as entregas.
+// Dentro do app Android (window.AtlasApp) o GPS é nativo: um serviço em primeiro plano envia a posição
+// com o app fechado e a tela bloqueada; aqui só ligamos/desligamos e mostramos o estado.
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { nativeApp, nativeStatus, type NativeStatus } from "@/lib/native-bridge";
 
-type Txt = { waiting: string; ok: string; denied: string; unsupported: string; ago: string; screen: string; screenOn: string; weak: string };
+type Txt = {
+  waiting: string; ok: string; denied: string; unsupported: string; ago: string; screen: string; screenOn: string; weak: string;
+  /** só no app Android */
+  background?: string; settings?: string; battery?: string; offlineNet?: string;
+};
 
 export function CourierTracker({ online, sig, t }: { online: boolean; sig: string; t: Txt }) {
   const router = useRouter();
@@ -14,10 +21,57 @@ export function CourierTracker({ online, sig, t }: { online: boolean; sig: strin
   const [acc, setAcc] = useState<number | null>(null);
   const [wake, setWake] = useState(false);
   const [, force] = useState(0);
+  const [nst, setNst] = useState<NativeStatus | null>(null);
   const sigRef = useRef(sig);
   sigRef.current = sig;
 
+  // app Android: liga/desliga o serviço nativo e acompanha o estado dele
   useEffect(() => {
+    const nb = nativeApp();
+    if (!nb) return;
+    if (online) nb.startTracking();
+    else nb.stopTracking();
+    let prevSig: string | null = null;
+    let prevTracking: boolean | null = null;
+    const tick = () => {
+      const st = nativeStatus();
+      if (!st) return;
+      setNst(st);
+      if (!online) setState("idle");
+      else if (st.permission === "denied") setState("denied");
+      else if (st.tracking && st.lastSentAt) {
+        setState("ok");
+        setLastSent(st.lastSentAt);
+        if (st.accuracy) setAcc(Math.round(st.accuracy));
+      } else setState("waiting");
+      // chegou/saiu entrega desde o último envio do serviço → recarrega a lista
+      if (prevSig !== null && st.sig !== prevSig && st.sig !== sigRef.current) router.refresh();
+      prevSig = st.sig;
+      // o serviço parou sozinho (ficou offline pela notificação ou a sessão caiu) → atualiza a tela
+      if (online && prevTracking === true && !st.tracking) router.refresh();
+      prevTracking = st.tracking;
+      force((n) => n + 1);
+    };
+    tick();
+    const i = setInterval(tick, 3000);
+    const now = () => tick();
+    window.addEventListener("atlas:status", now);
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        tick();
+        router.refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(i);
+      window.removeEventListener("atlas:status", now);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [online, router]);
+
+  useEffect(() => {
+    if (nativeApp()) return; // no app Android quem envia é o serviço nativo
     if (!online) return setState("idle");
     if (!("geolocation" in navigator)) return setState("unsupported");
     setState("waiting");
@@ -120,7 +174,19 @@ export function CourierTracker({ online, sig, t }: { online: boolean; sig: strin
         {state === "ok" ? `${t.ok}${secs != null ? ` · ${t.ago.replace("{s}", String(secs))}` : ""}` : state === "denied" ? t.denied : state === "unsupported" ? t.unsupported : t.waiting}
         {state === "ok" && acc != null && acc > 150 && <span className="block text-xs font-normal opacity-80">{t.weak}</span>}
       </span>
-      <span className="w-full pl-5 text-xs font-normal opacity-80">{wake ? t.screenOn : t.screen}</span>
+      {nst ? (
+        <span className="w-full space-y-2 pl-5 text-xs font-normal opacity-80">
+          <span className="block">{nst.error === "network" && t.offlineNet ? t.offlineNet : t.background ?? t.screen}</span>
+          {(state === "denied" || !nst.notifications) && t.settings && (
+            <button type="button" onClick={() => nativeApp()?.openAppSettings()} className="mr-2 rounded-full bg-current/10 px-3 py-1 font-bold underline">{t.settings}</button>
+          )}
+          {!nst.battery && t.battery && (
+            <button type="button" onClick={() => nativeApp()?.requestBatteryExemption()} className="rounded-full px-3 py-1 font-bold underline">{t.battery}</button>
+          )}
+        </span>
+      ) : (
+        <span className="w-full pl-5 text-xs font-normal opacity-80">{wake ? t.screenOn : t.screen}</span>
+      )}
     </div>
   );
 }
