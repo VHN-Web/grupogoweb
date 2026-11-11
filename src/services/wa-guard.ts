@@ -461,10 +461,11 @@ export async function aiGate(channel: string, contact: string | null): Promise<A
       storeMonth: sql<number>`coalesce(sum(${tok}) filter (where ${isAi} and ${L.channel} = ${channel}), 0)::bigint`,
       chatDay: sql<number>`coalesce(sum(${tok}) filter (where ${isAi} and ${L.channel} = ${channel} and ${L.contact} = ${contact ?? "-"} and ${L.createdAt} >= ${day}), 0)::bigint`,
       lastMinuteCalls: sql<number>`count(*) filter (where ${isAi} and ${L.createdAt} > ${new Date(Date.now() - MIN)})::int`,
+      storeMonthReplies: sql<number>`count(*) filter (where ${isAi} and ${L.channel} = ${channel})::int`,
     })
     .from(L)
     .where(and(eq(L.type, "ai"), gte(L.createdAt, month)));
-  const usage = { day: Number(u.day), month: Number(u.month), channelDay: Number(u.channelDay), storeMonth: Number(u.storeMonth), chatDay: contact ? Number(u.chatDay) : 0, lastMinuteCalls: Number(u.lastMinuteCalls) };
+  const usage = { day: Number(u.day), month: Number(u.month), channelDay: Number(u.channelDay), storeMonth: Number(u.storeMonth), chatDay: contact ? Number(u.chatDay) : 0, lastMinuteCalls: Number(u.lastMinuteCalls), storeMonthReplies: Number(u.storeMonthReplies) };
   const m = aiMode(usage, cfg.ai, scope);
   if (m.mode === "blocked" && m.reason?.startsWith("orçamento")) await alert(channel, "IA da Geovana sem orçamento", `Atingiu o ${m.reason}. As conversas vão para a equipe até o orçamento renovar ou ser aumentado.`);
   return { ...m, params: aiParams(m.mode, cfg.ai, scope), turnChars: cfg.ai.turnChars, emergency: false };

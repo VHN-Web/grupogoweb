@@ -378,6 +378,7 @@ export const platformSettings = pgTable("platform_settings", {
   odConfig: text("od_config").notNull().default("{}"),
   gwBotConfig: text("gw_bot_config").notNull().default("{}"),
   waGuardConfig: text("wa_guard_config").notNull().default("{}"), // proteção da Geovana: limites de envio e de IA (core/wa-guard.ts)
+  igConfig: text("ig_config").notNull().default("{}"), // Instagram: app da Meta (id, secret selado, verify token)
   contentIdeas: text("content_ideas"), // última geração de ideias de posts/Reels (JSON) — core/content-ideas.ts // Geovana da GoWeb (WhatsApp da própria GoWeb) — core/goweb-bot.ts // Apps de delivery (Open Delivery): credenciais padrão da GoWeb por app (segredo selado)
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -1046,7 +1047,7 @@ export const crmLeads = pgTable(
     competitor: text("competitor"),
     status: text("status").$type<"NEW" | "CONTACT" | "DEMO" | "PROPOSAL" | "WON" | "LOST">().notNull().default("NEW"),
     ownerId: text("owner_id"),
-    source: text("source").$type<"hunter" | "import" | "manual" | "affiliate" | "site" | "whatsapp">().notNull().default("manual"),
+    source: text("source").$type<"hunter" | "import" | "manual" | "affiliate" | "site" | "whatsapp" | "instagram">().notNull().default("manual"),
     dedupeKey: text("dedupe_key").notNull(),
     contactAt: timestamp("contact_at", { withTimezone: true }), // 1º contato
     lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
@@ -1390,3 +1391,59 @@ export const nudgeLog = pgTable("nudge_log", {
   key: text("key").primaryKey(), // ex.: setup:<tenantId>:<dia> · idle:<tenantId>:<semana> · inv:<invoiceId>:<etapa>
   createdAt: createdAt(),
 });
+
+// ---------------------------------------------------------------- Instagram (core/instagram.ts + services/instagram.ts)
+/** Conta do Instagram conectada pelo login oficial da Meta: a da GoWeb (tenantId null) ou de uma loja GoInteligence. */
+export const igAccounts = pgTable(
+  "ig_accounts",
+  {
+    id: id(),
+    tenantId: text("tenant_id").references(() => tenants.id, { onDelete: "cascade" }), // null = conta institucional da GoWeb
+    igUserId: text("ig_user_id").notNull(), // = entry.id dos webhooks
+    username: text("username"),
+    tokenSealed: text("token_sealed").notNull(), // token de 60 dias, criptografado (lib/secrets)
+    tokenIssuedAt: timestamp("token_issued_at", { withTimezone: true }),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    status: text("status").$type<"active" | "paused" | "error">().notNull().default("active"),
+    aiEnabled: boolean("ai_enabled").notNull().default(true), // Geovana responde (desligado = só caixa de entrada)
+    lastError: text("last_error"),
+    connectedBy: text("connected_by"),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("ig_accounts_user_uq").on(t.igUserId), uniqueIndex("ig_accounts_tenant_uq").on(t.tenantId)],
+);
+
+export const igChats = pgTable(
+  "ig_chats",
+  {
+    id: id(),
+    accountId: text("account_id").notNull().references(() => igAccounts.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id"), // null = GoWeb
+    igsid: text("igsid").notNull(), // id do cliente no Instagram (por conta)
+    name: text("name"),
+    username: text("username"),
+    leadId: text("lead_id"), // GoWeb: crm_leads.id
+    lastInboundAt: timestamp("last_inbound_at", { withTimezone: true }), // janela de 24 h
+    lastAt: timestamp("last_at", { withTimezone: true }).notNull().defaultNow(),
+    pausedUntil: timestamp("paused_until", { withTimezone: true }),
+    needsHuman: boolean("needs_human").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("ig_chats_account_igsid_uq").on(t.accountId, t.igsid), index("ig_chats_tenant_idx").on(t.tenantId, t.lastAt)],
+);
+
+export const igMessages = pgTable(
+  "ig_messages",
+  {
+    id: id(),
+    chatId: text("chat_id").notNull().references(() => igChats.id, { onDelete: "cascade" }),
+    role: text("role").$type<"user" | "ai" | "staff" | "system">().notNull(),
+    text: text("text").notNull(),
+    externalId: text("external_id"), // mid da Meta (idempotência)
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("ig_messages_ext_uq").on(t.externalId), index("ig_messages_chat_idx").on(t.chatId, t.createdAt)],
+);
+export type IgAccount = typeof igAccounts.$inferSelect;
+export type IgChat = typeof igChats.$inferSelect;

@@ -147,6 +147,13 @@ describe("economia de IA", () => {
     expect(aiMode({ ...u, chatDay: D.ai.chatDailyTokens }, D.ai, "goweb").mode).toBe("blocked");
     expect(aiMode({ ...u, lastMinuteCalls: D.ai.perMinute }, D.ai, "goweb").mode).toBe("blocked");
   });
+  it("franquia de 1.000 respostas por loja no mês (WhatsApp + Instagram)", () => {
+    expect(D.ai.storeMonthlyReplies).toBe(1000);
+    expect(aiMode({ ...u, storeMonthReplies: 999 }, D.ai, "store").mode).toBe("economy");
+    expect(aiMode({ ...u, storeMonthReplies: 1000 }, D.ai, "store")).toMatchObject({ mode: "blocked", reason: "franquia mensal de respostas de IA desta loja" });
+    expect(aiMode({ ...u, storeMonthReplies: 5000 }, D.ai, "goweb").mode).toBe("normal"); // a GoWeb não tem franquia
+    expect(parseWaGuard(JSON.stringify({ ai: { storeMonthlyReplies: 2000 } })).ai.storeMonthlyReplies).toBe(2000);
+  });
   it("modo economia corta histórico e tamanho da resposta", () => {
     expect(aiParams("normal", D.ai, "store")).toEqual({ turns: 10, maxTokens: 600, catalogLimit: 150 });
     expect(aiParams("economy", D.ai, "store")).toEqual({ turns: 5, maxTokens: 360, catalogLimit: 60 });

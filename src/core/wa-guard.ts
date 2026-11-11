@@ -122,6 +122,8 @@ export const DEFAULT_WA_GUARD: WaGuardConfig = {
     gowebDailyTokens: 700_000, // ≈ 100 respostas/dia no número da GoWeb
     storeDailyTokens: 500_000, // ≈ 70 respostas/dia por loja
     storeMonthlyTokens: 8_000_000,
+    // franquia do GoInteligence (decisão comercial de 11/11/2026): 1.000 respostas de IA por loja/mês, WhatsApp + Instagram somados
+    storeMonthlyReplies: 1000,
     chatDailyTokens: 80_000, // ≈ 11 respostas: conversa que passa disso no dia vai para um humano
     priceInPerM: 0.3, // Gemini 3.5 Flash-Lite (ago/2026)
     priceOutPerM: 2.5,
@@ -197,6 +199,7 @@ export function parseWaGuard(raw: string | null | undefined): WaGuardConfig {
       gowebDailyTokens: int(a.gowebDailyTokens, d.ai.gowebDailyTokens, 10_000, 1e10),
       storeDailyTokens: int(a.storeDailyTokens, d.ai.storeDailyTokens, 10_000, 1e10),
       storeMonthlyTokens: int(a.storeMonthlyTokens, d.ai.storeMonthlyTokens, 10_000, 1e11),
+      storeMonthlyReplies: int(a.storeMonthlyReplies, d.ai.storeMonthlyReplies, 10, 1_000_000),
       chatDailyTokens: int(a.chatDailyTokens, d.ai.chatDailyTokens, 5_000, 1e9),
       priceInPerM: num(a.priceInPerM, d.ai.priceInPerM, 0, 1000),
       priceOutPerM: num(a.priceOutPerM, d.ai.priceOutPerM, 0, 1000),
@@ -413,7 +416,8 @@ export const STORE_OPT_OUT = /^\s*(parar|pare|sair|stop|cancelar mensagens|n[ãa
 // -----------------------------------------------------------------------------
 // IA: orçamento de tokens, modo economia e histórico enxuto
 // -----------------------------------------------------------------------------
-export type AiUsage = { day: number; month: number; channelDay: number; storeMonth: number; chatDay: number; lastMinuteCalls: number };
+/** storeMonthReplies = respostas de IA da loja no mês (todos os canais) — a franquia. */
+export type AiUsage = { day: number; month: number; channelDay: number; storeMonth: number; chatDay: number; lastMinuteCalls: number; storeMonthReplies?: number };
 export type AiMode = { mode: "normal" | "economy" | "blocked"; reason: string | null; pct: number };
 
 /** Decide o modo da IA para esta chamada. `scope` = número da GoWeb ou de uma loja. */
@@ -423,7 +427,12 @@ export function aiMode(u: AiUsage, ai: WaGuardConfig["ai"], scope: ChannelKind):
     [u.day / ai.dailyTokens, "orçamento diário geral da IA"],
     [u.month / ai.monthlyTokens, "orçamento mensal geral da IA"],
     [u.channelDay / chDay, scope === "goweb" ? "orçamento diário da Geovana da GoWeb" : "orçamento diário da IA desta loja"],
-    ...(scope === "store" ? ([[u.storeMonth / ai.storeMonthlyTokens, "orçamento mensal da IA desta loja"]] as [number, string][]) : []),
+    ...(scope === "store"
+      ? ([
+          [u.storeMonth / ai.storeMonthlyTokens, "orçamento mensal da IA desta loja"],
+          [(u.storeMonthReplies ?? 0) / ai.storeMonthlyReplies, "franquia mensal de respostas de IA desta loja"],
+        ] as [number, string][])
+      : []),
   ];
   const [worst, why] = ratios.reduce((a, b) => (b[0] > a[0] ? b : a));
   const pct = Math.round(worst * 100);
