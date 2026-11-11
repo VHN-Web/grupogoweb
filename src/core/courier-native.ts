@@ -52,3 +52,38 @@ export function assetLinks(fingerprints: string | null | undefined) {
     },
   ];
 }
+
+/** Corrida oferecida ao entregador: vira a tela cheia "Nova entrega" no app Android (estilo iFood). */
+export type CourierOffer = {
+  /** mine = passada para ele (atribuída); open = livre, quem aceitar primeiro leva */
+  type: "mine" | "open";
+  orderId: string;
+  number: string | number;
+  address?: string | null;
+  km?: number | null;
+  /** quanto o entregador ganha, já formatado na moeda da loja */
+  fee?: string | null;
+  store?: string | null;
+  /** escolhido pela atribuição automática (se não responder a tempo, passa para o próximo) */
+  auto?: boolean;
+};
+
+/** Dados da oferta em texto (formato do Firebase e da resposta do ping). */
+export function offerData(o: CourierOffer): Record<string, string> {
+  return {
+    kind: "offer",
+    type: o.type,
+    orderId: o.orderId,
+    n: String(o.number),
+    addr: (o.address ?? "").slice(0, 200),
+    km: o.km != null && Number.isFinite(o.km) ? o.km.toFixed(1) : "",
+    fee: (o.fee ?? "").slice(0, 40),
+    store: (o.store ?? "").slice(0, 80),
+    auto: o.auto ? "1" : "0",
+  };
+}
+
+/** Pedido cancelado/retirado: o app fecha a tela da corrida se ela estiver aberta. */
+export function offerCancelData(orderId: string): Record<string, string> {
+  return { kind: "cancel", orderId };
+}

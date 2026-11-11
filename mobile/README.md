@@ -7,6 +7,7 @@ não consegue fazer:
 | O quê | Como |
 |---|---|
 | GPS com o app fechado / tela bloqueada | `LocationService` (serviço em primeiro plano, tipo `location`, aviso fixo com botão **Ficar offline**) → `POST /api/entregador/ping` com o cookie do WebView. Mesma regra do site: 20 m ou 8 s; parado, 20 s. |
+| **Corrida em tela cheia** (estilo iFood) | `IncomingActivity`: abre por cima de qualquer app (permissão "Sobrepor a outros apps", pedida na tela inicial do app) ou pela notificação de tela cheia com o celular bloqueado. Toca e vibra por 30 s; Aceitar/Recusar → `/api/entregador/oferta`. Sem resposta numa atribuição automática → recusa e passa ao próximo. |
 | Avisos com o motoboy **online** (sem configurar nada) | A resposta do ping traz `mine`/`open`; o serviço compara e mostra "Nova entrega #N" / "Entrega disponível #N". |
 | Avisos com o app fechado e o motoboy **offline** | Firebase Cloud Messaging (opcional): o app registra o token em `/api/entregador/push`; o servidor envia por `src/adapters/push/fcm.ts` dentro do mesmo `sendPush` do PWA. |
 | Entrar | Link de acesso abre direto no app (App Links + `/.well-known/assetlinks.json`), botão **Abrir no app** (`/entregador/abrir-app` → `gowebentregador://acesso/<token>`) ou colar o link na tela de entrada. |

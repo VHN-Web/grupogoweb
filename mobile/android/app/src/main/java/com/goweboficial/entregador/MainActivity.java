@@ -247,6 +247,23 @@ public class MainActivity extends Activity {
         }
     }
 
+    void requestOverlay() {
+        try {
+            startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+        } catch (Exception e) {
+            openAppSettings();
+        }
+    }
+
+    void requestFullScreen() {
+        if (Build.VERSION.SDK_INT < 34) return;
+        try {
+            startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + getPackageName())));
+        } catch (Exception e) {
+            openAppSettings();
+        }
+    }
+
     @SuppressLint("BatteryLife")
     void requestBatteryExemption() {
         try {

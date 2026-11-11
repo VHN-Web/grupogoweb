@@ -11,6 +11,9 @@ import { openSecret, sealSecret } from "@/lib/secrets";
 import { getRegion } from "@/core/region";
 import { setOrderStatus, setPaymentStatus } from "@/services/orders";
 import { sendPush } from "@/services/push";
+import { offerCancelData, offerData, type CourierOffer } from "@/core/courier-native";
+import { formatMoney } from "@/core/money";
+import type { Currency } from "@/core/types";
 
 export const courierActor = (id: string) => `courier:${id}`;
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -148,15 +151,21 @@ export async function courierEarnings(c: Courier, tenant: Tenant) {
   };
 }
 
-/** Avisa o entregador no celular (app instalado com notificações). */
-export function notifyCourier(courierId: string, title: string, body: string) {
-  return sendPush([courierActor(courierId)], { title, body, url: "/entregador", tag: `entrega-${courierId}`, icon: "/entregador/icon-192.png" });
+/** Avisa o entregador no celular. Com `offer`, o app Android abre a tela cheia da corrida; `cancelOrderId` fecha essa tela. */
+export function notifyCourier(courierId: string, title: string, body: string, extra?: { offer?: CourierOffer; cancelOrderId?: string }) {
+  const data = extra?.offer ? offerData(extra.offer) : extra?.cancelOrderId ? offerCancelData(extra.cancelOrderId) : undefined;
+  return sendPush([courierActor(courierId)], { title, body, url: "/entregador", tag: extra?.offer ? `oferta-${extra.offer.orderId}` : `entrega-${courierId}`, icon: "/entregador/icon-192.png", data });
 }
 
-/** Avisa todos os entregadores online da loja que há entrega livre. */
-export async function notifyOnlineCouriers(tenantId: string, title: string, body: string) {
+/** Avisa todos os entregadores online da loja que há entrega livre (com `offer`, vira a tela cheia no app). */
+export async function notifyOnlineCouriers(tenantId: string, title: string, body: string, offer?: CourierOffer) {
   const list = await db.query.couriers.findMany({ where: and(eq(schema.couriers.tenantId, tenantId), eq(schema.couriers.online, true), eq(schema.couriers.active, true)), columns: { id: true } });
-  if (list.length) await sendPush(list.map((c) => courierActor(c.id)), { title, body, url: "/entregador", tag: `livres-${tenantId}`, icon: "/entregador/icon-192.png" });
+  if (list.length) await sendPush(list.map((c) => courierActor(c.id)), { title, body, url: "/entregador", tag: offer ? `oferta-${offer.orderId}` : `livres-${tenantId}`, icon: "/entregador/icon-192.png", data: offer ? offerData(offer) : undefined });
+}
+
+/** Quanto o entregador ganha nesta entrega, formatado na moeda da loja. */
+export function courierFeeLabel(deliveryFee: number, feePerDelivery: number, currency: string) {
+  return formatMoney(courierEarning(deliveryFee, feePerDelivery), currency as Currency);
 }
 
 // ---------------- mapas (consumidor e loja) ----------------
@@ -241,7 +250,7 @@ const declined = (raw: string | null) => {
  * Atômico: só atribui se o pedido ainda estiver sem motoboy.
  */
 export async function autoAssign(tenantId: string, onlyOrderId?: string) {
-  const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.id, tenantId), columns: { lat: true, lng: true, dispatchConfig: true, name: true, country: true } });
+  const t = await db.query.tenants.findFirst({ where: eq(schema.tenants.id, tenantId), columns: { lat: true, lng: true, dispatchConfig: true, name: true, country: true, currency: true } });
   if (!t) return 0;
   const cfg = parseDispatch(t.dispatchConfig);
   if (!cfg.autoAssign) return 0;
@@ -254,7 +263,7 @@ export async function autoAssign(tenantId: string, onlyOrderId?: string) {
       inArray(schema.orders.status, ["PREPARING", "READY"]),
       ...(onlyOrderId ? [eq(schema.orders.id, onlyOrderId)] : []),
     ),
-    columns: { id: true, number: true, address: true, declinedCourierIds: true },
+    columns: { id: true, number: true, address: true, declinedCourierIds: true, deliveryFeePyg: true },
     orderBy: [schema.orders.createdAt],
     limit: 20,
   });
@@ -284,7 +293,10 @@ export async function autoAssign(tenantId: string, onlyOrderId?: string) {
     if (!ok) continue;
     load.set(best.id, (load.get(best.id) ?? 0) + 1);
     n++;
-    await notifyCourier(best.id, pt ? `Nova entrega #${o.number}` : `Nueva entrega #${o.number}`, `${t.name}${o.address ? ` · ${o.address}` : ""}${best.km != null ? ` · ${best.km.toFixed(1)} km da loja` : ""}`).catch(() => null);
+    const fee = courierFeeLabel(o.deliveryFeePyg, list.find((c) => c.id === best.id)?.feePerDelivery ?? 0, t.currency);
+    await notifyCourier(best.id, pt ? `Nova entrega #${o.number}` : `Nueva entrega #${o.number}`, `${t.name}${o.address ? ` · ${o.address}` : ""}${best.km != null ? ` · ${best.km.toFixed(1)} km da loja` : ""}`, {
+      offer: { type: "mine", orderId: o.id, number: o.number, address: o.address, km: best.km, fee, store: t.name, auto: true },
+    }).catch(() => null);
   }
   return n;
 }
@@ -300,7 +312,7 @@ export async function declineDelivery(c: Courier, orderId: string) {
     .set({ courierId: null, autoAssigned: false, declinedCourierIds: JSON.stringify(list), updatedAt: new Date() })
     .where(and(eq(schema.orders.id, o.id), eq(schema.orders.courierId, c.id)));
   const again = await autoAssign(c.tenantId, o.id);
-  if (!again) await notifyOnlineCouriers(c.tenantId, `Pedido #${o.number}`, "Entrega disponível · Entrega disponible").catch(() => null);
+  if (!again) await notifyOnlineCouriers(c.tenantId, `Pedido #${o.number}`, "Entrega disponível · Entrega disponible", { type: "open", orderId: o.id, number: o.number, address: o.address, km: o.distanceKm }).catch(() => null);
 }
 
 export async function saveDispatchConfig(tenantId: string, cfg: { autoAssign: boolean; maxKm: number; maxLoad: number }) {

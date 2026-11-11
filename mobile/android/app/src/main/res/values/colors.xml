@@ -2,4 +2,7 @@
 <resources>
     <color name="bg">#FF0E0E10</color>
     <color name="green">#FF3CC46B</color>
+    <color name="ivory">#FFF4F1EA</color>
+    <color name="muted">#FFB9B3A7</color>
+    <color name="amber">#FFF2C14E</color>
 </resources>

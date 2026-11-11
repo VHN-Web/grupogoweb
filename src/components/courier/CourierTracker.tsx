@@ -12,6 +12,7 @@ type Txt = {
   waiting: string; ok: string; denied: string; unsupported: string; ago: string; screen: string; screenOn: string; weak: string;
   /** só no app Android */
   background?: string; settings?: string; battery?: string; offlineNet?: string;
+  overlayTitle?: string; overlayText?: string; overlayBtn?: string; fullScreenBtn?: string;
 };
 
 export function CourierTracker({ online, sig, t }: { online: boolean; sig: string; t: Txt }) {
@@ -161,10 +162,29 @@ export function CourierTracker({ online, sig, t }: { online: boolean; sig: strin
     return () => clearInterval(i);
   }, [online, router]);
 
-  if (!online) return null;
+  // app Android sem permissão de tela cheia: a corrida só apareceria como notificação comum
+  const needOverlay = !!nst && (nst.overlay === false || nst.fullScreen === false) && !!t.overlayTitle;
+  const overlayCard = needOverlay ? (
+    <div className="mb-3 rounded-2xl border-2 border-[#F2C14E] bg-[#F2C14E]/15 p-4 text-sm" role="alert">
+      <p className="font-bold">{t.overlayTitle}</p>
+      <p className="mt-1 opacity-80">{t.overlayText}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {nst?.overlay === false && (
+          <button type="button" onClick={() => nativeApp()?.requestOverlay?.()} className="btn-brand py-2 text-sm">{t.overlayBtn}</button>
+        )}
+        {nst?.fullScreen === false && t.fullScreenBtn && (
+          <button type="button" onClick={() => nativeApp()?.requestFullScreen?.()} className="btn-ghost py-2 text-sm">{t.fullScreenBtn}</button>
+        )}
+      </div>
+    </div>
+  ) : null;
+
+  if (!online) return overlayCard;
   const secs = lastSent ? Math.max(0, Math.round((Date.now() - lastSent) / 1000)) : null;
   const tone = state === "ok" ? "bg-[var(--s-good-bg)] text-[var(--s-good-fg)]" : state === "denied" || state === "unsupported" ? "bg-red-500/15 text-red-500" : "bg-amber-400/15 text-amber-500";
   return (
+    <>
+    {overlayCard}
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl px-4 py-3 text-sm font-semibold ${tone}`} role="status">
       <span className="relative flex h-2.5 w-2.5">
         {state === "ok" && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-60" />}
@@ -188,5 +208,6 @@ export function CourierTracker({ online, sig, t }: { online: boolean; sig: strin
         <span className="w-full pl-5 text-xs font-normal opacity-80">{wake ? t.screenOn : t.screen}</span>
       )}
     </div>
+    </>
   );
 }

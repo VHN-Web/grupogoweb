@@ -22,6 +22,7 @@ final class Notifier {
 
     static final String CH_TRACK = "rastreio";
     static final String CH_JOBS = "entregas";
+    static final String CH_OFFER = "corridas";
     static final int ID_TRACK = 1001;
     private static final int COLOR = 0xFF3CC46B;
 
@@ -37,6 +38,15 @@ final class Notifier {
         j.setVibrationPattern(new long[] { 0, 400, 200, 400 });
         j.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         nm.createNotificationChannel(j);
+        // corrida nova: tela cheia + toque de chamada
+        NotificationChannel o = new NotificationChannel(CH_OFFER, L.t(c, "ch_offer"), NotificationManager.IMPORTANCE_HIGH);
+        o.enableVibration(true);
+        o.setVibrationPattern(new long[] { 0, 700, 500, 700 });
+        o.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        o.setBypassDnd(true);
+        o.setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE),
+                new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE).build());
+        nm.createNotificationChannel(o);
     }
 
     static boolean canNotify(Context c) {
@@ -102,32 +112,29 @@ final class Notifier {
     }
 
     /**
-     * Compara a resposta do ping com a anterior e avisa entrega nova/livre.
-     * Só quando o Firebase não está ativo (com Firebase o servidor já manda o aviso — evita duplicar).
+     * Compara a resposta do ping com a anterior: entrega nova (passada para ele) ou livre na loja
+     * vira a tela cheia da corrida. O Firebase pode avisar a mesma — Offer.show não repete.
      */
     static void diff(Context c, JSONObject j) {
         JSONArray mine = j.optJSONArray("mine");
         JSONArray open = j.optJSONArray("open");
         String prevMine = Prefs.str(c, "knownMine", null);
         String prevOpen = Prefs.str(c, "knownOpen", null);
-        boolean push = Prefs.bool(c, "pushActive", false);
-        if (!push && prevMine != null && mine != null) {
+        String store = j.optString("store", "");
+        if (prevMine != null && mine != null) {
             for (int i = 0; i < mine.length(); i++) {
                 JSONObject o = mine.optJSONObject(i);
-                if (o == null) continue;
-                String id = o.optString("id");
-                if (!prevMine.contains("," + id + ",")) {
-                    Notifier.show(c, "mine-" + id, L.t(c, "new_title").replace("{n}", o.optString("n")), L.t(c, "new_body"), "/entregador");
-                }
+                if (o == null || "OUT_FOR_DELIVERY".equals(o.optString("s"))) continue;
+                if (!prevMine.contains("," + o.optString("id") + ",")) Offer.show(c, Offer.fromJson(o, "mine", store));
             }
         }
-        if (!push && prevOpen != null && open != null) {
-            String lastN = null;
+        if (prevOpen != null && open != null) {
+            Offer newest = null;
             for (int i = 0; i < open.length(); i++) {
                 JSONObject o = open.optJSONObject(i);
-                if (o != null && !prevOpen.contains("," + o.optString("id") + ",")) lastN = o.optString("n");
+                if (o != null && !prevOpen.contains("," + o.optString("id") + ",")) newest = Offer.fromJson(o, "open", store);
             }
-            if (lastN != null) Notifier.show(c, "livres", L.t(c, "open_title").replace("{n}", lastN), L.t(c, "open_body"), "/entregador");
+            if (newest != null) Offer.show(c, newest);
         }
         if (mine != null) Prefs.putStr(c, "knownMine", ids(mine));
         if (open != null) Prefs.putStr(c, "knownOpen", ids(open));

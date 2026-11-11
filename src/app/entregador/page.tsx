@@ -93,6 +93,10 @@ export default async function CourierHome({ searchParams }: { searchParams: Prom
             settings: T("Abrir configuración", "Abrir configurações"),
             battery: T("Que Android no pause el GPS", "Não deixar o Android pausar o GPS"),
             offlineNet: T("Sin internet: la ubicación se envía cuando vuelva la señal.", "Sem internet: a localização é enviada quando o sinal voltar."),
+            overlayTitle: T("Que el viaje aparezca en la pantalla", "Faça a corrida aparecer na tela"),
+            overlayText: T("Permití \"Mostrar sobre otras apps\" para que la nueva entrega abra a pantalla completa, sonando, aunque estés en otra app o con el celular bloqueado.", "Permita \"Sobrepor a outros apps\" para a nova entrega abrir em tela cheia, tocando, mesmo se você estiver em outro app ou com o celular bloqueado."),
+            overlayBtn: T("Permitir sobre otras apps", "Permitir sobre outros apps"),
+            fullScreenBtn: T("Permitir pantalla completa", "Permitir tela cheia"),
           }}
         />
       </div>

@@ -35,6 +35,16 @@ final class L {
         put("offline_page_title", "Sem conexão", "Sin conexión");
         put("offline_page_body", "Confira a internet e tente de novo.", "Revisá la conexión e intentá de nuevo.");
         put("retry", "Tentar de novo", "Reintentar");
+        put("ch_offer", "Corridas (tela cheia)", "Viajes (pantalla completa)");
+        put("km_from_store", "{km} km da loja", "{km} km de la tienda");
+        put("accept", "Aceitar", "Aceptar");
+        put("claim", "Pegar entrega", "Tomar entrega");
+        put("decline", "Recusar", "Rechazar");
+        put("ignore", "Agora não", "Ahora no");
+        put("offer_cancelled", "A loja cancelou este pedido.", "La tienda canceló este pedido.");
+        put("offer_missed", "Tempo esgotado.", "Se acabó el tiempo.");
+        put("offer_failed", "Não deu certo. Abra o app para conferir.", "No se pudo. Abrí la app para revisar.");
+        put("no_net_short", "Sem internet.", "Sin internet.");
     }
 
     static String lang(Context c) {

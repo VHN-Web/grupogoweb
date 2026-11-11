@@ -435,9 +435,9 @@ export async function setOrderStatus(tenantId: string, orderId: string, status: 
     // em preparo/pronto sem motoboy: passa para o online mais perto; ninguém disponível → avisa todos (pronto)
     if ((status === "PREPARING" || status === "READY") && !order.courierId) {
       const n = await ca.autoAssign(tenantId, orderId).catch(() => 0);
-      if (!n && status === "READY") await ca.notifyOnlineCouriers(tenantId, `Pedido #${order.number}`, "Entrega disponível · Entrega disponible").catch(() => null);
+      if (!n && status === "READY") await ca.notifyOnlineCouriers(tenantId, `Pedido #${order.number}`, "Entrega disponível · Entrega disponible", { type: "open", orderId, number: order.number, address: order.address, km: order.distanceKm }).catch(() => null);
     }
-    if (status === "CANCELLED" && order.courierId) await ca.notifyCourier(order.courierId, `#${order.number} cancelado`, "A loja cancelou este pedido · La tienda canceló este pedido").catch(() => null);
+    if (status === "CANCELLED" && order.courierId) await ca.notifyCourier(order.courierId, `#${order.number} cancelado`, "A loja cancelou este pedido · La tienda canceló este pedido", { cancelOrderId: orderId }).catch(() => null);
   }
   // Geovana: aviso automático ao cliente pelo WhatsApp da loja (se ligado)
   if (order.status !== status) {

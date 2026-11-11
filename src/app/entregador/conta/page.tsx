@@ -45,6 +45,8 @@ export default async function CourierAccount() {
             <li>{T("Mientras estés online la app envía tu ubicación aunque la cierres o bloquees la pantalla. Un aviso fijo en las notificaciones lo indica; desde ahí también podés ponerte offline.", "Enquanto você estiver online o app envia sua localização mesmo fechado ou com a tela bloqueada. Um aviso fixo nas notificações mostra isso; por ele você também pode ficar offline.")}</li>
             <li>{T("Permití la ubicación \"precisa\" y, si el celular pregunta, que la app no tenga restricciones de batería.", "Permita a localização \"precisa\" e, se o celular perguntar, deixe o app sem restrição de bateria.")}</li>
             <li>{T("Podés usar Google Maps o Waze normalmente: la ubicación sigue enviándose.", "Pode usar Google Maps ou Waze normalmente: a localização continua sendo enviada.")}</li>
+            <li>{T("Nueva entrega abre a pantalla completa y suena por 30 s. Si fue asignada automáticamente y no respondés, pasa al siguiente repartidor.", "Entrega nova abre em tela cheia e toca por 30 s. Se foi passada automaticamente e você não responder, ela vai para o próximo entregador.")}</li>
+            <li>{T("Xiaomi/Redmi/POCO: en Configuración → Apps → Entregas → Otros permisos, activá \"Mostrar ventanas emergentes en segundo plano\".", "Xiaomi/Redmi/POCO: em Configurações → Apps → Entregas → Outras permissões, ative \"Exibir janelas pop-up ao executar em segundo plano\".")}</li>
           </ul>
         </section>
       ) : (

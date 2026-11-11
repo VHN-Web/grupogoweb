@@ -12,6 +12,10 @@ export type NativeStatus = {
   battery: boolean;
   push: boolean;
   version: string;
+  /** "Aparecer sobre outros apps": a corrida abre por cima de qualquer app */
+  overlay?: boolean;
+  /** Android 14+: tela cheia com o celular bloqueado */
+  fullScreen?: boolean;
 };
 
 type Bridge = {
@@ -22,6 +26,8 @@ type Bridge = {
   openAppSettings(): void;
   requestNotifications(): void;
   requestBatteryExemption(): void;
+  requestOverlay?(): void;
+  requestFullScreen?(): void;
   beforeLogout(): void;
 };
 

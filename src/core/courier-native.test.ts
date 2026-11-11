@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { androidOpenAppUrl, assetLinks, COURIER_APP, extractAccessToken, isCourierNativeUA } from "./courier-native";
+import { androidOpenAppUrl, assetLinks, COURIER_APP, extractAccessToken, isCourierNativeUA, offerCancelData, offerData } from "./courier-native";
 
 const TOKEN = "AbCdEfGhIjKlMnOpQrStUvWxYz012345";
 
@@ -30,5 +30,17 @@ describe("app Android do entregador", () => {
     expect(assetLinks(null)[0].target.sha256_cert_fingerprints).toEqual([COURIER_APP.defaultCertSha256]);
     const other = Array.from({ length: 32 }, () => "ab").join(":");
     expect(assetLinks(`${other}, lixo`)[0].target.sha256_cert_fingerprints).toEqual([other.toUpperCase()]);
+  });
+});
+
+describe("oferta de corrida (tela cheia no app)", () => {
+  it("tudo em texto, com km arredondado e campos vazios quando faltam", () => {
+    expect(offerData({ type: "mine", orderId: "o1", number: 4821, address: "Rua A, 10", km: 2.345, fee: "R$ 8,00", store: "Burguer", auto: true })).toEqual({
+      kind: "offer", type: "mine", orderId: "o1", n: "4821", addr: "Rua A, 10", km: "2.3", fee: "R$ 8,00", store: "Burguer", auto: "1",
+    });
+    expect(offerData({ type: "open", orderId: "o2", number: "77" })).toEqual({ kind: "offer", type: "open", orderId: "o2", n: "77", addr: "", km: "", fee: "", store: "", auto: "0" });
+  });
+  it("cancelamento", () => {
+    expect(offerCancelData("o1")).toEqual({ kind: "cancel", orderId: "o1" });
   });
 });

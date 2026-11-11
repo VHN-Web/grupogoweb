@@ -30,6 +30,8 @@ final class AtlasBridge {
             o.put("battery", a.ignoringBattery());
             o.put("push", Prefs.bool(a, "pushActive", false));
             o.put("version", BuildConfig.VERSION_NAME);
+            o.put("overlay", Offer.canOverlay(a));
+            o.put("fullScreen", Offer.canFullScreen(a));
         } catch (Exception ignored) {
         }
         return o.toString();
@@ -56,6 +58,18 @@ final class AtlasBridge {
     @JavascriptInterface
     public void requestNotifications() {
         if (a.trusted()) a.runOnUiThread(a::requestNotifications);
+    }
+
+    /** "Aparecer sobre outros apps": a corrida abre por cima do Instagram, WhatsApp etc. */
+    @JavascriptInterface
+    public void requestOverlay() {
+        if (a.trusted()) a.runOnUiThread(a::requestOverlay);
+    }
+
+    /** Android 14+: permissão de notificação em tela cheia (tela bloqueada). */
+    @JavascriptInterface
+    public void requestFullScreen() {
+        if (a.trusted()) a.runOnUiThread(a::requestFullScreen);
     }
 
     @JavascriptInterface

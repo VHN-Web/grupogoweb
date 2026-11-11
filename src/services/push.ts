@@ -55,7 +55,7 @@ export async function removePushSub(endpoint: string) {
   await db.delete(schema.crmPushSubs).where(eq(schema.crmPushSubs.endpoint, endpoint));
 }
 
-export type PushPayload = { title: string; body: string; url?: string; tag?: string; icon?: string };
+export type PushPayload = { title: string; body: string; url?: string; tag?: string; icon?: string; /** só app Android (Firebase): ex. oferta de corrida */ data?: Record<string, string> };
 
 /** Envia para alguns sócios (ids) ou para todos ("all"). Nunca lança erro. */
 export async function sendPush(to: string[] | "all", p: PushPayload) {
@@ -70,7 +70,7 @@ export async function sendPush(to: string[] | "all", p: PushPayload) {
     await Promise.all(
       subs.map(async (s) => {
         if (s.endpoint.startsWith(FCM_PREFIX)) {
-          const r = await sendFcm(s.endpoint.slice(FCM_PREFIX.length), { title: p.title, body: p.body, url: p.url ?? "/crm", tag: p.tag ?? "" });
+          const r = await sendFcm(s.endpoint.slice(FCM_PREFIX.length), { ...p.data, title: p.title, body: p.body, url: p.url ?? "/crm", tag: p.tag ?? "" });
           if (r === "ok") ok++;
           else if (r === "gone") await removePushSub(s.endpoint);
           return;
