@@ -6,6 +6,11 @@ import { eq, inArray, notLike } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { parseCrmConfig } from "@/core/crm";
 import { openSecret, sealSecret } from "@/lib/secrets";
+import { fcmConfigured, sendFcm } from "@/adapters/push/fcm";
+
+/** Aparelhos do app Android (Firebase) ficam na mesma tabela, com endpoint "fcm:<token>". */
+export const FCM_PREFIX = "fcm:";
+export { fcmConfigured };
 
 let cached: { pub: string; priv: string } | null = null;
 
@@ -35,11 +40,22 @@ export async function savePushSub(actorId: string, sub: { endpoint: string; keys
     .onConflictDoUpdate({ target: schema.crmPushSubs.endpoint, set: { actorId, p256dh: sub.keys.p256dh, auth: sub.keys.auth, device: device?.slice(0, 80) ?? null } });
 }
 
+/** Token do Firebase do app Android do entregador. */
+export async function saveFcmSub(actorId: string, fcmToken: string, device?: string | null) {
+  if (!/^[A-Za-z0-9:_\-.]{20,4096}$/.test(fcmToken)) throw new Error("token inválido");
+  const endpoint = `${FCM_PREFIX}${fcmToken}`;
+  const dev = device?.slice(0, 80) ?? "Android (app)";
+  await db
+    .insert(schema.crmPushSubs)
+    .values({ actorId, endpoint, p256dh: "fcm", auth: "fcm", device: dev })
+    .onConflictDoUpdate({ target: schema.crmPushSubs.endpoint, set: { actorId, device: dev } });
+}
+
 export async function removePushSub(endpoint: string) {
   await db.delete(schema.crmPushSubs).where(eq(schema.crmPushSubs.endpoint, endpoint));
 }
 
-export type PushPayload = { title: string; body: string; url?: string; tag?: string; icon?: string };
+export type PushPayload = { title: string; body: string; url?: string; tag?: string; icon?: string; /** só app Android (Firebase): ex. oferta de corrida */ data?: Record<string, string> };
 
 /** Envia para alguns sócios (ids) ou para todos ("all"). Nunca lança erro. */
 export async function sendPush(to: string[] | "all", p: PushPayload) {
@@ -53,6 +69,12 @@ export async function sendPush(to: string[] | "all", p: PushPayload) {
     let ok = 0;
     await Promise.all(
       subs.map(async (s) => {
+        if (s.endpoint.startsWith(FCM_PREFIX)) {
+          const r = await sendFcm(s.endpoint.slice(FCM_PREFIX.length), { ...p.data, title: p.title, body: p.body, url: p.url ?? "/crm", tag: p.tag ?? "" });
+          if (r === "ok") ok++;
+          else if (r === "gone") await removePushSub(s.endpoint);
+          return;
+        }
         try {
           await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 3600 * 12 });
           ok++;

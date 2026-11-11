@@ -10,7 +10,7 @@ import { getRegion, isValidE164, isValidName, tr } from "@/core/region";
 import { parseMajorToMinor } from "@/core/money";
 import { hasModule } from "@/core/modules";
 import type { Currency } from "@/core/types";
-import { courierAccessLink, notifyCourier, saveDispatchConfig } from "@/services/courier-app";
+import { courierAccessLink, courierFeeLabel, notifyCourier, saveDispatchConfig } from "@/services/courier-app";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const page = (slug: string) => `/painel/${slug}/motoboys`;
@@ -71,7 +71,10 @@ export async function assignCourier(slug: string, orderId: string, f: FormData) 
   await audit(t.id, await actorName(slug), "order.courier", `#${o!.number}`);
   if (courierId && courierId !== o!.courierId) {
     const T = tr(getRegion(t.country).locale);
-    await notifyCourier(courierId, T(`Nueva entrega #${o!.number}`, `Nova entrega #${o!.number}`), `${t.name}${o!.address ? ` · ${o!.address}` : ""}`);
+    const cour = await db.query.couriers.findFirst({ where: and(eq(schema.couriers.id, courierId), eq(schema.couriers.tenantId, t.id)), columns: { feePerDelivery: true } });
+    await notifyCourier(courierId, T(`Nueva entrega #${o!.number}`, `Nova entrega #${o!.number}`), `${t.name}${o!.address ? ` · ${o!.address}` : ""}`, {
+      offer: { type: "mine", orderId: o!.id, number: o!.number, address: o!.address, km: o!.distanceKm, fee: courierFeeLabel(o!.deliveryFeePyg, cour?.feePerDelivery ?? 0, t.currency), store: t.name, auto: false },
+    });
   }
   revalidatePath(path);
   redirect(path);

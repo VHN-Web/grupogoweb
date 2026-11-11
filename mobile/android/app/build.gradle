@@ -1,0 +1,70 @@
+plugins {
+    id "com.android.application"
+}
+
+// Firebase (notificações com o app fechado e o motoboy offline) só entra se existir app/google-services.json
+// — o workflow cria o arquivo a partir do secret GOOGLE_SERVICES_JSON.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+}
+
+// Endereço do site (o mesmo do Vercel). Troque com -PatlasUrl=https://... ou a variável ATLAS_URL.
+def atlasUrl = (project.findProperty("atlasUrl") ?: System.getenv("ATLAS_URL") ?: "https://goweboficial.com").toString().replaceAll('/+$', '')
+def atlasHost = new URI(atlasUrl).host
+def vCode = (project.findProperty("versionCode") ?: System.getenv("VERSION_CODE") ?: "1").toString().toInteger()
+def vName = (project.findProperty("versionName") ?: System.getenv("VERSION_NAME") ?: "1.0.0").toString()
+def keystore = System.getenv("ANDROID_KEYSTORE_FILE")
+
+android {
+    namespace "com.goweboficial.entregador"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.goweboficial.entregador"
+        minSdk 24
+        targetSdk 35
+        versionCode vCode
+        versionName vName
+        buildConfigField "String", "BASE_URL", "\"${atlasUrl}\""
+        manifestPlaceholders = [atlasHost: atlasHost]
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        release {
+            if (keystore) {
+                storeFile file(keystore)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // sem a chave própria assina com a chave de debug (instala, mas cada build exige desinstalar o anterior)
+            signingConfig keystore ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    implementation "androidx.core:core:1.13.1"
+    implementation "com.google.firebase:firebase-messaging:24.1.0"
+    implementation "com.google.android.gms:play-services-tasks:18.2.0"
+}

@@ -2,9 +2,10 @@
 // Ações do app do entregador. Toda ação confere a sessão do entregador e a loja dele.
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireCourier, clearCourierSession } from "@/lib/courier-auth";
-import { claimDelivery, completeDelivery, CourierError, declineDelivery, pickUpDelivery, setCourierOnline } from "@/services/courier-app";
-import { audit } from "@/lib/security";
+import { requireCourier, clearCourierSession, setCourierSession } from "@/lib/courier-auth";
+import { claimDelivery, completeDelivery, courierByToken, CourierError, declineDelivery, pickUpDelivery, setCourierOnline } from "@/services/courier-app";
+import { audit, clientIp, rateLimit } from "@/lib/security";
+import { extractAccessToken } from "@/core/courier-native";
 import { getRegion, tr } from "@/core/region";
 
 const done = (msg?: string, err?: boolean): never => {
@@ -59,4 +60,14 @@ export async function declineAction(orderId: string) {
   const { courier, tenant } = await requireCourier();
   const T = tr(getRegion(tenant.country).locale);
   await run(() => declineDelivery(courier, orderId), T("Entrega rechazada. Pasó al siguiente repartidor.", "Entrega recusada. Ela foi para o próximo entregador."));
+}
+
+/** Entrar colando o link de acesso (usado no app Android, onde o link do WhatsApp abre no navegador). */
+export async function enterWithLinkAction(f: FormData) {
+  if (!(await rateLimit(`courier-link:${await clientIp().catch(() => "x")}`, 30, 15 * 60))) redirect("/entregador/entrar?erro=limite");
+  const token = extractAccessToken(String(f.get("link") ?? ""));
+  const s = token ? await courierByToken(token) : null;
+  if (!token || !s) redirect("/entregador/entrar?erro=link");
+  await setCourierSession(token);
+  redirect("/entregador?bemvindo=1");
 }
