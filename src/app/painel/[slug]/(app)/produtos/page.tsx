@@ -14,6 +14,9 @@ import { Illustration } from "@/components/Illustration";
 import { adjustStock, deleteCategory, deleteProduct, saveCategory, saveProduct } from "../actions";
 import Link from "next/link";
 import { pendingImports } from "@/services/menu-import";
+import { mediaByProduct } from "@/services/product-media";
+import { MAX_EXTRA_IMAGES } from "@/core/media";
+import { ProductGalleryManager } from "@/components/forms/ProductGalleryManager";
 import { discardImportAction, publishImportAction } from "../menu-import-actions";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +33,7 @@ export default async function ProductsPage({ params, searchParams }: { params: P
   ]);
   const prodName = new Map(prods.map((p) => [p.id, p.name]));
   const low = prods.filter((p) => p.trackStock && p.stock <= 3);
-  const pending = await pendingImports(t.id);
+  const [pending, media] = await Promise.all([pendingImports(t.id), mediaByProduct(t.id)]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -88,6 +91,9 @@ export default async function ProductsPage({ params, searchParams }: { params: P
               </summary>
               <div className="space-y-4 border-t border-line bg-paper/60 px-4 py-4">
                 <ProductForm slug={slug} cats={cats} p={p} T={T} cur={t.currency as Currency} pro={t.tier === "pro"} />
+                <div className="border-t border-line pt-4">
+                  <ProductGalleryManager slug={slug} tenantId={t.id} productId={p.id} mainUrl={p.imageUrl} items={(media.get(p.id) ?? []).map((m) => ({ id: m.id, kind: m.kind, url: m.url }))} pt={t.country !== "PY"} maxExtra={MAX_EXTRA_IMAGES} />
+                </div>
                 {p.trackStock && (
                   <form action={adjustStock.bind(null, slug, p.id)} className="flex flex-wrap items-end gap-2">
                     <div>
@@ -179,7 +185,7 @@ function ProductForm({ slug, cats, p, T, cur, pro }: { slug: string; cats: Categ
         <input name="newCategory" className="input mt-2" maxLength={40} placeholder={cats.length ? T("…o creá una nueva categoría", "…ou crie uma nova categoria") : T("Creá la primera categoría (ej.: Bebidas)", "Crie a primeira categoria (ex.: Bebidas)")} />
       </div>
       <div>
-        <label className="label">{T("Foto", "Foto")}</label>
+        <label className="label">{T("Foto principal", "Foto principal")}</label>
         <ImageUpload name="imageFile" removeName="removeImage" current={p?.imageUrl} labels={uploadLabels(T)} />
       </div>
       <div>

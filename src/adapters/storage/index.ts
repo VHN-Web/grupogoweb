@@ -9,6 +9,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { HandleUploadPresignedBody } from "@vercel/blob/client";
+import { VIDEO_MAX_BYTES, VIDEO_TYPES } from "@/core/media";
 
 const MAX_BYTES = 4 * 1024 * 1024; // o navegador já comprime antes (components/forms/ImageUpload)
 const TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
@@ -66,5 +68,74 @@ export async function saveImage(file: File, folder: string): Promise<string> {
     if (e instanceof UploadError) throw e;
     console.error("[upload]", e);
     throw new UploadError("Não foi possível salvar a imagem agora. Tente de novo em instantes.", "No pudimos guardar la imagen ahora. Probá de nuevo en un momento.");
+  }
+}
+
+// =============================================================================
+// Vídeo dos produtos (galeria): o arquivo vai DIRETO do navegador para o Blob (URL de envio assinada,
+// sem passar pelo limite de 4,5 MB das funções) e é entregue por URL de leitura assinada (o CDN do Blob
+// faz o streaming com Range — necessário no iPhone — sem gastar a função).
+// =============================================================================
+
+/** Responde o pedido de URL de envio do navegador. `authorize` confere sessão/produto e o caminho; lança erro se não pode. */
+export async function videoUploadResponse(request: Request, body: HandleUploadPresignedBody, authorize: (pathname: string) => Promise<void>) {
+  if (!blobConfigured()) throw new UploadError("Envio de vídeo precisa do armazenamento da Vercel (Blob).", "El envío de video necesita el almacenamiento de Vercel (Blob).");
+  const { issueSignedToken } = await import("@vercel/blob");
+  const { handleUploadPresigned } = await import("@vercel/blob/client");
+  return handleUploadPresigned({
+    body,
+    request,
+    getSignedToken: async (pathname) => {
+      await authorize(pathname);
+      const types = Object.keys(VIDEO_TYPES);
+      const token = await issueSignedToken({ pathname, operations: ["put"], allowedContentTypes: types, maximumSizeInBytes: VIDEO_MAX_BYTES, validUntil: Date.now() + 15 * 60_000 });
+      return { token, urlOptions: { allowedContentTypes: types, maximumSizeInBytes: VIDEO_MAX_BYTES, validUntil: Date.now() + 15 * 60_000, addRandomSuffix: false, allowOverwrite: false, cacheControlMaxAge: 60 * 60 * 24 * 365 } };
+    },
+  });
+}
+
+/** Tamanho e tipo reais do arquivo no Blob (o servidor não confia no que o navegador diz). */
+export async function blobInfo(pathname: string): Promise<{ size: number; contentType: string; url: string } | null> {
+  if (!blobConfigured()) return null;
+  try {
+    const { head } = await import("@vercel/blob");
+    const h = await head(pathname);
+    return { size: h.size, contentType: h.contentType, url: h.url };
+  } catch {
+    return null;
+  }
+}
+
+/** Apaga um arquivo do Blob (galeria). Falha aqui não impede tirar da galeria. */
+export async function deleteBlob(pathname: string) {
+  if (!blobConfigured()) return;
+  try {
+    const { del } = await import("@vercel/blob");
+    await del(pathname);
+  } catch (e) {
+    console.error("[upload] del", e);
+  }
+}
+
+// tokens de leitura assinados guardados em memória (cada emissão é uma chamada à API do Blob)
+const readTokens = new Map<string, { token: { delegationToken: string; clientSigningToken: string; validUntil: number } }>();
+
+/** URL temporária (1 h) para tocar um vídeo privado direto do CDN do Blob. null = loja pública ou sem Blob. */
+export async function signedVideoUrl(pathname: string): Promise<string | null> {
+  if (!blobConfigured()) return null;
+  try {
+    const { issueSignedToken, presignUrl } = await import("@vercel/blob");
+    let hit = readTokens.get(pathname);
+    if (!hit || hit.token.validUntil - Date.now() < 10 * 60_000) {
+      const token = await issueSignedToken({ pathname, operations: ["get"], validUntil: Date.now() + 60 * 60_000 });
+      if (readTokens.size > 500) readTokens.clear();
+      hit = { token };
+      readTokens.set(pathname, hit);
+    }
+    const { presignedUrl } = await presignUrl(hit.token, { operation: "get", pathname, access: "private" });
+    return presignedUrl;
+  } catch (e) {
+    console.error("[upload] presign", e);
+    return null;
   }
 }
