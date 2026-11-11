@@ -5,3 +5,8 @@ node_modules
 next-env.d.ts
 *.tsbuildinfo
 .uploads
+
+# app Android (gerado no GitHub Actions)
+mobile/node_modules
+mobile/android
+mobile/package-lock.json

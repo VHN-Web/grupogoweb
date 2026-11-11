@@ -2,7 +2,7 @@
 
 Plataforma SaaS **multi-tenant white-label** para restaurantes, bares e lanchonetes no **Paraguai**:
 cardápio digital por QR, pedidos (mesa / retiro / delivery), pagamento multi-moeda (Gs., US$, R$),
-caixa (PDV), estoque, registro de facturas e painel do estabelecimento. É um **site** (não app nativo).
+caixa (PDV), estoque, registro de facturas e painel do estabelecimento. É um **site**; o único app nativo é o casco Android do entregador (`mobile/`, Capacitor, APK gerado pelo GitHub Actions — ver `mobile/README.md`), que apenas abre `/entregador` e envia o GPS em segundo plano.
 
 Dois níveis:
 1. **Plataforma** (dono: Lázaro) — `/admin`: planos, clientes contratantes, faturas multi-moeda,

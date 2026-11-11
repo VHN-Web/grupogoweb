@@ -34,7 +34,17 @@ const nextConfig: NextConfig = {
   // fontes das artes geradas no servidor (lidas com fs)
   outputFileTracingIncludes: { "/api/afiliados/arte": ["./assets/fonts/**"] },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // APK do app Android do entregador: tipo correto e sem cache (cada build novo substitui o arquivo)
+      {
+        source: "/entregador/entregas.apk",
+        headers: [
+          { key: "Content-Type", value: "application/vnd.android.package-archive" },
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+        ],
+      },
+    ];
   },
 };
 
