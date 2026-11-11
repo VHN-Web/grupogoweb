@@ -101,3 +101,54 @@ async function geminiOnce(key: string, model: string, body: string, timeoutMs: n
   }
   return (j?.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
 }
+
+/**
+ * Pesquisa com a ferramenta "Google Search" do Gemini (sem modo JSON — a busca não aceita).
+ * Devolve o texto e as páginas que o Google usou (groundingMetadata), para mostrar as fontes.
+ */
+export async function geminiSearch(o: { key: string; model: string; prompt: string; maxTokens?: number; timeoutMs?: number }) {
+  if (!o.key) throw new AiError("IA sem chave configurada", "key");
+  const model = geminiModel(o.model);
+  const chain = [model, ...GEMINI_FALLBACKS.filter((m) => m !== model)];
+  let last: unknown;
+  for (const m of chain) {
+    try {
+      const res = await fetch(`${process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com"}/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": o.key },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: o.prompt }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: geminiGenConfig(m, 0.2, o.maxTokens ?? 8192),
+        }),
+        signal: AbortSignal.timeout(o.timeoutMs ?? 110_000),
+      }).catch((e: unknown) => {
+        if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) throw new AiError("O Gemini demorou para responder (sobrecarga passageira).", "busy");
+        throw new AiError("Não consegui falar com o Gemini.");
+      });
+      type Chunk = { web?: { uri?: string; title?: string } };
+      const j = (await res.json().catch(() => null)) as {
+        candidates?: { content?: { parts?: { text?: string }[] }; groundingMetadata?: { groundingChunks?: Chunk[] } }[];
+        error?: { message?: string };
+      } | null;
+      if (!res.ok) {
+        const msg = j?.error?.message ?? `HTTP ${res.status}`;
+        if (res.status === 400 && /API key/i.test(msg)) throw new AiError("Chave do Gemini inválida.", "key");
+        if (res.status === 404 || /not found|no longer available|not supported/i.test(msg)) throw new AiError(`Modelo ${m} indisponível.`, "model");
+        if (res.status === 503 || /high demand|overloaded|unavailable/i.test(msg)) throw new AiError("O Gemini está sobrecarregado agora (passageiro).", "busy");
+        if (res.status === 429) throw new AiError("Limite do Gemini atingido por agora.", "quota");
+        throw new AiError(`Gemini: ${msg}`);
+      }
+      const c = j?.candidates?.[0];
+      const text = (c?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
+      const sources = (c?.groundingMetadata?.groundingChunks ?? [])
+        .map((g) => ({ title: g.web?.title ?? "", url: g.web?.uri ?? "" }))
+        .filter((s) => /^https?:\/\//.test(s.url));
+      return { text, sources };
+    } catch (e) {
+      last = e;
+      if (!(e instanceof AiError) || (e.kind !== "busy" && e.kind !== "model")) throw e;
+    }
+  }
+  throw last;
+}

@@ -59,6 +59,11 @@ export default async function LeadPage({ params, searchParams }: { params: Promi
         </div>
         <p className="mt-4 text-xs text-[#8a857b]">Responsável: <b className="text-[#F4F1EA]">{who(l.ownerId)}</b>{l.lastContactAt ? ` · último contato ${fmtBr(l.lastContactAt)}` : " · ainda sem contato"}{l.followUpAt ? ` · retorno ${fmtBr(l.followUpAt)}` : ""}</p>
         {l.customerId && <Link href={`/admin/clientes/${l.customerId}`} className="mt-3 inline-block rounded-xl bg-[#3CC46B] px-3 py-1.5 text-sm font-bold text-[#0E0E10]">Ver cliente no admin →</Link>}
+        {!l.customerId && (
+          <Link href={`/admin/demos?lead=${l.id}#geovana`} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-white/15 px-3 py-1.5 text-sm font-bold text-[#F4F1EA] hover:bg-white/5">
+            Montar demo com a Geovana →
+          </Link>
+        )}
       </section>
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
