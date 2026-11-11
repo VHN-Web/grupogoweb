@@ -22,8 +22,8 @@ O workflow `.github/workflows/android-apk.yml` roda em todo PR/push que mexe em 
 
 - **PR**: o APK fica em *Artifacts* da execução (`entregas-apk`).
 - **main/manual**: publica também em **Releases → entregador-latest**.
-- Variável `COMMIT_APK=true` (opcional): grava o APK em `public/entregador/entregas.apk`, que é o arquivo baixado em
-  `/entregador/baixar`. Sem ela, suba o APK nesse caminho por PR, ou hospede onde quiser e defina `COURIER_APK_URL` no Vercel.
+- O botão de `/entregador/baixar` aponta para esse APK do Releases (repositório público). Para usar outro endereço,
+  defina `COURIER_APK_URL` no Vercel.
 
 ### Secrets (Settings → Secrets and variables → Actions)
 

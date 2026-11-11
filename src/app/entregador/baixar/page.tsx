@@ -1,13 +1,13 @@
 import { headers } from "next/headers";
 import { Icon } from "@/components/ui/Icon";
-import { isAndroidUA, isCourierNativeUA } from "@/core/courier-native";
+import { COURIER_APP, isAndroidUA, isCourierNativeUA } from "@/core/courier-native";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Baixar o app · Descargar la app" };
 
-/** APK do app Android do entregador: COURIER_APK_URL ou o arquivo em public/entregador/entregas.apk. */
+/** APK do app Android do entregador: COURIER_APK_URL ou o último build publicado no GitHub (Releases). */
 function apkUrl() {
-  return process.env.COURIER_APK_URL?.trim() || "/entregador/entregas.apk";
+  return process.env.COURIER_APK_URL?.trim() || COURIER_APP.apkUrl;
 }
 
 export default async function CourierDownload() {
@@ -25,7 +25,7 @@ export default async function CourierDownload() {
       {native ? (
         <p className="mt-6 rounded-2xl bg-[var(--s-good-bg)] p-4 text-center text-sm text-[var(--s-good-fg)]">Você já está no app. · Ya estás en la app.</p>
       ) : (
-        <a href={apkUrl()} download="entregas.apk" className="btn-brand mt-6 w-full justify-center py-3 text-base">
+        <a href={apkUrl()} className="btn-brand mt-6 w-full justify-center py-3 text-base">
           <Icon name="download" size={18} /> Baixar o app (APK) · Descargar
         </a>
       )}
