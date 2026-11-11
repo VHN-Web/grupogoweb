@@ -72,7 +72,17 @@ final class AtlasBridge {
         PushRegistrar.unregister(a, Api.cookieHeader());
         Prefs.putStr(a, "widget", "");
         Prefs.putStr(a, "since", "");
+        Notifier.live(a, "");
         a.runOnUiThread(() -> Widgets.updateAll(a, false));
+    }
+
+    /** A ilha do CRM web mudou: atualiza a notificação "ao vivo" com cronômetro ("" = some). */
+    @JavascriptInterface
+    public void setLive(String json) {
+        if (!a.trusted()) return;
+        String key = json == null ? "" : json;
+        Prefs.putStr(a, "liveKey", key.isEmpty() ? "" : "web:" + key.hashCode());
+        Notifier.live(a, key);
     }
 
     @JavascriptInterface

@@ -47,6 +47,9 @@ const P: Record<string, React.ReactNode> = {
   wallet: (<><path d="M4 7a2 2 0 0 1 2-2h11v4" /><path d="M4 7v11a2 2 0 0 0 2 2h14V9H6a2 2 0 0 1-2-2z" /><circle cx="16" cy="14.5" r="1.2" /></>),
   bell: (<><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z" /><path d="M10 20a2 2 0 0 0 4 0" /></>),
   trash: (<><path d="M4 7h16M10 11v6M14 11v6" /><path d="M6 7l1 13h10l1-13M9 7V4h6v3" /></>),
+  plus: (<path d="M12 5v14M5 12h14" />),
+  note: (<><path d="M5 3h10l4 4v14H5z" /><path d="M15 3v4h4M8 12h8M8 16h5" /></>),
+  alarm: (<><circle cx="12" cy="13" r="7.5" /><path d="M12 9.5V13l2.5 1.5M4 5l3-2M20 5l-3-2" /></>),
   instagram: (<><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><path d="M17.5 6.5v.01" /></>),
 };
 

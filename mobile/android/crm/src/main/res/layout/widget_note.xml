@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget "Nota fixada + atalhos" (NoteWidget) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/widget_logo" />
+        <TextView
+            android:id="@+id/w_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:text="Nota fixada"
+            android:textColor="@color/ivory"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+        <ImageView
+            android:id="@+id/w_refresh"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="Atualizar"
+            android:padding="5dp"
+            android:src="@drawable/ic_refresh" />
+    </LinearLayout>
+    <TextView
+        android:id="@+id/n_body"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="6dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_cell"
+        android:ellipsize="end"
+        android:gravity="top"
+        android:padding="10dp"
+        android:text="Fixe uma nota no CRM para ela aparecer aqui."
+        android:textColor="@color/ivory"
+        android:textSize="14sp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/n_new"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_cell"
+            android:gravity="center"
+            android:text="+ Nota"
+            android:textColor="@color/green"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/n_rem"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_cell"
+            android:gravity="center"
+            android:text="+ Lembrete"
+            android:textColor="@color/amber"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/n_ev"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_cell"
+            android:gravity="center"
+            android:text="+ Agenda"
+            android:textColor="@color/blue"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>

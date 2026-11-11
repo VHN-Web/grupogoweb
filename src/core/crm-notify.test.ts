@@ -26,6 +26,8 @@ describe("notificações do CRM", () => {
     expect(shouldPush(p, "leads", DAY)).toBe(true);
     expect(shouldPush(p, "leads", NIGHT)).toBe(false);
     expect(shouldPush(p, "vendas", NIGHT)).toBe(true);
+    expect(shouldPush(p, "lembretes", NIGHT)).toBe(true); // o próprio sócio marcou o horário
+    expect(shouldPush(p, "agenda", NIGHT)).toBe(true);
     expect(shouldPush({ ...p, urgentInQuiet: false }, "suporte", NIGHT)).toBe(false);
     expect(shouldPush(DEFAULT_NOTIFY, null, NIGHT)).toBe(true);
   });

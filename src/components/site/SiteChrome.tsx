@@ -14,9 +14,9 @@ export function SiteHeader({ locale, path, wa }: { locale: Locale; path: string;
   return (
     <header style={{ background: INK }} className="border-b border-[#2C2C31]">
       <A11yMenu locale={locale} variant="floating" />
-      <nav className={`${wrap} flex flex-wrap items-center gap-x-6 gap-y-3 py-5`} aria-label={T("Principal", "Principal")}>
+      <nav className={`${wrap} flex flex-wrap items-center gap-x-6 gap-y-3 py-5 max-md:gap-x-3 max-md:py-4`} aria-label={T("Principal", "Principal")}>
         <Link href={`/?lang=${locale}`} aria-label={T("GoWeb, inicio", "GoWeb, início")}>
-          <GoWebLogo height={36} />
+          <GoWebLogo height={36} className="max-md:h-8 max-md:w-auto" />
         </Link>
         <div className="flex-1" />
         {link(`/?lang=${locale}#funciones`, T("Funciones", "Recursos"))}
@@ -28,8 +28,21 @@ export function SiteHeader({ locale, path, wa }: { locale: Locale; path: string;
           <a href={`${path}?lang=es`} className="px-2.5 py-2" style={{ background: pt ? "transparent" : "#2A2B2F", color: pt ? MUTED : IVORY }} aria-current={!pt ? "true" : undefined}>ES</a>
           <a href={`${path}?lang=pt`} className="px-2.5 py-2" style={{ background: pt ? "#2A2B2F" : "transparent", color: pt ? IVORY : MUTED }} aria-current={pt ? "true" : undefined}>PT</a>
         </span>
-        <Link href="/painel" className="rounded-xl border border-[#45454B] px-4 py-2.5 text-[15px] font-semibold text-[#F4F1EA]">{T("Ingresar", "Entrar")}</Link>
-        <a href={wa} className="rounded-xl px-4 py-2.5 text-[15px] font-bold" style={{ background: BRAND, color: INK }}>{T("Solicitar demo", "Pedir demonstração")}</a>
+        <Link href="/painel" className="rounded-xl border border-[#45454B] px-4 py-2.5 text-center text-[15px] font-semibold text-[#F4F1EA] max-md:order-last max-md:flex-1 max-md:basis-[42%]">{T("Ingresar", "Entrar")}</Link>
+        <a href={wa} className="rounded-xl px-4 py-2.5 text-center text-[15px] font-bold max-md:order-last max-md:flex-1 max-md:basis-[42%]" style={{ background: BRAND, color: INK }}>{T("Solicitar demo", "Pedir demonstração")}</a>
+        {/* celular: os atalhos que somem no topo viram uma fileira de botões que rola de lado */}
+        <div className="no-scrollbar -mx-6 flex w-[calc(100%+3rem)] gap-2 overflow-x-auto px-6 md:hidden max-md:order-last">
+          {[
+            [`/?lang=${locale}#funciones`, T("Funciones", "Recursos")],
+            [`/planos?lang=${locale}`, T("Planes", "Planos")],
+            [`/?lang=${locale}#comparativo`, T("Comparativo", "Comparativo")],
+            [`/shopping?lang=${locale}`, "Shopping"],
+          ].map(([href, label]) => (
+            <Link key={href} href={href} className="shrink-0 rounded-full border border-[#45454B] px-4 py-2 text-[14px] font-semibold" style={{ color: IVORY }}>
+              {label}
+            </Link>
+          ))}
+        </div>
       </nav>
     </header>
   );

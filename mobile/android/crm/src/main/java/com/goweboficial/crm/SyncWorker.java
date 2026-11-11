@@ -68,6 +68,7 @@ public class SyncWorker extends Worker {
         }
         Api.Res r = Api.send("GET", path, null, cookie);
         if (r.code == 401) {
+            Notifier.live(c, "");
             Prefs.putStr(c, "widget", "");
             Widgets.updateAll(c, false);
             return true;
@@ -88,6 +89,13 @@ public class SyncWorker extends Worker {
                 if (n == null || !n.optBoolean("ring", true)) continue;
                 Notifier.show(c, n.optString("id"), n.optString("category"), n.optString("title"), n.optString("body"), n.optString("url"));
             }
+        }
+        // "ao vivo": compromisso/lembrete chegando ou jornada rodando → notificação fixa com cronômetro
+        JSONObject live = j.optJSONObject("live");
+        String liveKey = live == null ? "" : live.optString("kind") + ":" + live.optString("id") + ":" + live.optLong("at", live.optLong("since", 0)) + ":" + live.optBoolean("paused", false);
+        if (!liveKey.equals(Prefs.str(c, "liveKey", "-"))) {
+            Prefs.putStr(c, "liveKey", liveKey);
+            Notifier.live(c, live == null ? "" : live.toString());
         }
         String now = j.optString("now", "");
         if (!now.isEmpty()) Prefs.putStr(c, "since", now);

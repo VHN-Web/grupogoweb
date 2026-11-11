@@ -3,6 +3,7 @@ import { GoWebLogo } from "@/components/brand/GoWebLogo";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { CrmNav } from "./CrmNav";
 import { SwRegister } from "./SwRegister";
+import { CrmIsland } from "./CrmIsland";
 import { Icon } from "@/components/ui/Icon";
 
 /** Moldura do app: barra lateral no computador, abas embaixo no celular. */
@@ -20,6 +21,7 @@ export function CrmShell({ me, unread = 0, children }: { me: { id: string; name:
   return (
     <div className="site aff crm min-h-dvh md:flex" style={{ ["--brand" as string]: "#2FAE5F" }}>
       <SwRegister />
+      <CrmIsland />
       <aside className="hidden w-60 shrink-0 flex-col bg-[#0E0E10] p-4 text-[#F4F1EA] md:sticky md:top-0 md:flex md:h-dvh">
         <Link href="/crm" className="flex items-center gap-2 px-2 py-2" aria-label="CRM GoWeb">
           <GoWebLogo height={26} />

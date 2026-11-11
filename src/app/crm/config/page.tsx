@@ -59,7 +59,7 @@ export default async function Config({ searchParams }: { searchParams: Promise<{
               das <input type="time" name="quietFrom" defaultValue={prefs.quietFrom ?? "22:00"} className="input w-auto" /> às <input type="time" name="quietTo" defaultValue={prefs.quietTo ?? "07:00"} className="input w-auto" /> (Brasília)
             </div>
             <label className="mt-3 flex items-center gap-3 text-sm">
-              <input type="checkbox" name="urgentInQuiet" defaultChecked={prefs.urgentInQuiet} className="h-5 w-5 accent-[#3CC46B]" /> No silêncio, vendas e suporte ainda tocam
+              <input type="checkbox" name="urgentInQuiet" defaultChecked={prefs.urgentInQuiet} className="h-5 w-5 accent-[#3CC46B]" /> No silêncio, vendas, suporte, agenda e lembretes ainda tocam
             </label>
           </div>
           <button className="btn-brand">Salvar preferências</button>

@@ -138,7 +138,7 @@ export function PanelShell({ slug, locale, areas, pro, modules = null, advisory 
       </aside>
 
       {/* Topo (celular) */}
-      <header className="no-print sticky top-0 z-30 flex items-center gap-3 bg-[#0F2747] px-4 py-2.5 text-white lg:hidden">
+      <header className="no-print safe-top sticky top-0 z-30 flex items-center gap-3 bg-[#0F2747] px-4 pb-2.5 text-white lg:hidden">
         <div className="min-w-0 flex-1">{store}</div>
         {actions}
         <button type="button" onClick={() => setOpen(true)} className="grid h-10 w-10 place-items-center rounded-xl bg-white/10" aria-label={locale === "pt" ? "Abrir menu" : "Abrir menú"} aria-expanded={open}>
@@ -183,21 +183,21 @@ export function PanelShell({ slug, locale, areas, pro, modules = null, advisory 
       </div>
 
       {/* Barra inferior (celular) */}
-      <nav aria-label={locale === "pt" ? "Atalhos" : "Atajos"} className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-black/10 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav aria-label={locale === "pt" ? "Atalhos" : "Atajos"} className="panel-tabbar no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-black/10 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_20px_rgba(15,39,71,.08)] backdrop-blur lg:hidden">
         {MOBILE_TABS.map((h) => items.find((i) => i.href === h))
           .filter((i): i is Item => !!i)
           .slice(0, 4)
           .map((i) => {
             const active = isActive(i);
             return (
-              <Link key={i.href} href={base + i.href} aria-current={active ? "page" : undefined} className="flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold" style={{ color: active ? GROUPS[i.group].color : "#5B6474" }}>
-                <Icon name={i.icon} size={22} />
+              <Link key={i.href} href={base + i.href} aria-current={active ? "page" : undefined} className="flex min-h-[58px] flex-col items-center justify-center gap-1 text-[12px] font-semibold" style={{ color: active ? GROUPS[i.group].color : "#5B6474" }}>
+                <Icon name={i.icon} size={24} />
                 {L(i).split(" ")[0]}
               </Link>
             );
           })}
-        <button type="button" onClick={() => setOpen(true)} className="col-start-5 flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-[#5B6474]">
-          <Icon name="menu" size={22} />
+        <button type="button" onClick={() => setOpen(true)} className="col-start-5 flex min-h-[58px] flex-col items-center justify-center gap-1 text-[12px] font-semibold text-[#5B6474]">
+          <Icon name="menu" size={24} />
           {locale === "pt" ? "Mais" : "Más"}
         </button>
       </nav>
