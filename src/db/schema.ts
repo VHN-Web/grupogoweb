@@ -240,6 +240,7 @@ export const orders = pgTable(
     tableId: text("table_id").references(() => diningTables.id, { onDelete: "set null" }),
     tableLabel: text("table_label"), // snapshot
     address: text("address"),
+    neighborhood: text("neighborhood"), // bairro da entrega (destaque para o motoboy) — core/address.ts
     lat: doublePrecision("lat"),
     lng: doublePrecision("lng"),
     distanceKm: doublePrecision("distance_km"),

@@ -6,6 +6,8 @@ export type DeliveryInfo = {
   customerName: string;
   customerPhone: string | null;
   address: string | null;
+  /** bairro (opcional) — ajuda o motoboy a saber a região */
+  neighborhood?: string | null;
   lat: number | null;
   lng: number | null;
   items: { name: string; quantity: number }[];
@@ -22,6 +24,7 @@ export function courierMessage(d: DeliveryInfo, T: (es: string, pt: string) => s
     `*${T("Entrega", "Entrega")} #${d.number} — ${d.storeName}*`,
     "",
     `${T("Cliente", "Cliente")}: ${d.customerName}${d.customerPhone ? ` · ${d.customerPhone}` : ""}`,
+    d.neighborhood ? `*${T("Barrio", "Bairro")}: ${d.neighborhood}*` : null,
     d.address ? `${T("Dirección", "Endereço")}: ${d.address}` : null,
     map ? `${T("Mapa", "Mapa")}: ${map}` : null,
     "",

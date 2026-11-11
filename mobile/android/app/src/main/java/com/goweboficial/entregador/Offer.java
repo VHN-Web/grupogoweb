@@ -26,6 +26,7 @@ final class Offer {
     String n = "";
     String type = "mine";
     String addr = "";
+    String bairro = "";
     String km = "";
     String fee = "";
     String store = "";
@@ -40,6 +41,7 @@ final class Offer {
         f.n = o.optString("n", "");
         f.type = type;
         f.addr = o.optString("addr", "");
+        f.bairro = o.optString("bairro", "");
         f.km = o.optString("km", "");
         f.fee = o.optString("fee", "");
         f.store = o.optString("store", store == null ? "" : store);
@@ -54,6 +56,7 @@ final class Offer {
         f.n = val(d, "n");
         f.type = "open".equals(d.get("type")) ? "open" : "mine";
         f.addr = val(d, "addr");
+        f.bairro = val(d, "bairro");
         f.km = val(d, "km");
         f.fee = val(d, "fee");
         f.store = val(d, "store");
@@ -67,7 +70,7 @@ final class Offer {
     }
 
     void put(Intent i) {
-        i.putExtra("o_id", id).putExtra("o_n", n).putExtra("o_type", type).putExtra("o_addr", addr)
+        i.putExtra("o_id", id).putExtra("o_n", n).putExtra("o_type", type).putExtra("o_addr", addr).putExtra("o_bairro", bairro)
                 .putExtra("o_km", km).putExtra("o_fee", fee).putExtra("o_store", store).putExtra("o_auto", auto);
     }
 
@@ -78,6 +81,7 @@ final class Offer {
         f.n = nz(i.getStringExtra("o_n"));
         f.type = nz(i.getStringExtra("o_type"));
         f.addr = nz(i.getStringExtra("o_addr"));
+        f.bairro = nz(i.getStringExtra("o_bairro"));
         f.km = nz(i.getStringExtra("o_km"));
         f.fee = nz(i.getStringExtra("o_fee"));
         f.store = nz(i.getStringExtra("o_store"));
@@ -125,6 +129,7 @@ final class Offer {
         StringBuilder body = new StringBuilder();
         if (!o.fee.isEmpty()) body.append(o.fee);
         if (!o.km.isEmpty()) body.append(body.length() > 0 ? " · " : "").append(o.km).append(" km");
+        if (!o.bairro.isEmpty()) body.append(body.length() > 0 ? " · " : "").append(o.bairro);
         if (!o.addr.isEmpty()) body.append(body.length() > 0 ? " · " : "").append(o.addr);
         NotificationCompat.Builder b = new NotificationCompat.Builder(c, Notifier.CH_OFFER)
                 .setSmallIcon(R.drawable.ic_stat_moto)

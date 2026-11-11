@@ -8,6 +8,7 @@ import { formatMoney } from "@/core/money";
 import type { Currency } from "@/core/types";
 import { courierEarnings, myActiveDeliveries, openDeliveries } from "@/services/courier-app";
 import { courierEarning } from "@/core/couriers";
+import { neighborhoodFromText } from "@/core/address";
 import { claimAction, declineAction, deliverAction, pickupAction, toggleOnlineAction } from "./actions";
 import { courierCtx } from "./ctx";
 
@@ -128,10 +129,15 @@ export default async function CourierHome({ searchParams }: { searchParams: Prom
                 </div>
                 <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${going ? "bg-[#3CC46B]/20 text-[#2FAE5F]" : o.status === "READY" ? "bg-amber-400/20 text-amber-600" : "bg-[var(--s-soft)] text-[var(--s-muted)]"}`}>{STATUS[o.status] ?? o.status}</span>
               </div>
+              {(o.neighborhood || neighborhoodFromText(o.address)) && (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--s-soft)] px-3 py-1 text-sm font-bold text-[var(--s-ink)]">
+                  <Icon name="pin" size={14} /> {T("Barrio", "Bairro", "Neighborhood")}: {o.neighborhood || neighborhoodFromText(o.address)}
+                </p>
+              )}
               {o.address && <p className="mt-2 flex gap-2 text-sm"><Icon name="pin" size={16} className="mt-0.5 shrink-0" /> {o.address}</p>}
               <p className="mt-1 text-xs text-[var(--s-muted)]">{o.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}</p>
               {o.notes && <p className="mt-1 text-xs"><b>{T("Obs.", "Obs.", "Note")}:</b> {o.notes}</p>}
-              <div className={`mt-3 rounded-2xl px-3 py-2 text-sm font-semibold ${paid ? "bg-[var(--s-good-bg)] text-[var(--s-good-fg)]" : "bg-amber-400/15 text-amber-700 dark:text-amber-400"}`}>
+              <div className={`mt-3 rounded-2xl px-3 py-2 text-sm font-semibold ${paid ? "bg-[var(--s-good-bg)] text-[var(--s-good-fg)]" : "bg-amber-400/15 text-amber-700 dark:text-amber-300"}`}>
                 {paid ? T("Ya pagado ✓", "Já pago ✓", "Already paid ✓") : `${T("Cobrar", "Cobrar", "Collect")} ${collect}${o.changeDuePyg ? ` · ${T("llevar vuelto", "levar troco", "bring change")} ${formatMoney(o.changeDuePyg, base)}` : ""}`}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -190,6 +196,7 @@ export default async function CourierHome({ searchParams }: { searchParams: Prom
                 <form key={o.id} action={claimAction.bind(null, o.id)} className="flex items-center gap-3 rounded-2xl border border-[var(--s-line)] bg-[var(--s-card)] p-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-bold">#{o.number} <span className="text-xs font-semibold text-[var(--s-muted)]">· {STATUS[o.status]}</span></p>
+                    {(o.neighborhood || neighborhoodFromText(o.address)) && <p className="truncate text-sm font-bold text-[var(--s-ink)]">{T("Barrio", "Bairro", "Neighborhood")}: {o.neighborhood || neighborhoodFromText(o.address)}</p>}
                     <p className="truncate text-xs text-[var(--s-muted)]">{o.address ?? "—"}{o.distanceKm != null && ` · ${o.distanceKm.toFixed(1)} km`}</p>
                     <p className="text-xs">{T("Ganás", "Você ganha", "You earn")} <b>{fm(courierEarning(o.deliveryFeePyg, c.feePerDelivery))}</b></p>
                   </div>

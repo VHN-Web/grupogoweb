@@ -22,6 +22,8 @@ describe("idiomas do app do entregador", () => {
     const pt = courierPushText("pt", "new", { number: 12, store: "Burguer", address: "Rua A", km: 2.34 });
     expect(pt).toEqual({ title: "Nova entrega #12", body: "Burguer · Rua A · 2,3 km da loja" });
     expect(courierPushText("en", "new", { number: 12, km: 2.34 }).body).toBe("2.3 km from the store");
+    expect(courierPushText("pt", "new", { number: 12, neighborhood: "Boa Viagem", km: 2.34 }).body).toBe("Bairro Boa Viagem · 2,3 km da loja");
+    expect(courierPushText("es", "new", { number: 12, neighborhood: "Villa Morra" }).body).toBe("Barrio Villa Morra");
     expect(courierPushText("es", "available", { number: 7 }).title).toBe("Entrega disponible #7");
     expect(courierPushText("en", "cancelled", { number: 7 }).body).toBe("The store canceled this order.");
     for (const v of Object.values(courierPushText("pt", "available", { number: 1 }))) expect(v.includes("·")).toBe(false);

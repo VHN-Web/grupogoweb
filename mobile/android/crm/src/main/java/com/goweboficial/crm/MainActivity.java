@@ -59,6 +59,9 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setSupportMultipleWindows(false);
         s.setUserAgentString(s.getUserAgentString() + " " + Api.userAgent());
+        // o site tem tema claro/escuro próprio: o escurecimento automático do celular deixava letra escura em fundo escuro
+        if (android.os.Build.VERSION.SDK_INT >= 33) s.setAlgorithmicDarkeningAllowed(false);
+        else if (android.os.Build.VERSION.SDK_INT >= 29) s.setForceDark(WebSettings.FORCE_DARK_OFF);
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);

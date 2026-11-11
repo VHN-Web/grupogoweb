@@ -11,6 +11,8 @@ describe("motoboys", () => {
     expect(m).toContain("destination=-8.1,-34.9");
     expect(m).toContain("2× X-Burger");
     expect(m).toContain("Já pago");
+    expect(m).not.toContain("Bairro");
+    expect(courierMessage({ ...base, neighborhood: "Boa Viagem" }, T)).toContain("*Bairro: Boa Viagem*");
   });
   it("cobrança na entrega com troco", () => {
     const m = courierMessage({ ...base, lat: null, lng: null, collect: "R$ 50,00", change: "R$ 50,00" }, T);

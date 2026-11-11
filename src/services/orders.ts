@@ -4,6 +4,8 @@ import { z } from "zod";
 import { db, schema } from "@/db";
 import { randomOrderNumber } from "@/core/codes";
 import { quoteDelivery } from "@/core/delivery";
+import { addressReady, neighborhoodFromText } from "@/core/address";
+import { geocodeAddress } from "@/adapters/geocoding";
 import { changeDue, formatMoney, fromBase, type Rates } from "@/core/money";
 import { checkCoupon, effectivePrice } from "@/core/intelligence";
 import { couponError, findCoupon, markCartRecovered } from "./intelligence";
@@ -35,8 +37,24 @@ export const createOrderSchema = z.object({
   type: z.enum(ORDER_TYPES),
   tableCode: z.string().trim().max(20).optional().nullable(),
   address: z.string().trim().max(200).optional().nullable(),
-  lat: z.number().optional().nullable(),
-  lng: z.number().optional().nullable(),
+  neighborhood: z.string().trim().max(60).optional().nullable(),
+  // endereço em partes (CEP, rua, número…): sem coordenada, o servidor acha a casa pelo endereço
+  addressParts: z
+    .object({
+      cep: z.string().max(9).default(""),
+      street: z.string().max(120).default(""),
+      number: z.string().max(12).default(""),
+      noNumber: z.boolean().default(false),
+      complement: z.string().max(60).default(""),
+      neighborhood: z.string().max(60).default(""),
+      city: z.string().max(60).default(""),
+      state: z.string().max(40).default(""),
+      reference: z.string().max(100).default(""),
+    })
+    .optional()
+    .nullable(),
+  lat: z.number().min(-90).max(90).optional().nullable(),
+  lng: z.number().min(-180).max(180).optional().nullable(),
   notes: z.string().trim().max(300).optional().nullable(),
   items: z
     .array(
@@ -180,7 +198,15 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
   let distanceKm: number | null = null;
   if (input.type === "DELIVERY") {
     if (!input.address) throw new OrderError("ADDRESS", T("Indicá la dirección de entrega", "Informe o endereço de entrega"));
-    if (input.lat == null || input.lng == null) throw new OrderError("ADDRESS", T("Compartí tu ubicación para calcular el delivery", "Compartilhe sua localização para calcular a entrega"));
+    if ((input.lat == null || input.lng == null) && input.addressParts && addressReady(input.addressParts, tenant.country)) {
+      // endereço digitado (sem compartilhar localização): acha a coordenada pelo endereço
+      const g = await geocodeAddress(input.addressParts, tenant.country).catch(() => null);
+      if (g) {
+        input.lat = g.lat;
+        input.lng = g.lng;
+      }
+    }
+    if (input.lat == null || input.lng == null) throw new OrderError("ADDRESS", T("No encontramos tu dirección. Revisá la calle y el número o compartí tu ubicación.", "Não encontramos seu endereço. Confira a rua e o número ou compartilhe sua localização."));
     const q = await quoteDeliveryForTenant(tenant.slug, input.lat, input.lng, subtotalPyg);
     if (!q.ok) {
       if (q.reason === "OUT_OF_RANGE") throw new OrderError("RANGE", T("Tu dirección está fuera del área de delivery", "Seu endereço está fora da área de entrega"));
@@ -262,6 +288,7 @@ export async function createOrder(raw: unknown): Promise<CreateOrderResult> {
         tableId: table?.id ?? null,
         tableLabel: table?.label ?? null,
         address: input.type === "DELIVERY" ? input.address : null,
+        neighborhood: input.type === "DELIVERY" ? input.neighborhood || input.addressParts?.neighborhood || neighborhoodFromText(input.address) : null,
         lat: input.type === "DELIVERY" ? input.lat : null,
         lng: input.type === "DELIVERY" ? input.lng : null,
         distanceKm,
@@ -435,7 +462,7 @@ export async function setOrderStatus(tenantId: string, orderId: string, status: 
     // em preparo/pronto sem motoboy: passa para o online mais perto; ninguém disponível → avisa todos (pronto)
     if ((status === "PREPARING" || status === "READY") && !order.courierId) {
       const n = await ca.autoAssign(tenantId, orderId).catch(() => 0);
-      if (!n && status === "READY") await ca.notifyOnlineCouriers(tenantId, { number: order.number, address: order.address, km: order.distanceKm }, { type: "open", orderId, number: order.number, address: order.address, km: order.distanceKm }).catch(() => null);
+      if (!n && status === "READY") await ca.notifyOnlineCouriers(tenantId, { number: order.number, address: order.address, neighborhood: order.neighborhood, km: order.distanceKm }, { type: "open", orderId, number: order.number, address: order.address, neighborhood: order.neighborhood, km: order.distanceKm }).catch(() => null);
     }
     if (status === "CANCELLED" && order.courierId) await ca.notifyCourier(order.courierId, "cancelled", { number: order.number }, { cancelOrderId: orderId }).catch(() => null);
   }

@@ -3,7 +3,7 @@
 import { A11yMenu } from "@/components/a11y/A11yMenu";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { RevealOnScroll } from "@/components/motion/RevealOnScroll";
-import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, parseMajorToMinor, fromBase, toBase, type Rates } from "@/core/money";
 import { formatCpf, isValidCpf, isValidName, tr, type Locale } from "@/core/region";
@@ -14,6 +14,8 @@ import { Illustration } from "@/components/Illustration";
 import { NameInput } from "@/components/forms/NameInput";
 import { PhoneInput } from "@/components/forms/PhoneInput";
 import { GoWebLogo } from "@/components/brand/GoWebLogo";
+import { DeliveryAddress, type DeliveryValue, type Quote } from "@/components/storefront/DeliveryAddress";
+import { EMPTY_ADDRESS } from "@/core/address";
 
 export type StoreProduct = {
   id: string;
@@ -925,7 +927,6 @@ function CartView({ lines, subtotal, rates, onQty, onNext, canOrder }: { lines: 
   );
 }
 
-type Quote = { state: "idle" } | { state: "loading" } | { state: "ok"; feePyg: number; distanceKm?: number; free?: boolean } | { state: "error"; message: string };
 
 function Checkout({
   data,
@@ -960,9 +961,11 @@ function Checkout({
   const [optIn, setOptIn] = useState(false);
   const refCode = readStored(`gw_ref_${data.slug}`);
   const [phone, setPhone] = useState<string | null>(null); // E.164 válido ou null
-  const [address, setAddress] = useState("");
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [quote, setQuote] = useState<Quote>({ state: "idle" });
+  // endereço, coordenada e taxa vêm do DeliveryAddress (CEP, número, localização compartilhada)
+  const [delivery, setDelivery] = useState<DeliveryValue>({ address: "", neighborhood: "", parts: EMPTY_ADDRESS, coords: null, quote: { state: "idle" } });
+  const onDelivery = useCallback((v: DeliveryValue) => setDelivery(v), []);
+  const { address, coords } = delivery;
+  const quote: Quote = delivery.quote;
   const [notes, setNotes] = useState("");
   const options = data.payment.options;
   const [method, setMethod] = useState<PaymentMethod | undefined>(options[0]?.method);
@@ -976,41 +979,7 @@ function Checkout({
     if (option && !option.currencies.includes(currency)) setCurrency(option.currencies.includes(base) ? base : option.currencies[0]);
   }, [option, currency, base]);
 
-  useEffect(() => {
-    if (type !== "DELIVERY" || !coords) return;
-    let cancel = false;
-    setQuote({ state: "loading" });
-    fetch("/api/delivery-quote", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ slug: data.slug, ...coords, subtotalPyg: subtotal }),
-    })
-      .then((r) => r.json())
-      .then((q) => {
-        if (cancel) return;
-        if (q.ok) setQuote({ state: "ok", feePyg: q.feePyg, distanceKm: q.distanceKm, free: q.free });
-        else if (q.reason === "NO_STORE_LOCATION") setQuote({ state: "ok", feePyg: q.baseFeePyg ?? 0 });
-        else
-          setQuote({
-            state: "error",
-            message: q.reason === "OUT_OF_RANGE" ? T(`Fuera del área de delivery (${q.distanceKm} km)`, `Fora da área de entrega (${q.distanceKm} km)`) : T("No se pudo calcular", "Não foi possível calcular"),
-          });
-      })
-      .catch(() => !cancel && setQuote({ state: "error", message: T("No se pudo calcular", "Não foi possível calcular") }));
-    return () => {
-      cancel = true;
-    };
-  }, [type, coords, subtotal, data.slug, T]);
 
-  const locate = () => {
-    if (!navigator.geolocation) return setQuote({ state: "error", message: T("Tu navegador no comparte ubicación", "Seu navegador não compartilha localização") });
-    setQuote({ state: "loading" });
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setQuote({ state: "error", message: T("Permití el acceso a la ubicación para calcular el delivery", "Permita o acesso à localização para calcular a entrega") }),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  };
 
   // Cupom (GoInteligence)
   const applyCoupon = async (code = couponInput) => {
@@ -1095,8 +1064,10 @@ function Checkout({
           type,
           tableCode: data.table?.code ?? null,
           address: type === "DELIVERY" ? address : null,
-          lat: coords?.lat ?? null,
-          lng: coords?.lng ?? null,
+          neighborhood: type === "DELIVERY" ? delivery.neighborhood || null : null,
+          addressParts: type === "DELIVERY" ? delivery.parts : null,
+          lat: type === "DELIVERY" ? coords?.lat ?? null : null,
+          lng: type === "DELIVERY" ? coords?.lng ?? null : null,
           notes: notes || null,
           items: lines.map((l) => ({ productId: l.product.id, quantity: l.qty })),
           paymentMethod: method,
@@ -1195,23 +1166,7 @@ function Checkout({
             <span>{T(`Quiero recibir ofertas de ${data.name} por WhatsApp. Puedo cancelar cuando quiera.`, `Quero receber ofertas da ${data.name} pelo WhatsApp. Posso cancelar quando quiser.`)}</span>
           </label>
         )}
-        {type === "DELIVERY" && (
-          <div className="space-y-2">
-            <label className="label" htmlFor="addr">{T("Dirección de entrega", "Endereço de entrega")}</label>
-            <input id="addr" className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder={T("Calle, número, referencia", "Rua, número, complemento")} autoComplete="street-address" />
-            <button type="button" onClick={locate} className={`${ghostBtn} w-full py-3`}>
-              {coords ? T("Ubicación compartida — actualizar", "Localização compartilhada — atualizar") : T("Compartir ubicación para calcular el delivery", "Compartilhar localização para calcular a entrega")}
-            </button>
-            {quote.state === "loading" && <p className="th-muted text-[13px]">{T("Calculando delivery…", "Calculando entrega…")}</p>}
-            {quote.state === "error" && <p className="text-[13px] text-red-500">{quote.message}</p>}
-            {quote.state === "ok" && (
-              <p className="th-muted text-[13px]">
-                {T("Delivery", "Entrega")}: <b style={{ color: "var(--fg)" }}>{quote.free ? T("Gratis", "Grátis") : money(quote.feePyg)}</b>
-                {quote.distanceKm != null && ` · ${quote.distanceKm} km`}
-              </p>
-            )}
-          </div>
-        )}
+        {type === "DELIVERY" && <DeliveryAddress slug={data.slug} country={data.country} subtotal={subtotal} T={T} money={money} ghostBtn={ghostBtn} onChange={onDelivery} />}
       </div>
 
       <div className="space-y-3">

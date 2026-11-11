@@ -57,6 +57,19 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
+        <!-- bairro em destaque: o motoboy já sabe para que lado vai -->
+        <TextView
+            android:id="@+id/offer_bairro"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:textColor="@color/green"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/offer_addr"
             android:layout_width="match_parent"

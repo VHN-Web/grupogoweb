@@ -35,10 +35,10 @@ describe("app Android do entregador", () => {
 
 describe("oferta de corrida (tela cheia no app)", () => {
   it("tudo em texto, com km arredondado e campos vazios quando faltam", () => {
-    expect(offerData({ type: "mine", orderId: "o1", number: 4821, address: "Rua A, 10", km: 2.345, fee: "R$ 8,00", store: "Burguer", auto: true })).toEqual({
-      kind: "offer", type: "mine", orderId: "o1", n: "4821", addr: "Rua A, 10", km: "2.3", fee: "R$ 8,00", store: "Burguer", auto: "1",
+    expect(offerData({ type: "mine", orderId: "o1", number: 4821, address: "Rua A, 10", neighborhood: "Boa Viagem", km: 2.345, fee: "R$ 8,00", store: "Burguer", auto: true })).toEqual({
+      kind: "offer", type: "mine", orderId: "o1", n: "4821", addr: "Rua A, 10", bairro: "Boa Viagem", km: "2.3", fee: "R$ 8,00", store: "Burguer", auto: "1",
     });
-    expect(offerData({ type: "open", orderId: "o2", number: "77" })).toEqual({ kind: "offer", type: "open", orderId: "o2", n: "77", addr: "", km: "", fee: "", store: "", auto: "0" });
+    expect(offerData({ type: "open", orderId: "o2", number: "77" })).toEqual({ kind: "offer", type: "open", orderId: "o2", n: "77", addr: "", bairro: "", km: "", fee: "", store: "", auto: "0" });
   });
   it("cancelamento", () => {
     expect(offerCancelData("o1")).toEqual({ kind: "cancel", orderId: "o1" });
