@@ -50,6 +50,44 @@ export function igAuthUrl(o: { appId: string; redirectUri: string; state: string
   return u.toString();
 }
 
+// ---------------------------------------------------------------- login unificado (apps novos da Meta)
+/**
+ * Apps criados a partir de 2026 não têm mais o "login do Instagram" separado: a Meta obriga o "login unificado"
+ * (Login do Facebook para Empresas com uma configuração). A pessoa entra pela janela do Facebook, o app usa o
+ * ID e a chave do APP DA META, e a permissão vem da configuração (config_id) — sem lista de escopos na URL.
+ * O token é de usuário do sistema (não expira) e as chamadas vão para graph.facebook.com.
+ */
+export const FB_GRAPH_VERSION = "v25.0";
+export const UNIFIED_MESSAGES = "instagram_manage_messages";
+export const UNIFIED_PUBLISH = "instagram_content_publish";
+
+export function fbLoginUrl(o: { appId: string; configId: string; redirectUri: string; state: string }) {
+  const u = new URL(`https://www.facebook.com/${FB_GRAPH_VERSION}/dialog/oauth`);
+  u.searchParams.set("client_id", o.appId);
+  u.searchParams.set("config_id", o.configId);
+  u.searchParams.set("redirect_uri", o.redirectUri);
+  u.searchParams.set("response_type", "code");
+  u.searchParams.set("override_default_response_type", "true");
+  u.searchParams.set("state", o.state);
+  return u.toString();
+}
+
+/** debug_token do login unificado → permissões dadas e as contas do Instagram liberadas (target_ids). */
+export function parseDebugToken(j: unknown): { scopes: string[]; igIds: string[]; expiresAt: Date | null } {
+  const d = ((j as { data?: unknown } | null)?.data ?? {}) as { scopes?: unknown; granular_scopes?: unknown; expires_at?: unknown };
+  const scopes = Array.isArray(d.scopes) ? d.scopes.map(String) : [];
+  const ids: string[] = [];
+  if (Array.isArray(d.granular_scopes)) {
+    for (const g of d.granular_scopes as { scope?: unknown; target_ids?: unknown }[]) {
+      const sc = String(g?.scope ?? "");
+      if (!sc.startsWith("instagram_") || !Array.isArray(g.target_ids)) continue;
+      for (const t of g.target_ids) if (!ids.includes(String(t))) ids.push(String(t));
+    }
+  }
+  const exp = Number(d.expires_at);
+  return { scopes, igIds: ids, expiresAt: Number.isFinite(exp) && exp > 0 ? new Date(exp * 1000) : null };
+}
+
 /** O código volta com "#_" no fim (documentado pela Meta). */
 export const cleanAuthCode = (code: string) => code.replace(/#_$/, "").trim();
 

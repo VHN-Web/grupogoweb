@@ -1453,6 +1453,7 @@ export const igAccounts = pgTable(
     status: text("status").$type<"active" | "paused" | "error">().notNull().default("active"),
     aiEnabled: boolean("ai_enabled").notNull().default(true), // Geovana responde (desligado = só caixa de entrada)
     canPublish: boolean("can_publish").notNull().default(false), // login deu instagram_business_content_publish (Assessoria: autonomia)
+    api: text("api").$type<"instagram" | "facebook">().notNull().default("instagram"), // "facebook" = login unificado (apps novos da Meta, graph.facebook.com)
     lastError: text("last_error"),
     connectedBy: text("connected_by"),
     createdAt: createdAt(),

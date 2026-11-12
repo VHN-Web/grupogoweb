@@ -5,12 +5,18 @@
 // Mensagens: POST graph.instagram.com/me/messages · webhooks: POST /me/subscribed_apps?subscribed_fields=messages.
 // IG_GRAPH_BASE / IG_OAUTH_BASE (env) só para testes. Regras puras em core/instagram.ts.
 // =============================================================================
-import { igText, parseLongToken, parseShortToken } from "@/core/instagram";
+import { FB_GRAPH_VERSION, igText, parseDebugToken, parseLongToken, parseShortToken } from "@/core/instagram";
 import { sandboxBlocks } from "@/lib/sandbox";
 
 const GRAPH = () => (process.env.IG_GRAPH_BASE ?? "https://graph.instagram.com").replace(/\/$/, "");
 const OAUTH = () => (process.env.IG_OAUTH_BASE ?? "https://api.instagram.com").replace(/\/$/, "");
 const TIMEOUT = 20_000;
+/** Login unificado (apps novos): mesma API do Instagram, servida em graph.facebook.com. FB_GRAPH_BASE só para testes. */
+const FB = () => (process.env.FB_GRAPH_BASE ?? `https://graph.facebook.com/${FB_GRAPH_VERSION}`).replace(/\/$/, "");
+
+/** Por onde a conta conversa: "instagram" (login do Instagram, graph.instagram.com) ou "facebook" (login unificado). */
+export type IgVia = { api: "instagram" | "facebook"; igUserId: string };
+const host = (via?: IgVia) => (via?.api === "facebook" ? FB() : GRAPH());
 
 export class IgError extends Error {
   constructor(
@@ -94,9 +100,9 @@ export async function igMe(token: string) {
 }
 
 /** Liga os avisos (webhook) de mensagens desta conta para o app da GoWeb. */
-export async function igSubscribe(token: string) {
+export async function igSubscribe(token: string, via?: IgVia) {
   if (sandboxBlocks("instagram", null, "subscribed_apps")) return; // prévia: não mexe na conta real
-  const u = new URL(`${GRAPH()}/me/subscribed_apps`);
+  const u = new URL(`${host(via)}/${via?.api === "facebook" ? encodeURIComponent(via.igUserId) : "me"}/subscribed_apps`);
   u.searchParams.set("subscribed_fields", "messages");
   u.searchParams.set("access_token", token);
   const res = await fetch(u, { method: "POST", signal: AbortSignal.timeout(TIMEOUT) });
@@ -105,16 +111,16 @@ export async function igSubscribe(token: string) {
 }
 
 /** Desliga os avisos (ao desconectar). Falha aqui não impede desconectar. */
-export async function igUnsubscribe(token: string) {
+export async function igUnsubscribe(token: string, via?: IgVia) {
   if (sandboxBlocks("instagram", null, "subscribed_apps delete")) return;
-  const u = new URL(`${GRAPH()}/me/subscribed_apps`);
+  const u = new URL(`${host(via)}/${via?.api === "facebook" ? encodeURIComponent(via.igUserId) : "me"}/subscribed_apps`);
   u.searchParams.set("access_token", token);
   await fetch(u, { method: "DELETE", signal: AbortSignal.timeout(TIMEOUT) }).catch(() => null);
 }
 
 /** Nome/@ de quem escreveu (para a caixa de entrada). null se a Meta não liberar. */
-export async function igProfile(token: string, igsid: string) {
-  const u = new URL(`${GRAPH()}/${encodeURIComponent(igsid)}`);
+export async function igProfile(token: string, igsid: string, via?: IgVia) {
+  const u = new URL(`${host(via)}/${encodeURIComponent(igsid)}`);
   u.searchParams.set("fields", "name,username");
   u.searchParams.set("access_token", token);
   const res = await fetch(u, { signal: AbortSignal.timeout(TIMEOUT) }).catch(() => null);
@@ -124,9 +130,9 @@ export async function igProfile(token: string, igsid: string) {
 }
 
 /** Responde no Direct. Devolve o id da mensagem. */
-export async function igSendText(token: string, recipientIgsid: string, text: string): Promise<string | null> {
+export async function igSendText(token: string, recipientIgsid: string, text: string, via?: IgVia): Promise<string | null> {
   if (sandboxBlocks("instagram", recipientIgsid, text)) return `sandbox-${Date.now()}`; // prévia: simula o envio
-  const res = await fetch(`${GRAPH()}/me/messages`, {
+  const res = await fetch(`${host(via)}/${via?.api === "facebook" ? encodeURIComponent(via.igUserId) : "me"}/messages`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify({ recipient: { id: recipientIgsid }, message: { text: igText(text) } }),
@@ -142,9 +148,10 @@ export async function igSendText(token: string, recipientIgsid: string, text: st
  * Publica uma foto no feed: cria o contêiner (a Meta busca a imagem JPEG na URL pública) e publica.
  * Exige instagram_business_content_publish. Limite da Meta: 100 publicações pela API a cada 24 h por conta.
  */
-export async function igPublishImage(token: string, igUserId: string, imageUrl: string, caption: string): Promise<string> {
+export async function igPublishImage(token: string, igUserId: string, imageUrl: string, caption: string, api: IgVia["api"] = "instagram"): Promise<string> {
   if (sandboxBlocks("instagram", igUserId, `post: ${caption.slice(0, 80)}`)) return `sandbox-${Date.now()}`; // prévia: nunca publica
-  const base = `${GRAPH()}/${encodeURIComponent(igUserId)}`;
+  const root = api === "facebook" ? FB() : GRAPH();
+  const base = `${root}/${encodeURIComponent(igUserId)}`;
   const create = await fetch(`${base}/media`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -157,7 +164,7 @@ export async function igPublishImage(token: string, igUserId: string, imageUrl: 
   if (!creationId) throw new IgError("Instagram (contêiner do post): sem id");
   // imagem costuma ficar pronta na hora; confere o status algumas vezes antes de publicar
   for (let i = 0; i < 5; i++) {
-    const st = await fetch(`${GRAPH()}/${encodeURIComponent(creationId)}?fields=status_code`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(TIMEOUT) }).catch(() => null);
+    const st = await fetch(`${root}/${encodeURIComponent(creationId)}?fields=status_code`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(TIMEOUT) }).catch(() => null);
     const j = st?.ok ? await readJson(st) : {};
     if (j.status_code === "FINISHED" || !st?.ok) break;
     if (j.status_code === "ERROR" || j.status_code === "EXPIRED") throw new IgError(`Instagram (post): a Meta não aceitou a imagem (${String(j.status_code)})`);
@@ -173,4 +180,52 @@ export async function igPublishImage(token: string, igUserId: string, imageUrl: 
   if (!pub.ok) fail(pub, p, "publicação");
   if (typeof p.id !== "string") throw new IgError("Instagram (publicação): sem id");
   return p.id;
+}
+
+// ---------------------------------------------------------------- login unificado (apps novos da Meta)
+/** Código do Login do Facebook para Empresas → token (de usuário do sistema; normalmente não expira). */
+export async function fbExchangeCode(o: { appId: string; appSecret: string; redirectUri: string; code: string }) {
+  const u = new URL(`${FB()}/oauth/access_token`);
+  u.searchParams.set("client_id", o.appId);
+  u.searchParams.set("client_secret", o.appSecret);
+  u.searchParams.set("redirect_uri", o.redirectUri);
+  u.searchParams.set("code", o.code);
+  const res = await fetch(u, { signal: AbortSignal.timeout(TIMEOUT) });
+  const j = await readJson(res);
+  if (!res.ok) fail(res, j, "login");
+  if (typeof j.access_token !== "string") throw new IgError("Instagram (login): resposta sem token");
+  return j.access_token;
+}
+
+/** Quais permissões e contas do Instagram o token recebeu (granular_scopes). */
+export async function fbDebugToken(token: string, appId: string, appSecret: string) {
+  const u = new URL(`${FB()}/debug_token`);
+  u.searchParams.set("input_token", token);
+  u.searchParams.set("access_token", `${appId}|${appSecret}`);
+  const res = await fetch(u, { signal: AbortSignal.timeout(TIMEOUT) });
+  const j = await readJson(res);
+  if (!res.ok) fail(res, j, "permissões");
+  return parseDebugToken(j);
+}
+
+/** Reserva: contas do Instagram ligadas ao usuário do sistema, quando o debug_token não lista nenhuma. */
+export async function fbAssignedIgAccounts(token: string): Promise<string[]> {
+  const u = new URL(`${FB()}/me/assigned_instagram_accounts`);
+  u.searchParams.set("fields", "id");
+  u.searchParams.set("access_token", token);
+  const res = await fetch(u, { signal: AbortSignal.timeout(TIMEOUT) }).catch(() => null);
+  if (!res?.ok) return [];
+  const j = await readJson(res);
+  return Array.isArray(j.data) ? (j.data as { id?: unknown }[]).map((x) => String(x?.id ?? "")).filter(Boolean) : [];
+}
+
+/** @ e nome da conta profissional do Instagram (login unificado). */
+export async function fbIgAccount(token: string, igUserId: string) {
+  const u = new URL(`${FB()}/${encodeURIComponent(igUserId)}`);
+  u.searchParams.set("fields", "id,username,name");
+  u.searchParams.set("access_token", token);
+  const res = await fetch(u, { signal: AbortSignal.timeout(TIMEOUT) });
+  const j = await readJson(res);
+  if (!res.ok) fail(res, j, "conta");
+  return { userId: String(j.id ?? igUserId), username: typeof j.username === "string" ? j.username : null, name: typeof j.name === "string" ? j.name : null };
 }

@@ -10,12 +10,12 @@ import { randomBytes } from "node:crypto";
 import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { IgAccount, IgChat, Tenant } from "@/db/schema";
-import { IG_PUBLISH_SCOPE, igAuthUrl, igContact, igLogChannel, igVerifySignature, igWindowOpen, instagramAllowed, loginScopes, makeState, missingScopes, parseIgWebhook, readState, tokenNeedsRefresh, type IgEvent, type IgScope } from "@/core/instagram";
+import { IG_PUBLISH_SCOPE, UNIFIED_MESSAGES, UNIFIED_PUBLISH, fbLoginUrl, igAuthUrl, igContact, igLogChannel, igVerifySignature, igWindowOpen, instagramAllowed, loginScopes, makeState, missingScopes, parseIgWebhook, readState, tokenNeedsRefresh, type IgEvent, type IgScope } from "@/core/instagram";
 import { geovanaAnswers, wantsHuman } from "@/core/geovana";
 import { aiFallbackText, costUsd, isRepeat, trimHistory } from "@/core/wa-guard";
 import { brMonthStart } from "@/core/crm";
 import { getRegion, tr } from "@/core/region";
-import { IgError, igExchangeCode, igLongToken, igMe, igProfile, igRefreshToken, igSendText, igSubscribe, igUnsubscribe } from "@/adapters/instagram/client";
+import { IgError, fbAssignedIgAccounts, fbDebugToken, fbExchangeCode, fbIgAccount, igExchangeCode, igLongToken, igMe, igProfile, igRefreshToken, igSendText, igSubscribe, igUnsubscribe, type IgVia } from "@/adapters/instagram/client";
 import type { OnUsage } from "@/adapters/ai/gemini";
 import { openSecret, sealSecret } from "@/lib/secrets";
 import { appUrl } from "@/lib/urls";
@@ -27,7 +27,11 @@ export class InstagramError extends Error {}
 export { IgError };
 
 // ---------------------------------------------------------------- app da Meta (Admin → Geovana → Instagram)
-export type IgPlatform = { appId: string; appSecretSealed: string; verifyToken: string };
+/**
+ * configId preenchido = login unificado (apps novos da Meta): appId/secret são os do APP DA META
+ * (Configurações do app → Básico). Sem configId = login do Instagram (ID e chave do app do Instagram).
+ */
+export type IgPlatform = { appId: string; appSecretSealed: string; verifyToken: string; configId: string };
 
 export async function igPlatform(): Promise<IgPlatform> {
   const s = await db.query.platformSettings.findFirst({ columns: { igConfig: true } });
@@ -39,15 +43,21 @@ export async function igPlatform(): Promise<IgPlatform> {
     appId: o.appId || process.env.IG_APP_ID || "",
     appSecretSealed: o.appSecretSealed || (process.env.IG_APP_SECRET ? sealSecret(process.env.IG_APP_SECRET) : ""),
     verifyToken: o.verifyToken || process.env.IG_VERIFY_TOKEN || "",
+    configId: o.configId || process.env.IG_CONFIG_ID || "",
   };
 }
 
-export async function saveIgPlatform(patch: { appId?: string; appSecret?: string }) {
+export const igUnified = (p: IgPlatform) => !!p.configId;
+/** Como falar com a Meta para esta conta (login do Instagram ou unificado). */
+export const viaOf = (a: { api: string; igUserId: string }): IgVia => ({ api: a.api === "facebook" ? "facebook" : "instagram", igUserId: a.igUserId });
+
+export async function saveIgPlatform(patch: { appId?: string; appSecret?: string; configId?: string }) {
   const cur = await igPlatform();
   const next: IgPlatform = {
     appId: patch.appId?.trim() || cur.appId,
     appSecretSealed: patch.appSecret?.trim() ? sealSecret(patch.appSecret.trim()) : cur.appSecretSealed,
     verifyToken: cur.verifyToken || randomBytes(18).toString("base64url"),
+    configId: patch.configId !== undefined ? patch.configId.trim() : cur.configId,
   };
   await db
     .insert(schema.platformSettings)
@@ -86,7 +96,48 @@ export async function igLoginUrl(scope: IgScope, actor: string, purpose: "messag
     } else assertTenantInstagram(t);
   }
   const state = sealSecret(JSON.stringify(makeState(scope, actor, Date.now(), randomBytes(8).toString("hex"), scope === "goweb" ? "messages" : purpose)));
+  // apps novos: login unificado (janela do Facebook; as permissões vêm da configuração criada na Meta)
+  if (igUnified(p)) return fbLoginUrl({ appId: p.appId, configId: p.configId, redirectUri: igRedirectUri(), state });
   return igAuthUrl({ appId: p.appId, redirectUri: igRedirectUri(), state, scopes });
+}
+
+/** Login unificado: troca o código no graph.facebook.com, descobre a conta do Instagram liberada e guarda. */
+async function finishUnified(o: { code: string; st: NonNullable<ReturnType<typeof readState>>; tenant: Tenant | null; messaging: boolean; appId: string; secret: string }) {
+  const { st, tenant, messaging } = o;
+  const token = await fbExchangeCode({ appId: o.appId, appSecret: o.secret, redirectUri: igRedirectUri(), code: o.code });
+  const dbg = await fbDebugToken(token, o.appId, o.secret).catch(() => ({ scopes: [] as string[], igIds: [] as string[], expiresAt: null as Date | null }));
+  const need = [...(messaging ? [UNIFIED_MESSAGES] : []), ...(st.purpose === "publish" ? [UNIFIED_PUBLISH] : [])];
+  const missing = dbg.scopes.length ? need.filter((x) => !dbg.scopes.includes(x)) : [];
+  if (missing.length) throw new InstagramError(`Faltou autorizar: ${missing.join(", ")}. Na configuração do login unificado, deixe essas permissões marcadas e conecte de novo.`);
+  const ids = dbg.igIds.length ? dbg.igIds : await fbAssignedIgAccounts(token);
+  if (!ids.length) throw new InstagramError("O login não liberou nenhuma conta do Instagram. Na tela de login, escolha a conta profissional do Instagram e conecte de novo.");
+  if (ids.length > 1) console.warn("[instagram] login unificado liberou mais de uma conta; usando a primeira", ids);
+  const via: IgVia = { api: "facebook", igUserId: ids[0] };
+  const me = await fbIgAccount(token, ids[0]).catch(() => ({ userId: ids[0], username: null as string | null, name: null as string | null }));
+  const other = await db.query.igAccounts.findFirst({ where: eq(schema.igAccounts.igUserId, me.userId) });
+  if (other && other.tenantId !== (tenant?.id ?? null)) throw new InstagramError("Esta conta do Instagram já está conectada em outro lugar da GoWeb.");
+  // avisos de mensagem: assinatura pela conta (a do painel da Meta, campo "messages", também vale)
+  if (messaging) await igSubscribe(token, via).catch((e) => console.warn("[instagram] subscribed_apps (unificado)", e instanceof Error ? e.message : e));
+  const current = await accountFor(tenant ? { tenantId: tenant.id } : "goweb");
+  const values = {
+    tenantId: tenant?.id ?? null,
+    igUserId: me.userId,
+    username: me.username,
+    tokenSealed: sealSecret(token),
+    tokenIssuedAt: new Date(),
+    tokenExpiresAt: dbg.expiresAt,
+    status: "active" as const,
+    lastError: null,
+    connectedBy: st.actor,
+    canPublish: dbg.scopes.length ? dbg.scopes.includes(UNIFIED_PUBLISH) : st.purpose === "publish",
+    api: "facebook" as const,
+    ...(messaging ? {} : { aiEnabled: false }),
+    updatedAt: new Date(),
+  };
+  if (current) await db.update(schema.igAccounts).set(values).where(eq(schema.igAccounts.id, current.id));
+  else await db.insert(schema.igAccounts).values(values);
+  await audit(tenant?.id ?? null, st.actor, "instagram.conectar", `@${me.username ?? me.userId} (login unificado)`);
+  return { scope: st.scope, tenant, username: me.username, purpose: st.purpose };
 }
 
 /** Volta do login: confere o state, o plano (de novo), troca o código, liga o webhook e guarda a conta. */
@@ -110,6 +161,7 @@ export async function igFinishLogin(code: string, stateRaw: string) {
   }
   const p = await igPlatform();
   const secret = openSecret(p.appSecretSealed);
+  if (igUnified(p)) return finishUnified({ code, st, tenant, messaging, appId: p.appId, secret });
   const short = await igExchangeCode({ appId: p.appId, appSecret: secret, redirectUri: igRedirectUri(), code });
   const missing = missingScopes(short.permissions, st.purpose === "publish" ? loginScopes({ messages: messaging, publish: true }) : undefined);
   if (missing.length) throw new InstagramError(`Faltou autorizar: ${missing.join(", ")}. Conecte de novo e deixe as permissões marcadas.`);
@@ -131,6 +183,7 @@ export async function igFinishLogin(code: string, stateRaw: string) {
     lastError: null,
     connectedBy: st.actor,
     canPublish: short.permissions.includes(IG_PUBLISH_SCOPE),
+    api: "instagram" as const,
     // conta só de publicação (loja sem GoInteligence) nunca liga a IA do Direct
     ...(messaging ? {} : { aiEnabled: false }),
     updatedAt: new Date(),
@@ -148,7 +201,7 @@ export async function accountFor(scope: IgScope) {
 export async function igDisconnect(scope: IgScope, actor: string) {
   const acc = await accountFor(scope);
   if (!acc) return;
-  await igUnsubscribe(openSecret(acc.tokenSealed));
+  await igUnsubscribe(openSecret(acc.tokenSealed), viaOf(acc));
   await db.delete(schema.igAccounts).where(eq(schema.igAccounts.id, acc.id));
   await audit(scope === "goweb" ? null : scope.tenantId, actor, "instagram.desconectar", `@${acc.username ?? acc.igUserId}`);
 }
@@ -173,7 +226,8 @@ export async function igMaintenance(now = Date.now()) {
       } else if (!ok && a.status === "active") await db.update(schema.igAccounts).set({ status: "paused", lastError: "Plano sem GoInteligence: Instagram pausado.", updatedAt: new Date() }).where(eq(schema.igAccounts.id, a.id));
       if (ok && a.status === "paused" && a.lastError?.startsWith("Plano")) await db.update(schema.igAccounts).set({ status: "active", lastError: null, updatedAt: new Date() }).where(eq(schema.igAccounts.id, a.id));
     }
-    if (!tokenNeedsRefresh({ expiresAt: a.tokenExpiresAt, issuedAt: a.tokenIssuedAt }, now)) continue;
+    // login unificado: token de usuário do sistema (não expira; não usa a renovação do Instagram)
+    if (a.api === "facebook" || !tokenNeedsRefresh({ expiresAt: a.tokenExpiresAt, issuedAt: a.tokenIssuedAt }, now)) continue;
     try {
       const t = await igRefreshToken(openSecret(a.tokenSealed));
       await db.update(schema.igAccounts).set({ tokenSealed: sealSecret(t.token), tokenIssuedAt: new Date(now), tokenExpiresAt: t.expiresAt, updatedAt: new Date() }).where(eq(schema.igAccounts.id, a.id));
@@ -253,7 +307,7 @@ async function handleEvent(acc: IgAccount, ev: IgEvent): Promise<string> {
   chat.lastInboundAt = ev.at;
   await logEvent({ channel: logCh, tenantId: acc.tenantId, type: "in", contact });
   if (!chat.name && !chat.username) {
-    const prof = await igProfile(openSecret(acc.tokenSealed), ev.contactId).catch(() => null);
+    const prof = await igProfile(openSecret(acc.tokenSealed), ev.contactId, viaOf(acc)).catch(() => null);
     if (prof) await db.update(schema.igChats).set({ name: prof.name, username: prof.username }).where(eq(schema.igChats.id, chat.id));
     chat.name = prof?.name ?? null;
     chat.username = prof?.username ?? null;
@@ -410,7 +464,7 @@ async function igSend(acc: IgAccount, chat: IgChat, text: string, kind: "reply" 
     if (!t || !instagramAllowed({ tier: t.tier, demo: t.demo, country: t.country }).ok) return no("plano sem GoInteligence");
   }
   try {
-    const id = await igSendText(openSecret(acc.tokenSealed), chat.igsid, text);
+    const id = await igSendText(openSecret(acc.tokenSealed), chat.igsid, text, viaOf(acc));
     await logEvent({ channel: logCh, tenantId: acc.tenantId, type: "out", kind, contact });
     return { ok: true, id };
   } catch (e) {
@@ -480,6 +534,7 @@ export async function igOverview(scope: IgScope) {
     webhookUrl: igWebhookUrl(),
     verifyToken: p.verifyToken,
     appId: p.appId,
+    configId: p.configId,
   };
 }
 

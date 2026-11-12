@@ -15,8 +15,10 @@ export async function igSaveAppAction(f: FormData) {
   await requirePlatformOwner();
   const appId = String(f.get("appId") ?? "").trim();
   const appSecret = String(f.get("appSecret") ?? "").trim();
-  if (appId && !/^\d{5,25}$/.test(appId)) back(IG, "err", "O ID do app do Instagram tem só números.");
-  await saveIgPlatform({ appId: appId || undefined, appSecret: appSecret || undefined });
+  const configId = String(f.get("configId") ?? "").trim();
+  if (appId && !/^\d{5,25}$/.test(appId)) back(IG, "err", "O ID do app tem só números.");
+  if (configId && !/^\d{5,25}$/.test(configId)) back(IG, "err", "O ID da configuração do login unificado tem só números.");
+  await saveIgPlatform({ appId: appId || undefined, appSecret: appSecret || undefined, configId });
   await audit(null, await adminActor(), "instagram.app", appSecret ? "id + secret" : "id");
   back(IG, "ok", "App do Instagram salvo ✓");
 }

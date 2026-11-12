@@ -37,7 +37,7 @@ export default async function AdminInstagramPage({ searchParams }: { searchParam
 
       <section className="card p-5 text-sm">
         <h2 className="font-semibold">1. App da Meta</h2>
-        <p className="mt-1 text-muted">Crie um app do tipo Negócios em developers.facebook.com, adicione o produto Instagram (login pelo Instagram) e cadastre estes endereços:</p>
+        <p className="mt-1 text-muted">Crie um app do tipo Negócios em developers.facebook.com, adicione o produto Instagram (login pelo Instagram ou login unificado) e cadastre estes endereços:</p>
         <dl className="mt-3 grid gap-2 sm:grid-cols-[180px_1fr]">
           <dt className="font-semibold">URL de redirecionamento</dt><dd className="break-all font-mono text-xs">{ov.redirectUri}</dd>
           <dt className="font-semibold">URL do webhook</dt><dd className="break-all font-mono text-xs">{ov.webhookUrl}</dd>
@@ -46,8 +46,11 @@ export default async function AdminInstagramPage({ searchParams }: { searchParam
         </dl>
         {owner ? (
           <form action={igSaveAppAction} className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="text-xs font-semibold">ID do app do Instagram<input name="appId" defaultValue={ov.appId} inputMode="numeric" className="input mt-1" /></label>
+            <label className="text-xs font-semibold">ID do app<input name="appId" defaultValue={ov.appId} inputMode="numeric" className="input mt-1" /></label>
             <label className="text-xs font-semibold">Chave secreta do app {ov.configured ? "(salva — preencha só para trocar)" : ""}<input name="appSecret" type="password" autoComplete="off" className="input mt-1" /></label>
+            <label className="text-xs font-semibold sm:col-span-2">ID da configuração (login unificado)<input name="configId" defaultValue={ov.configId} inputMode="numeric" className="input mt-1" placeholder="deixe vazio se o app usa o login do Instagram" />
+              <span className="mt-1 block font-normal text-muted">Apps novos da Meta usam o login unificado: crie a configuração em Instagram → Configuração da API com login unificado e cole o ID aqui. Nesse caso use o ID e a chave secreta do APP DA META (Configurações do app → Básico).</span>
+            </label>
             <div className="sm:col-span-2"><SubmitButton className="btn-brand">Salvar app</SubmitButton></div>
           </form>
         ) : (
