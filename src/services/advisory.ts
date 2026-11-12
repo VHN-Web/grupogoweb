@@ -682,7 +682,7 @@ export async function publishDuePosts(now = new Date(), limit = 5) {
     try {
       const url = await fetchableImage(post.jpegUrl!);
       if (!url) throw new Error("imagem sem endereço público");
-      const id = await igPublishImage(openSecret(acc.tokenSealed), acc.igUserId, url, igCaption(post.caption));
+      const id = await igPublishImage(openSecret(acc.tokenSealed), acc.igUserId, url, igCaption(post.caption), acc.api === "facebook" ? "facebook" : "instagram");
       await db.update(schema.advisoryPosts).set({ status: "published", igMediaId: id, publishedAt: new Date(), error: null, updatedAt: new Date() }).where(eq(schema.advisoryPosts.id, post.id));
       published++;
     } catch (e) {

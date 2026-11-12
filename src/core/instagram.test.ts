@@ -3,7 +3,9 @@ import { createHmac } from "node:crypto";
 import {
   IG_MAX_TEXT_BYTES,
   cleanAuthCode,
+  fbLoginUrl,
   igAuthUrl,
+  parseDebugToken,
   igContact,
   igLogChannel,
   igText,
@@ -122,5 +124,23 @@ describe("Instagram: envio", () => {
     expect(igLogChannel("goweb")).toBe("ig:goweb");
     expect(igLogChannel({ tenantId: "t1" })).toBe("ig:store:t1");
     expect(igContact("555")).toBe("ig:555");
+  });
+});
+
+describe("login unificado (apps novos)", () => {
+  it("URL do Facebook com config_id e sem escopos", () => {
+    const u = new URL(fbLoginUrl({ appId: "984222160934052", configId: "777", redirectUri: "https://goweboficial.com/api/instagram/oauth/callback", state: "s" }));
+    expect(u.hostname).toBe("www.facebook.com");
+    expect(u.searchParams.get("client_id")).toBe("984222160934052");
+    expect(u.searchParams.get("config_id")).toBe("777");
+    expect(u.searchParams.get("scope")).toBeNull();
+    expect(u.searchParams.get("response_type")).toBe("code");
+  });
+  it("lê permissões, contas do Instagram e validade do debug_token", () => {
+    const r = parseDebugToken({ data: { scopes: ["instagram_basic", "instagram_manage_messages"], expires_at: 0, granular_scopes: [{ scope: "instagram_basic", target_ids: ["1784"] }, { scope: "instagram_manage_messages", target_ids: ["1784", "1790"] }, { scope: "ads_read", target_ids: ["act_1"] }] } });
+    expect(r.scopes).toContain("instagram_manage_messages");
+    expect(r.igIds).toEqual(["1784", "1790"]);
+    expect(r.expiresAt).toBeNull();
+    expect(parseDebugToken(null)).toEqual({ scopes: [], igIds: [], expiresAt: null });
   });
 });
